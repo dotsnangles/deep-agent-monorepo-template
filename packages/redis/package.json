@@ -1,0 +1,20 @@
+{
+  "name": "@hollow-echo-distant-signal/redis",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@hollow-echo-distant-signal/env": "workspace:*",
+    "ioredis": "^5.5.0"
+  },
+  "devDependencies": {
+    "@hollow-echo-distant-signal/config": "workspace:*",
+    "@types/node": "^22.20.1",
+    "typescript": "catalog:"
+  }
+}

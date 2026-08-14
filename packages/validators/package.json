@@ -1,0 +1,19 @@
+{
+  "name": "@hollow-echo-distant-signal/validators",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@hollow-echo-distant-signal/config": "workspace:*",
+    "@types/node": "^22.20.1",
+    "typescript": "catalog:"
+  }
+}
