@@ -1,0 +1,26 @@
+{
+  "name": "@hollow-echo-distant-signal/auth",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {},
+  "dependencies": {
+    "@hollow-echo-distant-signal/db": "workspace:*",
+    "@hollow-echo-distant-signal/env": "workspace:*",
+    "@polar-sh/better-auth": "catalog:",
+    "@polar-sh/sdk": "^0.47.0",
+    "better-auth": "catalog:",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@hollow-echo-distant-signal/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

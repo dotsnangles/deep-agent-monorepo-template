@@ -1,0 +1,40 @@
+{
+  "name": "hollow-echo-distant-signal",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "type": "module",
+  "scripts": {
+    "dev": "nx run-many -t dev",
+    "build": "nx run-many -t build",
+    "check-types": "nx run-many -t check-types",
+    "dev:web": "nx run-many -t dev --projects=web",
+    "dev:server": "nx run-many -t dev --projects=server",
+    "db:push": "nx run-many -t db:push --projects=@hollow-echo-distant-signal/db",
+    "db:studio": "nx run-many -t db:studio --projects=@hollow-echo-distant-signal/db",
+    "db:generate": "nx run-many -t db:generate --projects=@hollow-echo-distant-signal/db",
+    "db:migrate": "nx run-many -t db:migrate --projects=@hollow-echo-distant-signal/db",
+    "db:start": "docker compose up -d postgres",
+    "db:watch": "docker compose up postgres",
+    "db:stop": "docker compose stop postgres",
+    "db:down": "docker compose down postgres",
+    "docker:build": "docker compose build",
+    "docker:up": "docker compose up -d --build",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f"
+  },
+  "dependencies": {
+    "@hollow-echo-distant-signal/env": "workspace:*",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@hollow-echo-distant-signal/config": "workspace:*",
+    "@types/node": "^22.20.1",
+    "nx": "^23.1.0",
+    "typescript": "catalog:"
+  },
+  "packageManager": "pnpm@11.9.0"
+}

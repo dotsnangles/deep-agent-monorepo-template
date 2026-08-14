@@ -1,0 +1,3 @@
+{
+  "extends": "@hollow-echo-distant-signal/config/tsconfig.base.json"
+}
