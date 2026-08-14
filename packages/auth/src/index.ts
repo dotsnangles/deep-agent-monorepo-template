@@ -32,8 +32,8 @@ export function createAuth() {
     plugins: [
       polar({
         client: polarClient,
-        createCustomerOnSignUp: true,
-        enableCustomerPortal: true,
+        createCustomerOnSignUp: Boolean(env.POLAR_ACCESS_TOKEN),
+        enableCustomerPortal: Boolean(env.POLAR_ACCESS_TOKEN),
         use: [
           checkout({
             products: [
