@@ -5,6 +5,7 @@ Overview of bounded contexts and packages in `hollow-echo-distant-signal`:
 | Context / Package | Location | Description |
 | --- | --- | --- |
 | Root Context | `CONTEXT.md` | Core domain glossary and cross-cutting architectural concepts |
+| Python Agent | `apps/agent` | Python Deep Agents, CopilotKit Remote Endpoint, LangGraph (`uv`) |
 | Storage | `packages/storage` | MinIO & AWS S3 Object Storage handling (`@aws-sdk/client-s3`) |
 | Redis / KV | `packages/redis` | In-memory key-value cache and client (`ioredis`) |
 | Validators | `packages/validators` | Shared Zod schemas and DTO validations |

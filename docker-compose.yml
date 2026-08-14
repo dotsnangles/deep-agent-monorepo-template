@@ -16,8 +16,11 @@ services:
     environment:
       SERVER_URL: http://server:3000
       NEXT_PUBLIC_SERVER_URL: http://server:3000
+      AGENT_SERVER_URL: http://agent:8000
     depends_on:
       server:
+        condition: service_healthy
+      agent:
         condition: service_healthy
     healthcheck:
       test:
@@ -112,6 +115,47 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+
+  langfuse:
+    image: langfuse/langfuse:2
+    container_name: hollow-echo-distant-signal-langfuse
+    ports:
+      - "3002:3000"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/hollow-echo-distant-signal
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-langfuse-secret-key-1234567890}
+      SALT: ${SALT:-langfuse-salt-key-1234567890}
+      NEXTAUTH_URL: http://localhost:3002
+      TELEMETRY_ENABLED: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  agent:
+    build:
+      context: .
+      dockerfile: apps/agent/Dockerfile
+    container_name: hollow-echo-distant-signal-agent
+    ports:
+      - "8000:8000"
+    environment:
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      LANGFUSE_HOST: http://langfuse:3000
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/copilotkit/health')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
 
 volumes:
