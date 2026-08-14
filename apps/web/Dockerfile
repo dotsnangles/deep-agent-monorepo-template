@@ -3,7 +3,7 @@ RUN npm install -g pnpm@11
 WORKDIR /app
 
 COPY . .
-RUN --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
+RUN --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store --ignore-scripts
 
 ARG NEXT_PUBLIC_SERVER_URL
 ENV NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL}

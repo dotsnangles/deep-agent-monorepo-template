@@ -4,7 +4,7 @@ WORKDIR /app
 ENV SKIP_ENV_VALIDATION=1
 
 COPY . .
-RUN --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
+RUN --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store --ignore-scripts
 
 ENV NODE_ENV=production
 RUN cd apps/server && pnpm run build
