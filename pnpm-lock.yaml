@@ -147,6 +147,9 @@ importers:
       '@copilotkit/runtime':
         specifier: ^1.67.1
         version: 1.67.1(dedd7410e0895782aa11bb330b392ba5)
+      '@copilotkit/runtime-client-gql':
+        specifier: ^1.67.1
+        version: 1.67.1(@ag-ui/core@0.0.57)(graphql@16.14.2)(react@19.2.8)
       '@hollow-echo-distant-signal/env':
         specifier: workspace:*
         version: link:../../packages/env

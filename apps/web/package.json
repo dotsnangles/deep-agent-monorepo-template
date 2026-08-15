@@ -12,6 +12,7 @@
     "@copilotkit/react-core": "^1.67.1",
     "@copilotkit/react-ui": "^1.67.1",
     "@copilotkit/runtime": "^1.67.1",
+    "@copilotkit/runtime-client-gql": "^1.67.1",
     "@hollow-echo-distant-signal/env": "workspace:*",
     "@hollow-echo-distant-signal/ui": "workspace:*",
     "@hollow-echo-distant-signal/validators": "workspace:*",
