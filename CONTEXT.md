@@ -20,5 +20,9 @@ Key terms and definitions used across `hollow-echo-distant-signal`:
 | Chat Engine | In-process state machine encapsulating message tree mutations, stream chunk accumulation, and optimistic rollback | Web Client (`apps/web`) |
 | Chat Engine Registry | Global singleton coordinating session engine lifecycles, stream persistence across routes, and event-driven updates | Web Client (`apps/web`) |
 | Chat Transport | Ports-and-adapters network interface decoupling state management from HTTP streaming and database endpoints | Web Client (`apps/web`) |
+| Chat Repository | Deep domain repository interface encapsulating session/message CRUD, tree queries, and transactional mutations | Database (`@repo/db`) |
+| Drizzle Chat Repository | Concrete Drizzle ORM implementation providing atomic database transactions for subtree pruning and message insertion | Database (`@repo/db`) |
+| Fake Chat Repository | In-memory test double implementing ChatRepository with zero database dependencies for instant unit tests | Database (`@repo/db`) |
+
 
 
