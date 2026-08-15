@@ -4,23 +4,14 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Activity,
   Bot,
   Check,
-  CreditCard,
-  Database,
-  FileCode2,
-  GitBranch,
-  KeyRound,
-  LayoutDashboard,
   MessageSquare,
-  MessageSquarePlus,
   MoreHorizontal,
+  PanelLeft,
   Pencil,
   Plus,
   Search,
-  Settings,
-  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -50,63 +41,25 @@ import {
   SidebarMenuItem,
   SidebarRail,
   SidebarSeparator,
+  useSidebar,
 } from "@repo/ui/components/sidebar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@repo/ui/components/tooltip";
 import { NavUser } from "@/features/auth";
 import { useChatSessions } from "@/features/chat";
 
-const navGroups = [
-  {
-    title: "플랫폼 & 데이터",
-    items: [
-      {
-        title: "대시보드",
-        url: "/dashboard",
-        icon: LayoutDashboard,
-      },
-      {
-        title: "실행 메트릭 & 로그",
-        url: "#metrics",
-        icon: Activity,
-      },
-      {
-        title: "프롬프트 템플릿",
-        url: "#prompts",
-        icon: FileCode2,
-      },
-      {
-        title: "오브젝트 스토리지",
-        url: "#storage",
-        icon: Database,
-      },
-    ],
-  },
-  {
-    title: "설정 & 관리",
-    items: [
-      {
-        title: "API 키 & 런타임",
-        url: "#keys",
-        icon: KeyRound,
-      },
-      {
-        title: "플랜 및 사용량",
-        url: "#billing",
-        icon: CreditCard,
-      },
-      {
-        title: "워크스페이스 설정",
-        url: "#settings",
-        icon: Settings,
-      },
-    ],
-  },
-];
+const PAGE_SIZE = 25;
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
-  const [searchQuery, setSearchQuery] = React.useState("");
+  const { state, toggleSidebar } = useSidebar();
+  const [visibleCount, setVisibleCount] = React.useState(PAGE_SIZE);
   const [editingSessionId, setEditingSessionId] = React.useState<string | null>(null);
   const [editTitle, setEditTitle] = React.useState("");
+  const sentinelRef = React.useRef<HTMLLIElement>(null);
 
   const {
     sessions,
@@ -115,9 +68,31 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     switchSession,
     deleteSession,
     renameSession,
+    openSearch,
     isLoading,
     isDraft,
   } = useChatSessions();
+
+  // Seamless lazy loading: load next batch instantly as user approaches bottom
+  React.useEffect(() => {
+    if (visibleCount >= sessions.length) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setVisibleCount((prev) => Math.min(prev + PAGE_SIZE, sessions.length));
+        }
+      },
+      { threshold: 0, rootMargin: "200px" }
+    );
+
+    const target = sentinelRef.current;
+    if (target) observer.observe(target);
+
+    return () => {
+      if (target) observer.unobserve(target);
+    };
+  }, [visibleCount, sessions.length]);
 
   const handleStartRename = (id: string, currentTitle: string) => {
     setEditingSessionId(id);
@@ -131,102 +106,135 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     setEditingSessionId(null);
   };
 
-  const filteredSessions = sessions.filter((s) =>
-    s.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const displayedSessions = sessions.slice(0, visibleCount);
+  const hasMore = visibleCount < sessions.length;
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border" {...props}>
-      {/* SaaS Workspace Header */}
-      <SidebarHeader className="border-b border-sidebar-border/60 pb-3">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              render={<Link href="/" />}
-              size="lg"
-              className="gap-3 hover:bg-sidebar-accent/70"
-            >
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs">
-                <Bot className="size-4" />
-              </div>
-              <div className="grid flex-1 text-left text-xs leading-tight">
-                <div className="flex items-center gap-1.5 font-semibold text-foreground">
-                  <span>Hollow Echo</span>
-                  <Badge variant="outline" className="h-3.5 px-1 text-[9px] font-mono leading-none">
-                    v1.0
-                  </Badge>
-                </div>
-                <span className="truncate text-[11px] text-muted-foreground">
-                  Deep Agent Platform
-                </span>
-              </div>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-
-        {/* New Chat Primary Button */}
-        <div className="px-1 mt-1 group-data-[collapsible=icon]:hidden">
-          <Button
-            size="sm"
-            className="w-full justify-start gap-2 h-8 text-xs font-medium shadow-xs"
-            onClick={() => createNewSession()}
+      {/* Workspace / Brand Header (Only Brand Identity & Sidebar Toggle) */}
+      <SidebarHeader className="shrink-0 pt-4 pb-1 px-3 group-data-[collapsible=icon]:pt-3 group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:pb-1">
+        {/* App Identity / Brand Row & Sidebar Toggle */}
+        <div className="flex items-center justify-between gap-2 px-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+          {/* Expanded Mode: Brand Logo + Name */}
+          <Link
+            href="/"
+            className="flex items-center gap-2.5 rounded-lg hover:opacity-85 transition-opacity group-data-[collapsible=icon]:hidden"
           >
-            <Plus className="size-3.5" />
-            <span>새 대화 시작</span>
-          </Button>
-        </div>
+            <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs shrink-0">
+              <Bot className="size-4.5" />
+            </div>
+            <div className="grid flex-1 text-left text-xs leading-tight">
+              <div className="flex items-center gap-1.5 font-semibold text-foreground">
+                <span>Hollow Echo</span>
+                <Badge variant="outline" className="h-3.5 px-1 text-[9px] font-mono leading-none">
+                  v1.0
+                </Badge>
+              </div>
+              <span className="truncate text-[11px] text-muted-foreground">
+                Deep Agent Platform
+              </span>
+            </div>
+          </Link>
 
-        {/* Quick Filter Search */}
-        <div className="relative mt-1 group-data-[collapsible=icon]:hidden px-1">
-          <Search className="absolute left-3.5 top-2.5 size-3.5 text-muted-foreground" />
-          <SidebarInput
-            placeholder="대화 또는 메뉴 검색..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-8 text-xs h-8"
-          />
+          {/* Expanded Mode: Collapse Button */}
+          <div className="group-data-[collapsible=icon]:hidden">
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={toggleSidebar}
+                    className="size-8 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent rounded-lg shrink-0"
+                  />
+                }
+              >
+                <PanelLeft className="size-4" />
+                <span className="sr-only">사이드바 접기</span>
+              </TooltipTrigger>
+              <TooltipContent side="right">사이드바 접기</TooltipContent>
+            </Tooltip>
+          </div>
+
+          {/* Collapsed Mode: App Logo by default, morphs to Sidebar Toggle on hover (Gemini UX) */}
+          <div className="hidden group-data-[collapsible=icon]:flex justify-center w-full">
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <button
+                    type="button"
+                    onClick={toggleSidebar}
+                    className="group/toggle relative flex size-8 items-center justify-center rounded-lg cursor-pointer transition-colors hover:bg-sidebar-accent focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-sidebar-ring overflow-hidden"
+                  />
+                }
+              >
+                {/* 1. App Logo (Default visible, fades & scales down on hover) */}
+                <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs transition-all duration-200 group-hover/toggle:opacity-0 group-hover/toggle:scale-75 absolute inset-0">
+                  <Bot className="size-4.5" />
+                </div>
+
+                {/* 2. PanelLeft Toggle Icon (Fades in & scales up on hover) */}
+                <div className="flex size-8 items-center justify-center rounded-lg text-foreground transition-all duration-200 opacity-0 scale-75 group-hover/toggle:opacity-100 group-hover/toggle:scale-100 absolute inset-0">
+                  <PanelLeft className="size-4.5" />
+                </div>
+
+                <span className="sr-only">사이드바 열기</span>
+              </TooltipTrigger>
+              <TooltipContent side="right">사이드바 열기</TooltipContent>
+            </Tooltip>
+          </div>
         </div>
       </SidebarHeader>
 
-      {/* Navigation & Chat Sessions Content */}
-      <SidebarContent className="py-2">
-        {/* Main Agent Hub */}
-        <SidebarGroup>
-          <SidebarGroupLabel>AI 에이전트</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  render={<Link href="/" />}
-                  isActive={pathname === "/"}
-                  tooltip="에이전트 플레이그라운드"
-                  className="font-medium text-xs"
-                >
-                  <Sparkles className="size-4 text-sidebar-foreground/70 group-data-[active=true]:text-primary" />
-                  <span>에이전트 플레이그라운드</span>
-                  <SidebarMenuBadge className="text-[9px] bg-primary/10 text-primary border border-primary/20">
-                    Live
-                  </SidebarMenuBadge>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  render={<Link href="#workflows" />}
-                  tooltip="워크플로우 오케스트레이션"
-                  className="font-medium text-xs"
-                >
-                  <GitBranch className="size-4 text-sidebar-foreground/70" />
-                  <span>워크플로우 오케스트레이션</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+      {/* Pinned Primary Action Tools (New Chat & Search) - Stays fixed at top */}
+      <div className="shrink-0 px-2 py-1.5 group-data-[collapsible=icon]:px-1">
+        <SidebarGroup className="p-0">
+          <SidebarMenu className="gap-1.5 group-data-[collapsible=icon]:items-center">
+            {/* New Chat Action */}
+            <SidebarMenuItem className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
+              <SidebarMenuButton
+                onClick={() => createNewSession()}
+                tooltip="새 대화 시작"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground font-medium rounded-lg h-9 gap-2.5 justify-start group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:size-8 shadow-xs"
+              >
+                <Plus className="size-4 shrink-0" />
+                <span className="group-data-[collapsible=icon]:hidden">새 대화 시작</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
 
+            {/* Conversation Search Action (Triggers Gemini-style Search Overlay) */}
+            <SidebarMenuItem className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
+              <SidebarMenuButton
+                onClick={() => openSearch()}
+                tooltip="대화 검색 (⌘K)"
+                className="rounded-lg h-9 text-muted-foreground hover:text-foreground justify-start group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:size-8 hover:bg-sidebar-accent border border-sidebar-border/40 bg-muted/20"
+              >
+                <Search className="size-4 shrink-0" />
+                <span className="flex-1 text-left truncate group-data-[collapsible=icon]:hidden">대화 검색</span>
+                <kbd className="hidden group-data-[collapsible=icon]:hidden sm:inline-flex h-4.5 select-none items-center gap-0.5 rounded-sm border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
+                  ⌘K
+                </kbd>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
+      </div>
+
+      {/* Scrollable Middle: Recent Chat Sessions ONLY (with Lazy Loading / Infinite Scroll) */}
+      <SidebarContent className="flex-1 min-h-0 overflow-y-auto px-2 py-1 group-data-[collapsible=icon]:hidden overscroll-contain">
         {/* User Chat Sessions Section */}
-        <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-          <div className="flex items-center justify-between px-2 py-1">
-            <SidebarGroupLabel className="p-0">내 대화 세션 기록</SidebarGroupLabel>
+        <SidebarGroup className="p-0 pt-1">
+          <div className="flex items-center justify-between px-2 pb-1.5">
+            <div className="flex items-center gap-1.5">
+              <SidebarGroupLabel className="p-0 text-[11px] font-medium text-muted-foreground tracking-normal">
+                최근 대화
+              </SidebarGroupLabel>
+              {sessions.length > 0 && (
+                <span className="text-[10px] text-muted-foreground font-mono">
+                  ({sessions.length})
+                </span>
+              )}
+            </div>
             <SidebarGroupAction
               title="새 대화 만들기"
               onClick={() => createNewSession()}
@@ -240,39 +248,23 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarMenu>
               {isLoading ? (
                 <div className="px-3 py-2 text-xs text-muted-foreground animate-pulse">
-                  세션 목록 로딩 중...
+                  대화 목록 로딩 중...
                 </div>
               ) : (
                 <>
-                  {/* Active Draft Session Indicator */}
-                  {isDraft && (
-                    <SidebarMenuItem>
-                      <SidebarMenuButton
-                        isActive={pathname === "/"}
-                        tooltip="새로운 대화 (작성 중)"
-                        className="font-normal text-xs justify-between text-primary/90 bg-primary/5 border border-dashed border-primary/30"
-                      >
-                        <div className="flex items-center gap-2 truncate">
-                          <MessageSquarePlus className="size-3.5 shrink-0 text-primary animate-pulse" />
-                          <span className="truncate font-medium">새로운 대화 (작성 중...)</span>
-                        </div>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  )}
-
-                  {filteredSessions.length === 0 && !isDraft ? (
-                    <div className="px-3 py-3 text-center text-xs text-muted-foreground border border-dashed rounded-md mx-2 my-1">
+                  {sessions.length === 0 ? (
+                    <div className="px-3 py-3 text-center text-xs text-muted-foreground border border-dashed rounded-md mx-1 my-1">
                       저장된 대화 기록이 없습니다.
                     </div>
                   ) : (
-                    filteredSessions.map((session) => {
+                    displayedSessions.map((session) => {
                       const isActive = pathname === "/" && session.id === activeSessionId;
                       const isEditing = editingSessionId === session.id;
 
                       return (
                         <SidebarMenuItem key={session.id}>
                           {isEditing ? (
-                            <div className="flex items-center gap-1 px-2 py-1">
+                            <div className="flex items-center gap-1 px-1 py-1">
                               <input
                                 type="text"
                                 value={editTitle}
@@ -334,14 +326,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                 <DropdownMenuContent side="right" align="start" className="w-36">
                                   <DropdownMenuItem
                                     onClick={() => handleStartRename(session.id, session.title)}
-                                    className="gap-2 text-xs"
+                                    className="gap-2 text-xs cursor-pointer"
                                   >
                                     <Pencil className="size-3.5" />
                                     <span>제목 변경</span>
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
                                     onClick={() => deleteSession(session.id)}
-                                    className="gap-2 text-xs text-destructive focus:text-destructive"
+                                    className="gap-2 text-xs text-destructive focus:text-destructive cursor-pointer"
                                   >
                                     <Trash2 className="size-3.5" />
                                     <span>대화 삭제</span>
@@ -354,50 +346,24 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                       );
                     })
                   )}
+
+                  {/* Invisible Lazy Loading Trigger Sentinel */}
+                  {hasMore && (
+                    <SidebarMenuItem
+                      ref={sentinelRef}
+                      className="h-px opacity-0 pointer-events-none p-0 m-0 overflow-hidden"
+                      aria-hidden="true"
+                    />
+                  )}
                 </>
               )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-
-        <SidebarSeparator />
-
-        {/* Other Platform Navigation */}
-        {navGroups.map((group) => (
-          <SidebarGroup key={group.title}>
-            <SidebarGroupLabel>{group.title}</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {group.items.map((item) => {
-                  const isActive =
-                    item.url === "/"
-                      ? pathname === "/"
-                      : item.url.startsWith("/") && pathname.startsWith(item.url);
-
-                  return (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton
-                        render={<Link href={item.url as any} />}
-                        isActive={isActive}
-                        tooltip={item.title}
-                        className="font-medium text-xs"
-                      >
-                        <item.icon className="size-4 text-sidebar-foreground/70 group-data-[active=true]:text-primary" />
-                        <span>{item.title}</span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
       </SidebarContent>
 
-      <SidebarSeparator />
-
       {/* Sidebar Footer with User Profile */}
-      <SidebarFooter className="pt-2">
+      <SidebarFooter className="p-2 pt-1">
         <NavUser />
       </SidebarFooter>
 

@@ -1,27 +1,42 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { CopilotChat } from "@copilotkit/react-ui";
-import { useCopilotChat } from "@copilotkit/react-core";
-import { Role, TextMessage } from "@copilotkit/runtime-client-gql";
-import {
-  Activity,
-  Bot,
-  Calculator,
-  Clock,
-  Sparkles,
-  Zap,
-} from "lucide-react";
-
+import { Bot } from "lucide-react";
 import { Badge } from "@repo/ui/components/badge";
-import { Card, CardContent } from "@repo/ui/components/card";
+import { useChatSessions } from "@/features/chat";
 
 export default function Home() {
+  const { activeSessionId } = useChatSessions();
+  const chatContainerRef = useRef<HTMLDivElement>(null);
   const [health, setHealth] = useState<{
     status?: string;
     provider?: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Auto-focus chat input whenever session changes or page loads
+  useEffect(() => {
+    const focusInput = () => {
+      if (!chatContainerRef.current) return;
+      const textarea = chatContainerRef.current.querySelector(
+        "textarea, input[type=text], .copilotKitInput textarea, [data-copilotkit-input]"
+      ) as HTMLTextAreaElement | HTMLInputElement | null;
+
+      if (textarea) {
+        textarea.focus();
+      }
+    };
+
+    focusInput();
+    const t1 = setTimeout(focusInput, 50);
+    const t2 = setTimeout(focusInput, 200);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [activeSessionId]);
 
   useEffect(() => {
     async function checkHealth() {
@@ -46,46 +61,25 @@ export default function Home() {
 
   const isOnline = health?.status === "healthy" || health?.status === "ok" || !loading;
 
-  const quickPrompts = [
-    {
-      title: "현재 시각 조회",
-      icon: Clock,
-      prompt: "현재 날짜와 시간을 알려줘.",
-      color: "text-blue-500 bg-blue-500/10",
-    },
-    {
-      title: "수학 수식 계산",
-      icon: Calculator,
-      prompt: "128 * 45 + 1024 의 계산 결과를 알려줘.",
-      color: "text-purple-500 bg-purple-500/10",
-    },
-    {
-      title: "시스템 상태 진단",
-      icon: Activity,
-      prompt: "에이전트 런타임과 시스템 상태 정보를 확인해줘.",
-      color: "text-emerald-500 bg-emerald-500/10",
-    },
-  ];
-
   return (
-    <div className="flex flex-col h-[calc(100vh-3.5rem)] max-w-5xl mx-auto px-4 py-2">
+    <div className="flex flex-col h-full max-w-5xl w-full mx-auto px-4 sm:px-6 pt-5 pb-4">
       {/* Top Status Header */}
-      <div className="flex items-center justify-between py-2 border-b border-border/40 shrink-0">
+      <div className="flex items-center justify-between py-1 pb-3 shrink-0">
         <div className="flex items-center gap-2.5">
-          <div className="flex items-center justify-center size-7 rounded-lg bg-primary/10 text-primary">
+          <div className="flex items-center justify-center size-7 rounded-lg bg-primary/10 text-primary shadow-xs">
             <Bot className="size-4" />
           </div>
           <div>
             <h2 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
               <span>Hollow Echo Deep Agent</span>
-              <Badge variant="outline" className="h-4 px-1 text-[9px] font-mono">
+              <Badge variant="outline" className="h-4 px-1.5 text-[9px] font-mono leading-none">
                 LangGraph
               </Badge>
             </h2>
           </div>
         </div>
 
-        <Badge variant="secondary" className="gap-1.5 py-0.5 px-2 text-[10px] font-mono">
+        <Badge variant="secondary" className="gap-1.5 py-1 px-2.5 text-[10px] font-mono bg-muted/60">
           <span
             className={`size-1.5 rounded-full ${
               loading
@@ -100,9 +94,9 @@ export default function Home() {
       </div>
 
       {/* Main Fullscreen Chat Area */}
-      <div className="flex-1 min-h-0 relative flex flex-col pt-2 pb-1">
+      <div ref={chatContainerRef} className="flex-1 min-h-0 relative flex flex-col pt-1 pb-1">
         <CopilotChat
-          className="h-full rounded-xl border border-border/50 shadow-xs overflow-hidden bg-background/50 backdrop-blur-xs"
+          className="h-full rounded-2xl border border-border/50 shadow-sm overflow-hidden bg-background/50 backdrop-blur-xs"
           labels={{
             placeholder: "무엇이든 물어보거나 작업을 요청하세요... (예: '현재 시각 알려줘', '계산해줘')",
           }}

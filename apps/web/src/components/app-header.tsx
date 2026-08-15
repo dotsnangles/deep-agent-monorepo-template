@@ -54,8 +54,8 @@ export function AppHeader() {
   return (
     <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border/60 bg-background/95 px-4 backdrop-blur-xs">
       <div className="flex items-center gap-3">
-        <SidebarTrigger />
-        <Separator orientation="vertical" className="h-4" />
+        <SidebarTrigger className="md:hidden" />
+        <Separator orientation="vertical" className="h-4 md:hidden" />
         
         {/* Breadcrumb Navigation */}
         <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground">

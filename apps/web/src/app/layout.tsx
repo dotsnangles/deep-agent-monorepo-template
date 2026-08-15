@@ -2,12 +2,12 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import "../index.css";
-import { AppHeader } from "@/components/app-header";
 import { AppSidebar } from "@/features/sidebar";
-import Providers from "@/components/providers";
+import Providers, { CopilotKitWithSession } from "@/components/providers";
 import {
   SidebarInset,
   SidebarProvider,
+  SidebarTrigger,
 } from "@repo/ui/components/sidebar";
 
 const geistSans = Geist({
@@ -36,11 +36,20 @@ export default function RootLayout({
         <Providers>
           <SidebarProvider>
             <AppSidebar />
-            <SidebarInset className="min-w-0">
-              <AppHeader />
-              <div className="flex-1 overflow-y-auto">
-                {children}
+            <SidebarInset className="min-w-0 flex flex-col h-svh overflow-hidden bg-background">
+              {/* Mobile-only compact header */}
+              <div className="flex md:hidden items-center justify-between p-3 border-b border-border/50 bg-background/80 backdrop-blur-xs shrink-0">
+                <SidebarTrigger />
+                <span className="font-semibold text-xs text-foreground">Hollow Echo</span>
+                <div className="size-7" />
               </div>
+
+              {/* Full-bleed Immersion Canvas */}
+              <main className="flex-1 min-h-0 relative flex flex-col h-full overflow-hidden">
+                <CopilotKitWithSession>
+                  {children}
+                </CopilotKitWithSession>
+              </main>
             </SidebarInset>
           </SidebarProvider>
         </Providers>

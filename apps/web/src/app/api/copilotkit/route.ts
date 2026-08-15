@@ -102,8 +102,8 @@ export async function POST(req: NextRequest) {
             .where(eq(chatSession.id, threadId));
         }
       } else {
-        // Lazy-create session: only create record when user sends the first message
-        if (userMessageTitle) {
+        // ONLY create session record when user actually sends a non-empty message!
+        if (userMessageTitle && userMessageTitle.trim().length > 0) {
           await db
             .insert(chatSession)
             .values({

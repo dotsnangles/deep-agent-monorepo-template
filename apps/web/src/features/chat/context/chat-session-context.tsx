@@ -18,6 +18,10 @@ interface ChatSessionContextType {
   activeSessionId: string;
   isLoading: boolean;
   isDraft: boolean;
+  isSearchOpen: boolean;
+  setIsSearchOpen: (open: boolean) => void;
+  openSearch: () => void;
+  closeSearch: () => void;
   createNewSession: () => void;
   switchSession: (id: string) => void;
   deleteSession: (id: string) => Promise<void>;
@@ -33,6 +37,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
   const router = useRouter();
   const pathname = usePathname();
   const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [activeSessionId, setActiveSessionId] = useState<string>(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem(STORAGE_KEY) || crypto.randomUUID();
@@ -42,6 +47,21 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const { data: sessionData } = authClient.useSession();
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
+  const openSearch = useCallback(() => setIsSearchOpen(true), []);
+  const closeSearch = useCallback(() => setIsSearchOpen(false), []);
+
+  // Global keyboard shortcut for Cmd+K / Ctrl+K
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setIsSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   // Save active session id to localStorage
   const updateActiveSessionId = useCallback((id: string) => {
@@ -84,7 +104,71 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
     };
   }, [fetchSessions]);
 
-  // Check if current active session is a draft (not yet saved to DB)
+  // Optimistically add session to local list
+  const optimisticAddSession = useCallback(
+    (id: string, title = "새로운 대화") => {
+      setSessions((prev) => {
+        if (prev.some((s) => s.id === id)) return prev;
+        const newSession: ChatSession = {
+          id,
+          userId: sessionData?.user?.id || "guest",
+          title,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        return [newSession, ...prev];
+      });
+    },
+    [sessionData?.user?.id]
+  );
+
+  // Auto-detect when user sends a message in a draft session and immediately add to list
+  useEffect(() => {
+    const handleUserInteraction = (e: KeyboardEvent | MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+
+      if (e instanceof KeyboardEvent && e.key === "Enter" && !e.shiftKey) {
+        // Only trigger if inside a textarea or text input with non-empty content
+        if (target instanceof HTMLTextAreaElement || target instanceof HTMLInputElement) {
+          // Ignore search dialog / filter inputs
+          if (target.placeholder?.includes("검색") || target.closest("[role=dialog]")) {
+            return;
+          }
+          const text = target.value?.trim();
+          if (text && text.length > 0) {
+            if (!sessions.some((s) => s.id === activeSessionId)) {
+              const snippet = text.length > 30 ? text.slice(0, 30) + "..." : text;
+              optimisticAddSession(activeSessionId, snippet);
+              setTimeout(() => fetchSessions(true), 1500);
+            }
+          }
+        }
+      } else if (e instanceof MouseEvent) {
+        const sendBtn = target.closest("button[type=submit], .copilotKitSendButton, [data-copilotkit-send]");
+        if (sendBtn) {
+          const formOrContainer = sendBtn.closest("form, .copilotKitInput, div");
+          const textarea = formOrContainer?.querySelector("textarea, input") as HTMLTextAreaElement | HTMLInputElement | null;
+          const text = textarea?.value?.trim();
+          if (text && text.length > 0) {
+            if (!sessions.some((s) => s.id === activeSessionId)) {
+              const snippet = text.length > 30 ? text.slice(0, 30) + "..." : text;
+              optimisticAddSession(activeSessionId, snippet);
+              setTimeout(() => fetchSessions(true), 1500);
+            }
+          }
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleUserInteraction, true);
+    window.addEventListener("click", handleUserInteraction, true);
+    return () => {
+      window.removeEventListener("keydown", handleUserInteraction, true);
+      window.removeEventListener("click", handleUserInteraction, true);
+    };
+  }, [activeSessionId, sessions, optimisticAddSession, fetchSessions]);
+
   const isDraft = !sessions.some((s) => s.id === activeSessionId);
 
   const createNewSession = () => {
@@ -93,15 +177,8 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
       router.push("/");
     }
 
-    // If current session is already an unsaved draft, don't create unnecessary duplicate IDs
-    if (isDraft) {
-      toast.info("새로운 대화 준비 상태입니다.");
-      return;
-    }
-
     const newId = crypto.randomUUID();
     updateActiveSessionId(newId);
-    toast.success("새로운 대화가 시작되었습니다.");
   };
 
   const switchSession = (id: string) => {
@@ -171,6 +248,10 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
         activeSessionId,
         isLoading,
         isDraft,
+        isSearchOpen,
+        setIsSearchOpen,
+        openSearch,
+        closeSearch,
         createNewSession,
         switchSession,
         deleteSession,

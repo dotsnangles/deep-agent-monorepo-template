@@ -4,10 +4,10 @@ import { CopilotKit } from "@copilotkit/react-core";
 import "@copilotkit/react-ui/styles.css";
 import { Toaster } from "@repo/ui/components/sonner";
 
-import { ChatSessionProvider, useChatSessions } from "@/features/chat";
+import { ChatSessionProvider, ChatSearchDialog, useChatSessions } from "@/features/chat";
 import { ThemeProvider } from "./theme-provider";
 
-function CopilotKitWithSession({ children }: { children: React.ReactNode }) {
+export function CopilotKitWithSession({ children }: { children: React.ReactNode }) {
   const { activeSessionId } = useChatSessions();
 
   return (
@@ -30,9 +30,10 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
       <ChatSessionProvider>
-        <CopilotKitWithSession>{children}</CopilotKitWithSession>
+        {children}
+        <ChatSearchDialog />
+        <Toaster richColors />
       </ChatSessionProvider>
-      <Toaster richColors />
     </ThemeProvider>
   );
 }

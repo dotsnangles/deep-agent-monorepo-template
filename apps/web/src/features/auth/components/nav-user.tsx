@@ -88,18 +88,18 @@ export function NavUser() {
   };
 
   return (
-    <SidebarMenu>
-      <SidebarMenuItem>
+    <SidebarMenu className="group-data-[collapsible=icon]:items-center">
+      <SidebarMenuItem className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
               <SidebarMenuButton
                 size="lg"
-                className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:size-8"
               />
             }
           >
-            <Avatar className="size-8 rounded-lg">
+            <Avatar className="size-8 rounded-lg shrink-0">
               {user.image ? (
                 <AvatarImage src={user.image} alt={user.name || ""} />
               ) : null}
@@ -107,7 +107,7 @@ export function NavUser() {
                 {initials}
               </AvatarFallback>
             </Avatar>
-            <div className="grid flex-1 text-left text-xs leading-tight">
+            <div className="grid flex-1 text-left text-xs leading-tight group-data-[collapsible=icon]:hidden">
               <span className="truncate font-semibold text-foreground">
                 {user.name || "사용자"}
               </span>
@@ -115,7 +115,7 @@ export function NavUser() {
                 {user.email}
               </span>
             </div>
-            <ChevronsUpDown className="ml-auto size-4 text-muted-foreground" />
+            <ChevronsUpDown className="ml-auto size-4 text-muted-foreground group-data-[collapsible=icon]:hidden" />
           </DropdownMenuTrigger>
           <DropdownMenuContent
             className="w-60 min-w-56 rounded-lg p-1.5"
