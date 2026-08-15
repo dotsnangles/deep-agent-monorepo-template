@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@repo/auth";
 import { db, chatSession, chatMessage } from "@repo/db";
+import {
+  createChatMessageSchema,
+  patchChatLeafSchema,
+  deleteChatMessageSchema,
+} from "@repo/validators";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { headers } from "next/headers";
 import {
@@ -9,6 +14,7 @@ import {
   pruneSubtree,
   findNewActiveLeafAfterPrune,
 } from "@/features/chat/lib/tree";
+import { generateSmartTitleInBackground } from "@/features/chat/server";
 
 export async function GET(req: NextRequest) {
   try {
@@ -95,17 +101,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json().catch(() => ({}));
-    const { sessionId, parentId = null, role, content, id } = body;
+    const rawBody = await req.json().catch(() => ({}));
+    const parseResult = createChatMessageSchema.safeParse(rawBody);
 
-    if (!sessionId || !role || typeof content !== "string") {
+    if (!parseResult.success) {
       return NextResponse.json(
-        { error: "sessionId, role, and content are required" },
+        { error: "Validation failed", details: parseResult.error.flatten() },
         { status: 400 }
       );
     }
 
+    const { sessionId, parentId = null, role, content, id } = parseResult.data;
     const messageId = id || crypto.randomUUID();
+
+    // Check if session exists
+    const [existingSession] = await db
+      .select()
+      .from(chatSession)
+      .where(eq(chatSession.id, sessionId))
+      .limit(1);
+
+    const isNewSession = !existingSession;
 
     // Ensure session exists or create it lazily
     await db
@@ -123,6 +139,11 @@ export async function POST(req: NextRequest) {
           updatedAt: new Date(),
         },
       });
+
+    // Trigger smart title generation in background if first user message
+    if (isNewSession && role === "user") {
+      generateSmartTitleInBackground(sessionId, content);
+    }
 
     const [newMessage] = await db
       .insert(chatMessage)
@@ -162,15 +183,17 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json().catch(() => ({}));
-    const { sessionId, activeLeafId } = body;
+    const rawBody = await req.json().catch(() => ({}));
+    const parseResult = patchChatLeafSchema.safeParse(rawBody);
 
-    if (!sessionId || !activeLeafId) {
+    if (!parseResult.success) {
       return NextResponse.json(
-        { error: "sessionId and activeLeafId are required" },
+        { error: "Validation failed", details: parseResult.error.flatten() },
         { status: 400 }
       );
     }
+
+    const { sessionId, activeLeafId } = parseResult.data;
 
     const [updated] = await db
       .update(chatSession)
@@ -214,15 +237,17 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json().catch(() => ({}));
-    const { sessionId, messageId } = body;
+    const rawBody = await req.json().catch(() => ({}));
+    const parseResult = deleteChatMessageSchema.safeParse(rawBody);
 
-    if (!sessionId || !messageId) {
+    if (!parseResult.success) {
       return NextResponse.json(
-        { error: "sessionId and messageId are required" },
+        { error: "Validation failed", details: parseResult.error.flatten() },
         { status: 400 }
       );
     }
+
+    const { sessionId, messageId } = parseResult.data;
 
     // Verify session ownership
     const [sessionRecord] = await db

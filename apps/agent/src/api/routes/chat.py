@@ -2,13 +2,19 @@ from typing import List, Optional
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
 
 from src.core.config import get_llm
 from src.graphs.chat.prompts import MAIN_SYSTEM_PROMPT
 from src.core.observability import get_langfuse_callback
 
 chat_router = APIRouter(prefix="/chat", tags=["chat"])
+
+ROLE_MESSAGE_MAP = {
+    "user": HumanMessage,
+    "assistant": AIMessage,
+    "system": SystemMessage,
+}
 
 
 class ChatMessageInput(BaseModel):
@@ -28,14 +34,10 @@ async def stream_chat(req: ChatStreamRequest):
     lf_callback = get_langfuse_callback()
     callbacks = [lf_callback] if lf_callback else []
 
-    lc_messages = [SystemMessage(content=MAIN_SYSTEM_PROMPT)]
+    lc_messages: List[BaseMessage] = [SystemMessage(content=MAIN_SYSTEM_PROMPT)]
     for msg in req.messages:
-        if msg.role == "user":
-            lc_messages.append(HumanMessage(content=msg.content))
-        elif msg.role == "assistant":
-            lc_messages.append(AIMessage(content=msg.content))
-        elif msg.role == "system":
-            lc_messages.append(SystemMessage(content=msg.content))
+        msg_cls = ROLE_MESSAGE_MAP.get(msg.role.lower(), HumanMessage)
+        lc_messages.append(msg_cls(content=msg.content))
 
     async def token_generator():
         try:

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@repo/auth";
+import { chatStreamRequestSchema } from "@repo/validators";
 import { headers } from "next/headers";
 
 const AGENT_SERVER_URL = process.env.AGENT_SERVER_URL || "http://127.0.0.1:8000";
@@ -15,24 +16,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json().catch(() => ({}));
-    const { threadId, messages } = body;
+    const rawBody = await req.json().catch(() => ({}));
+    const parseResult = chatStreamRequestSchema.safeParse(rawBody);
 
-    if (!messages || !Array.isArray(messages)) {
+    if (!parseResult.success) {
       return NextResponse.json(
-        { error: "messages array is required" },
+        { error: "Validation failed", details: parseResult.error.flatten() },
         { status: 400 }
       );
     }
+
+    const { threadId, messages } = parseResult.data;
 
     const agentRes = await fetch(`${AGENT_SERVER_URL}/chat/stream`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         thread_id: threadId,
-        messages: messages.map((m: any) => ({
-          role: m.role || "user",
-          content: m.content || "",
+        messages: messages.map((m) => ({
+          role: m.role,
+          content: m.content,
         })),
       }),
     });

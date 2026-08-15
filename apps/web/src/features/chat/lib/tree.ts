@@ -157,7 +157,7 @@ export function findNewActiveLeafAfterPrune(
   return activePath.length > 0 ? activePath[activePath.length - 1].id : null;
 }
 
-function findDeepestDescendant(nodes: MessageNode[], rootId: string): string {
+export function findDeepestDescendant(nodes: MessageNode[], rootId: string): string {
   let currId = rootId;
   while (true) {
     const children = nodes.filter((n) => n.parentId === currId);

@@ -7,6 +7,7 @@ import {
   getBranchInfo,
   pruneSubtree,
   traverseActivePath,
+  findDeepestDescendant,
 } from "../lib/tree";
 
 export function useMessageTree(sessionId: string) {
@@ -45,16 +46,7 @@ export function useMessageTree(sessionId: string) {
   // Switch to a specific branch by message ID
   const switchBranch = useCallback(
     async (targetMessageId: string) => {
-      // Find deepest descendant of the target node
-      let currId = targetMessageId;
-      while (true) {
-        const children = allNodes.filter((n) => n.parentId === currId);
-        if (children.length === 0) break;
-        children.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        currId = children[0].id;
-      }
-
-      const newLeafId = currId;
+      const newLeafId = findDeepestDescendant(allNodes, targetMessageId);
       setActiveLeafId(newLeafId);
 
       // Persist active leaf to server
