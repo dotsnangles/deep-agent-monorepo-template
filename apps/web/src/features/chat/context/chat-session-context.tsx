@@ -89,7 +89,34 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
       if (res.ok) {
         const data = await res.json();
         const fetchedSessions: ChatSession[] = data.sessions || [];
-        setSessions(fetchedSessions);
+        setSessions((prev) => {
+          const generatingIds = globalStreamManager.getGeneratingSessionIds();
+          const activeStreams = globalStreamManager.getActiveStreamStates();
+          
+          // Keep in-flight generating sessions that may not have persisted to DB yet
+          const activeInMemorySessions: ChatSession[] = activeStreams.map((st) => {
+            const existing = prev.find((p) => p.id === st.sessionId);
+            if (existing) return existing;
+            const snippet = st.titleSnippet
+              ? st.titleSnippet.length > 30
+                ? st.titleSnippet.slice(0, 30) + "..."
+                : st.titleSnippet
+              : "새로운 대화";
+            return {
+              id: st.sessionId,
+              userId: sessionData?.user?.id || "guest",
+              title: snippet,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+          });
+
+          const dbOnlySessions = fetchedSessions.filter(
+            (dbS) => !activeInMemorySessions.some((mem) => mem.id === dbS.id)
+          );
+
+          return [...activeInMemorySessions, ...dbOnlySessions];
+        });
       }
     } catch (error) {
       console.error("Failed to fetch chat sessions:", error);

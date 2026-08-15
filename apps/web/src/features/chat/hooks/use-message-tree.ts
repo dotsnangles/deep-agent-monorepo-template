@@ -27,9 +27,31 @@ async function saveMessageToDB(dto: CreateChatMessageDTO): Promise<boolean> {
 }
 
 export function useMessageTree(sessionId: string) {
-  const [allNodes, setAllNodes] = useState<MessageNode[]>([]);
-  const [activeLeafId, setActiveLeafId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [allNodes, setAllNodes] = useState<MessageNode[]>(() => {
+    const activeStream = globalStreamManager.getStreamState(sessionId);
+    if (activeStream?.isGenerating && activeStream.assistantMessageId) {
+      return [
+        {
+          id: activeStream.assistantMessageId,
+          sessionId,
+          parentId: activeStream.userMessageId,
+          role: "assistant",
+          content: activeStream.content,
+          createdAt: new Date(),
+        },
+      ];
+    }
+    return [];
+  });
+  const [activeLeafId, setActiveLeafId] = useState<string | null>(() => {
+    const activeStream = globalStreamManager.getStreamState(sessionId);
+    return activeStream?.isGenerating && activeStream.assistantMessageId
+      ? activeStream.assistantMessageId
+      : null;
+  });
+  const [isLoading, setIsLoading] = useState<boolean>(() =>
+    !globalStreamManager.isSessionGenerating(sessionId)
+  );
   const [isGenerating, setIsGenerating] = useState<boolean>(() =>
     globalStreamManager.isSessionGenerating(sessionId)
   );
@@ -43,7 +65,9 @@ export function useMessageTree(sessionId: string) {
   // Fetch full message tree on session change
   const fetchTree = useCallback(async () => {
     if (!sessionId) return;
-    setIsLoading(true);
+    if (!globalStreamManager.isSessionGenerating(sessionId)) {
+      setIsLoading(true);
+    }
     try {
       const res = await fetch(`/api/chat/messages?sessionId=${encodeURIComponent(sessionId)}`);
       if (res.ok) {
