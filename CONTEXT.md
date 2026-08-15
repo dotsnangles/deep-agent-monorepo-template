@@ -15,4 +15,6 @@ Key terms and definitions used across `hollow-echo-distant-signal`:
 | Active Path | The single linear sequence of messages from the root message to the currently selected leaf node, displayed to the user and sent to the LLM | Web & Agent (`apps/web`, `apps/agent`) |
 | Immutable Forking | An append-only branching strategy where editing or regenerating a message creates a new sibling node without modifying existing history | Web & DB (`@repo/db`, `apps/web`) |
 | Cascade Delete | A pruning strategy where deleting a message node permanently removes all of its descendant child nodes | Web & DB (`@repo/db`, `apps/web`) |
+| Global Stream Manager | Client-side lifecycle coordinator managing active HTTP stream connections and buffers decoupled from view unmounts | Web Client (`apps/web`) |
+| Stream Reconnection | Restoring buffered stream chunks and re-attaching live chunk rendering upon re-entering an actively generating session | Web Client (`apps/web`) |
 

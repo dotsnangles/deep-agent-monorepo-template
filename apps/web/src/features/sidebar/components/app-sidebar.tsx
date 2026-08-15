@@ -71,6 +71,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     openSearch,
     isLoading,
     isDraft,
+    isSessionGenerating,
   } = useChatSessions();
 
   // Seamless lazy loading: load next batch instantly as user approaches bottom
@@ -309,6 +310,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                   />
                                   <span className="truncate">{session.title}</span>
                                 </div>
+                                {isSessionGenerating(session.id) && (
+                                  <span
+                                    className="size-2 rounded-full bg-primary animate-pulse shrink-0 ml-1.5"
+                                    title="답변 생성 중..."
+                                  />
+                                )}
                               </SidebarMenuButton>
 
                               <DropdownMenu>

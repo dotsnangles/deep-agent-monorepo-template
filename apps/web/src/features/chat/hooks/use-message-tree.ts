@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import type { CreateChatMessageDTO, PatchChatLeafDTO, DeleteChatMessageDTO } from "@repo/validators";
 import {
   type MessageNode,
   getBranchInfo,
@@ -9,13 +10,29 @@ import {
   traverseActivePath,
   findDeepestDescendant,
 } from "../lib/tree";
+import { globalStreamManager } from "../lib/stream-manager";
+
+async function saveMessageToDB(dto: CreateChatMessageDTO): Promise<boolean> {
+  try {
+    const res = await fetch("/api/chat/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(dto),
+    });
+    return res.ok;
+  } catch (err) {
+    console.error("[useMessageTree] Failed to save message:", err);
+    return false;
+  }
+}
 
 export function useMessageTree(sessionId: string) {
   const [allNodes, setAllNodes] = useState<MessageNode[]>([]);
   const [activeLeafId, setActiveLeafId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isGenerating, setIsGenerating] = useState<boolean>(false);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const [isGenerating, setIsGenerating] = useState<boolean>(() =>
+    globalStreamManager.isSessionGenerating(sessionId)
+  );
 
   // Compute the current active linear path based on allNodes and activeLeafId
   const activePath = useMemo(() => {
@@ -30,8 +47,27 @@ export function useMessageTree(sessionId: string) {
       const res = await fetch(`/api/chat/messages?sessionId=${encodeURIComponent(sessionId)}`);
       if (res.ok) {
         const data = await res.json();
-        setAllNodes(data.messages || []);
+        const messages: MessageNode[] = data.messages || [];
+        setAllNodes(messages);
         setActiveLeafId(data.activeLeafId || null);
+
+        // Check if there is an active stream in progress for this session to reconnect to
+        const activeStream = globalStreamManager.getStreamState(sessionId);
+        if (activeStream?.isGenerating && activeStream.assistantMessageId) {
+          const assistantExists = messages.some((m) => m.id === activeStream.assistantMessageId);
+          if (!assistantExists) {
+            const reconnectedNode: MessageNode = {
+              id: activeStream.assistantMessageId,
+              sessionId,
+              parentId: activeStream.userMessageId,
+              role: "assistant",
+              content: activeStream.content,
+              createdAt: new Date(),
+            };
+            setAllNodes([...messages, reconnectedNode]);
+          }
+          setActiveLeafId(activeStream.assistantMessageId);
+        }
       }
     } catch (err) {
       console.error("[useMessageTree] Failed to fetch message tree:", err);
@@ -44,15 +80,53 @@ export function useMessageTree(sessionId: string) {
     fetchTree();
   }, [fetchTree]);
 
+  // Subscribe to Global Stream Manager updates for real-time streaming & reconnection
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const unsubscribe = globalStreamManager.subscribe(sessionId, (streamState) => {
+      setIsGenerating(streamState.isGenerating);
+
+      if (streamState.assistantMessageId) {
+        setAllNodes((prev) => {
+          const exists = prev.some((n) => n.id === streamState.assistantMessageId);
+          if (exists) {
+            return prev.map((n) =>
+              n.id === streamState.assistantMessageId
+                ? { ...n, content: streamState.content }
+                : n
+            );
+          } else if (streamState.isGenerating) {
+            // Re-attached or newly created stream node
+            const newNode: MessageNode = {
+              id: streamState.assistantMessageId,
+              sessionId,
+              parentId: streamState.userMessageId,
+              role: "assistant",
+              content: streamState.content,
+              createdAt: new Date(),
+            };
+            return [...prev, newNode];
+          }
+          return prev;
+        });
+
+        if (streamState.isGenerating) {
+          setActiveLeafId(streamState.assistantMessageId);
+        }
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [sessionId]);
+
   // Stop active AI generation
   const stopGeneration = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-      setIsGenerating(false);
-      toast.info("답변 생성을 중단했습니다.");
-    }
-  }, []);
+    globalStreamManager.stopStream(sessionId);
+    toast.info("답변 생성을 중단했습니다.");
+  }, [sessionId]);
 
   // Switch to a specific branch by message ID
   const switchBranch = useCallback(
@@ -62,10 +136,11 @@ export function useMessageTree(sessionId: string) {
 
       // Persist active leaf to server
       try {
+        const payload: PatchChatLeafDTO = { sessionId, activeLeafId: newLeafId };
         await fetch("/api/chat/messages", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sessionId, activeLeafId: newLeafId }),
+          body: JSON.stringify(payload),
         });
       } catch (err) {
         console.error("[useMessageTree] Failed to persist active leaf:", err);
@@ -97,12 +172,7 @@ export function useMessageTree(sessionId: string) {
   // Helper to execute agent response for a given active linear path
   const executeAgentStream = useCallback(
     async (userMsgNode: MessageNode, contextMessages: MessageNode[]) => {
-      setIsGenerating(true);
       const assistantMessageId = crypto.randomUUID();
-
-      // Create abort controller for streaming cancellation
-      const controller = new AbortController();
-      abortControllerRef.current = controller;
 
       // Create initial empty assistant placeholder node
       const placeholderAssistantNode: MessageNode = {
@@ -117,97 +187,21 @@ export function useMessageTree(sessionId: string) {
       setAllNodes((prev) => [...prev, placeholderAssistantNode]);
       setActiveLeafId(assistantMessageId);
 
-      let assistantContent = "";
-      try {
-        // Send request with only active path context messages to streaming endpoint
-        const response = await fetch("/api/chat/stream", {
-          method: "POST",
-          signal: controller.signal,
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            threadId: sessionId,
-            messages: [
-              ...contextMessages.map((m) => ({
-                role: m.role,
-                content: m.content,
-              })),
-              { role: "user", content: userMsgNode.content },
-            ],
-          }),
-        });
+      const formattedContext = [
+        ...contextMessages.map((m) => ({
+          role: m.role as "user" | "assistant" | "system",
+          content: m.content,
+        })),
+        { role: "user" as const, content: userMsgNode.content },
+      ];
 
-        if (response.ok && response.body) {
-          const reader = response.body.getReader();
-          const decoder = new TextDecoder();
-          let done = false;
-
-          while (!done) {
-            const { value, done: doneReading } = await reader.read();
-            done = doneReading;
-            if (value) {
-              const chunk = decoder.decode(value, { stream: true });
-              assistantContent += chunk;
-              setAllNodes((prev) =>
-                prev.map((n) =>
-                  n.id === assistantMessageId ? { ...n, content: assistantContent } : n
-                )
-              );
-            }
-          }
-        } else {
-          assistantContent = "답변 생성에 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.";
-        }
-
-        // Clean up any streaming protocol wrapping if present
-        const cleanContent = assistantContent.trim() || "답변이 준비되었습니다.";
-
-        // Persist final assistant node to DB
-        await fetch("/api/chat/messages", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            id: assistantMessageId,
-            sessionId,
-            parentId: userMsgNode.id,
-            role: "assistant",
-            content: cleanContent,
-          }),
-        });
-
-        setAllNodes((prev) =>
-          prev.map((n) => (n.id === assistantMessageId ? { ...n, content: cleanContent } : n))
-        );
-      } catch (error: any) {
-        if (error.name === "AbortError" || controller.signal.aborted) {
-          const finalContent = assistantContent.trim() || "(답변 생성이 중단되었습니다.)";
-          try {
-            await fetch("/api/chat/messages", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                id: assistantMessageId,
-                sessionId,
-                parentId: userMsgNode.id,
-                role: "assistant",
-                content: finalContent,
-              }),
-            });
-            setAllNodes((prev) =>
-              prev.map((n) => (n.id === assistantMessageId ? { ...n, content: finalContent } : n))
-            );
-          } catch (e) {
-            console.error("[useMessageTree] Failed to save aborted message:", e);
-          }
-        } else {
-          console.error("[useMessageTree] Stream error:", error);
-          toast.error("에이전트 응답 수신 중 오류가 발생했습니다.");
-        }
-      } finally {
-        abortControllerRef.current = null;
-        setIsGenerating(false);
-      }
+      // Delegate stream lifecycle to globalStreamManager (survives unmounts & switches)
+      await globalStreamManager.startStream({
+        sessionId,
+        assistantMessageId,
+        userMessageId: userMsgNode.id,
+        contextMessages: formattedContext,
+      });
     },
     [sessionId]
   );
@@ -234,21 +228,13 @@ export function useMessageTree(sessionId: string) {
       setActiveLeafId(userMessageId);
 
       // Persist user message to DB
-      try {
-        await fetch("/api/chat/messages", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            id: userMessageId,
-            sessionId,
-            parentId,
-            role: "user",
-            content: content.trim(),
-          }),
-        });
-      } catch (err) {
-        console.error("[useMessageTree] Failed to save user message:", err);
-      }
+      await saveMessageToDB({
+        id: userMessageId,
+        sessionId,
+        parentId,
+        role: "user",
+        content: content.trim(),
+      });
 
       // Execute AI generation with current active path as context
       await executeAgentStream(newUserNode, activePath);
@@ -284,21 +270,13 @@ export function useMessageTree(sessionId: string) {
       setAllNodes((prev) => [...prev, newUserNode]);
       setActiveLeafId(newUserNodeId);
 
-      try {
-        await fetch("/api/chat/messages", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            id: newUserNodeId,
-            sessionId,
-            parentId,
-            role: "user",
-            content: newContent.trim(),
-          }),
-        });
-      } catch (err) {
-        console.error("[useMessageTree] Failed to save edited user message:", err);
-      }
+      await saveMessageToDB({
+        id: newUserNodeId,
+        sessionId,
+        parentId,
+        role: "user",
+        content: newContent.trim(),
+      });
 
       // Execute agent response from the new forked point
       await executeAgentStream(newUserNode, parentAncestors);
@@ -340,10 +318,11 @@ export function useMessageTree(sessionId: string) {
       setActiveLeafId(newActive.length > 0 ? newActive[newActive.length - 1].id : null);
 
       try {
+        const payload: DeleteChatMessageDTO = { sessionId, messageId };
         const res = await fetch("/api/chat/messages", {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sessionId, messageId }),
+          body: JSON.stringify(payload),
         });
 
         if (res.ok) {

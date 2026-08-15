@@ -48,6 +48,7 @@ export function ChatSearchDialog() {
     switchSession,
     isSearchOpen,
     closeSearch,
+    isSessionGenerating,
   } = useChatSessions();
 
   const [query, setQuery] = React.useState("");
@@ -196,6 +197,12 @@ export function ChatSearchDialog() {
                       <span className="truncate text-xs font-medium">
                         {session.title}
                       </span>
+                      {isSessionGenerating(session.id) && (
+                        <span
+                          className="size-2 rounded-full bg-primary animate-pulse shrink-0 ml-1"
+                          title="답변 생성 중..."
+                        />
+                      )}
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">

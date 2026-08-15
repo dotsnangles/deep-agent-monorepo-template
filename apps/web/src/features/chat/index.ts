@@ -18,3 +18,10 @@ export {
   type MessageNode,
   type BranchInfo,
 } from "./lib/tree";
+export {
+  StreamManager,
+  globalStreamManager,
+  type StreamState,
+  type StartStreamOptions,
+} from "./lib/stream-manager";
+

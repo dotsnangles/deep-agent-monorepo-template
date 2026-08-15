@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { usePathname, useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
+import { globalStreamManager } from "../lib/stream-manager";
 
 export interface ChatSession {
   id: string;
@@ -19,6 +20,8 @@ interface ChatSessionContextType {
   isLoading: boolean;
   isDraft: boolean;
   isSearchOpen: boolean;
+  generatingSessionIds: string[];
+  isSessionGenerating: (id: string) => boolean;
   setIsSearchOpen: (open: boolean) => void;
   openSearch: () => void;
   closeSearch: () => void;
@@ -45,8 +48,23 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
     return "default-session";
   });
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [generatingSessionIds, setGeneratingSessionIds] = useState<string[]>(() =>
+    globalStreamManager.getGeneratingSessionIds()
+  );
   const { data: sessionData } = authClient.useSession();
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Subscribe to global stream updates for sidebar/UI indicators
+  useEffect(() => {
+    return globalStreamManager.subscribeGlobal(() => {
+      setGeneratingSessionIds(globalStreamManager.getGeneratingSessionIds());
+    });
+  }, []);
+
+  const isSessionGenerating = useCallback(
+    (id: string) => generatingSessionIds.includes(id),
+    [generatingSessionIds]
+  );
 
   const openSearch = useCallback(() => setIsSearchOpen(true), []);
   const closeSearch = useCallback(() => setIsSearchOpen(false), []);
@@ -249,6 +267,8 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
         isLoading,
         isDraft,
         isSearchOpen,
+        generatingSessionIds,
+        isSessionGenerating,
         setIsSearchOpen,
         openSearch,
         closeSearch,
