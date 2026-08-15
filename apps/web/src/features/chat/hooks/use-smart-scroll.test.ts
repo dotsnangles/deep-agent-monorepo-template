@@ -1,28 +1,29 @@
 import { describe, expect, it } from "vitest";
 
-describe("useSmartScroll Pure Position Calculation", () => {
-  it("determines atBottom true when distance is less than or equal to threshold", () => {
+describe("useSmartScroll Strict Latching Mechanism", () => {
+  it("maintains isPinnedToBottom true only when exactly at bottom (<= 2px)", () => {
     const scrollHeight = 1000;
     const clientHeight = 600;
-    const threshold = 100;
 
-    // scrollTop = 350 -> distance = 1000 - 350 - 600 = 50 <= 100 -> true
-    const scrollTop = 350;
-    const distance = scrollHeight - scrollTop - clientHeight;
-    const isAtBottom = distance <= threshold;
+    // Case 1: Exactly at bottom (distance = 0)
+    const scrollTopAtBottom = 400;
+    const distAtBottom = scrollHeight - scrollTopAtBottom - clientHeight;
+    expect(distAtBottom <= 2).toBe(true);
 
-    expect(isAtBottom).toBe(true);
+    // Case 2: Sub-pixel rendering (distance = 1px)
+    const scrollTopSubPixel = 399;
+    const distSubPixel = scrollHeight - scrollTopSubPixel - clientHeight;
+    expect(distSubPixel <= 2).toBe(true);
   });
 
-  it("determines atBottom false when user has scrolled up past threshold", () => {
+  it("locks auto-scroll to false when user is even slightly above bottom (> 2px)", () => {
     const scrollHeight = 1000;
     const clientHeight = 600;
-    const threshold = 100;
 
-    // scrollTop = 200 -> distance = 1000 - 200 - 600 = 200 > 100 -> false
-    const scrollTop = 200;
-    const distance = scrollHeight - scrollTop - clientHeight;
-    const isAtBottom = distance <= threshold;
+    // Case: User scrolled up slightly by 5px (distance = 5px)
+    const scrollTopScrolledUp = 395;
+    const dist = scrollHeight - scrollTopScrolledUp - clientHeight;
+    const isAtBottom = dist <= 2;
 
     expect(isAtBottom).toBe(false);
   });

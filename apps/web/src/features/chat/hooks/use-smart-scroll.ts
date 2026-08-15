@@ -2,43 +2,41 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-interface UseSmartScrollOptions {
-  threshold?: number;
-}
-
-export function useSmartScroll({ threshold = 60 }: UseSmartScrollOptions = {}) {
+export function useSmartScroll() {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [isAtBottom, setIsAtBottom] = useState(true);
   const [showScrollBottomButton, setShowScrollBottomButton] = useState(false);
-  const userScrolledUpRef = useRef(false);
+
+  // Master Latch: true when locked to bottom, false the instant user scrolls up by even 1px
+  const isPinnedToBottomRef = useRef(true);
   const isProgrammaticScrollRef = useRef(false);
   const touchStartYRef = useRef(0);
 
-  // Check scroll position and update button state
+  // Strict scroll position check with zero threshold ambiguity
   const checkScrollPosition = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
 
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    const atBottom = distanceFromBottom <= threshold;
 
-    setIsAtBottom(atBottom);
-    setShowScrollBottomButton(!atBottom);
+    // Show floating return button if scrolled up by more than 20px
+    setShowScrollBottomButton(distanceFromBottom > 20);
 
-    // If user has naturally scrolled all the way to the bottom, re-enable auto-scroll
-    if (atBottom && !isProgrammaticScrollRef.current) {
-      userScrolledUpRef.current = false;
+    // Auto-scroll is ONLY re-enabled when the user reaches the absolute bottom (<= 2px)
+    if (distanceFromBottom <= 2) {
+      isPinnedToBottomRef.current = true;
+    } else if (!isProgrammaticScrollRef.current) {
+      // If user is anywhere above the bottom, latch auto-scroll to false
+      isPinnedToBottomRef.current = false;
     }
-  }, [threshold]);
+  }, []);
 
-  // Scroll to bottom (instant for streaming updates, smooth for explicit button clicks)
+  // Scroll to bottom helper
   const scrollToBottom = useCallback((behavior: "smooth" | "instant" | "auto" = "instant") => {
     const el = scrollRef.current;
     if (!el) return;
 
     isProgrammaticScrollRef.current = true;
-    userScrolledUpRef.current = false;
-    setIsAtBottom(true);
+    isPinnedToBottomRef.current = true;
     setShowScrollBottomButton(false);
 
     if (behavior === "instant" || behavior === "auto") {
@@ -51,26 +49,26 @@ export function useSmartScroll({ threshold = 60 }: UseSmartScrollOptions = {}) {
       });
       setTimeout(() => {
         isProgrammaticScrollRef.current = false;
-      }, 250);
+      }, 300);
     }
   }, []);
 
-  // Zero-latency listener for wheel & touch gestures to immediately break auto-scroll
+  // Zero-latency event listeners for wheel, touch, and keyboard
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
 
     const handleWheel = (e: WheelEvent) => {
-      // User is scrolling UP -> instantly lock auto-scroll with 0ms latency
+      // Any upward wheel tick immediately latches auto-scroll OFF with 0ms delay
       if (e.deltaY < 0) {
-        userScrolledUpRef.current = true;
-        setIsAtBottom(false);
+        isPinnedToBottomRef.current = false;
         setShowScrollBottomButton(true);
       } else if (e.deltaY > 0) {
-        // User scrolling down: check if they reached bottom
+        // Downward wheel: re-enable auto-scroll only if reaching the very bottom
         const dist = el.scrollHeight - (el.scrollTop + e.deltaY) - el.clientHeight;
-        if (dist <= threshold) {
-          userScrolledUpRef.current = false;
+        if (dist <= 2) {
+          isPinnedToBottomRef.current = true;
+          setShowScrollBottomButton(false);
         }
       }
     };
@@ -84,10 +82,9 @@ export function useSmartScroll({ threshold = 60 }: UseSmartScrollOptions = {}) {
     const handleTouchMove = (e: TouchEvent) => {
       if (e.touches.length > 0) {
         const currentY = e.touches[0].clientY;
-        // Dragging down finger = scrolling UP content
-        if (currentY - touchStartYRef.current > 5) {
-          userScrolledUpRef.current = true;
-          setIsAtBottom(false);
+        // Dragging finger downward moves content upward
+        if (currentY - touchStartYRef.current > 3) {
+          isPinnedToBottomRef.current = false;
           setShowScrollBottomButton(true);
         }
       }
@@ -95,8 +92,7 @@ export function useSmartScroll({ threshold = 60 }: UseSmartScrollOptions = {}) {
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (["PageUp", "ArrowUp", "Home"].includes(e.key)) {
-        userScrolledUpRef.current = true;
-        setIsAtBottom(false);
+        isPinnedToBottomRef.current = false;
         setShowScrollBottomButton(true);
       }
     };
@@ -112,7 +108,7 @@ export function useSmartScroll({ threshold = 60 }: UseSmartScrollOptions = {}) {
       el.removeEventListener("touchmove", handleTouchMove);
       el.removeEventListener("keydown", handleKeyDown);
     };
-  }, [threshold]);
+  }, []);
 
   const handleScroll = useCallback(() => {
     checkScrollPosition();
@@ -120,9 +116,8 @@ export function useSmartScroll({ threshold = 60 }: UseSmartScrollOptions = {}) {
 
   return {
     scrollRef,
-    isAtBottom,
     showScrollBottomButton,
-    userScrolledUpRef,
+    isPinnedToBottomRef,
     scrollToBottom,
     handleScroll,
     checkScrollPosition,

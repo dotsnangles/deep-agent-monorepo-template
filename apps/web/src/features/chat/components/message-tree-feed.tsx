@@ -49,17 +49,17 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
   const {
     scrollRef,
     showScrollBottomButton,
-    userScrolledUpRef,
+    isPinnedToBottomRef,
     scrollToBottom,
     handleScroll,
-  } = useSmartScroll({ threshold: 100 });
+  } = useSmartScroll();
 
-  // Auto-scroll on streaming or new messages ONLY if user has not scrolled up
+  // Auto-scroll on streaming or new messages ONLY if pinned to bottom
   useEffect(() => {
-    if (!userScrolledUpRef.current) {
+    if (isPinnedToBottomRef.current) {
       scrollToBottom("instant");
     }
-  }, [activePath, isGenerating, scrollToBottom, userScrolledUpRef]);
+  }, [activePath, isGenerating, scrollToBottom, isPinnedToBottomRef]);
 
   // Focus textarea & reset scroll on session change
   useEffect(() => {
