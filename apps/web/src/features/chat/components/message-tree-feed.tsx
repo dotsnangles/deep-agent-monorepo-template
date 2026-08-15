@@ -57,7 +57,7 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
   // Auto-scroll on streaming or new messages ONLY if user has not scrolled up
   useEffect(() => {
     if (!userScrolledUpRef.current) {
-      scrollToBottom("smooth");
+      scrollToBottom("instant");
     }
   }, [activePath, isGenerating, scrollToBottom, userScrolledUpRef]);
 
