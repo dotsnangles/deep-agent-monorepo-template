@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, Bot, Sparkles, Terminal } from "lucide-react";
+import { ArrowDown, ArrowUp, Bot, Sparkles, Terminal } from "lucide-react";
 import { Button } from "@repo/ui/components/button";
 import { Textarea } from "@repo/ui/components/textarea";
 import { useMessageTree } from "../hooks/use-message-tree";
+import { useSmartScroll } from "../hooks/use-smart-scroll";
 import { MessageItem } from "./message-item";
 
 interface MessageTreeFeedProps {
@@ -43,18 +44,28 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
   } = useMessageTree(sessionId);
 
   const [inputPrompt, setInputPrompt] = useState("");
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-scroll to bottom on active path changes or streaming updates
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [activePath, isGenerating]);
+  const {
+    scrollRef,
+    showScrollBottomButton,
+    userScrolledUpRef,
+    scrollToBottom,
+    handleScroll,
+  } = useSmartScroll({ threshold: 100 });
 
-  // Focus textarea on session change
+  // Auto-scroll on streaming or new messages ONLY if user has not scrolled up
   useEffect(() => {
+    if (!userScrolledUpRef.current) {
+      scrollToBottom("smooth");
+    }
+  }, [activePath, isGenerating, scrollToBottom, userScrolledUpRef]);
+
+  // Focus textarea & reset scroll on session change
+  useEffect(() => {
+    scrollToBottom("auto");
     textareaRef.current?.focus();
-  }, [sessionId]);
+  }, [sessionId, scrollToBottom]);
 
   // Auto-adjust textarea height
   useEffect(() => {
@@ -73,6 +84,7 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
       textareaRef.current.style.height = "auto";
     }
     sendMessage(content);
+    scrollToBottom("smooth");
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -84,8 +96,12 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
 
   return (
     <div className="flex flex-col h-full w-full max-w-4xl mx-auto min-h-0 relative">
-      {/* Scrollable Message Feed Area */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-6 py-4 space-y-4">
+      {/* Scrollable Message Feed Area with Smart Scroll Tracking */}
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-6 py-4 space-y-4"
+      >
         {isLoading && activePath.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-muted-foreground gap-2">
             <span className="size-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
@@ -109,7 +125,10 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
                   <button
                     key={idx}
                     type="button"
-                    onClick={() => sendMessage(item.prompt)}
+                    onClick={() => {
+                      sendMessage(item.prompt);
+                      scrollToBottom("smooth");
+                    }}
                     className="flex flex-col items-start p-3.5 rounded-2xl bg-card border border-border/70 hover:border-primary/50 hover:bg-muted/30 transition-all text-left group shadow-xs cursor-pointer"
                   >
                     <div className="flex items-center gap-2 text-xs font-semibold text-foreground group-hover:text-primary transition-colors">
@@ -135,14 +154,31 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
                 isGenerating={isGenerating}
                 onNavigateSibling={(direction) => navigateSibling(msg.id, direction)}
                 onEdit={(newContent) => editUserMessage(msg.id, newContent)}
-                onRegenerate={() => regenerateAssistantMessage(msg.id)}
+                onRegenerate={() => {
+                  regenerateAssistantMessage(msg.id);
+                  scrollToBottom("smooth");
+                }}
                 onDelete={() => deleteMessage(msg.id)}
               />
             ))}
-            <div ref={messagesEndRef} />
           </div>
         )}
       </div>
+
+      {/* Floating 'Scroll to Bottom' Button when user scrolled up */}
+      {showScrollBottomButton && (
+        <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-20 animate-in fade-in zoom-in-95 duration-150">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => scrollToBottom("smooth")}
+            className="rounded-full shadow-lg border border-border/80 text-xs px-3.5 py-1.5 gap-1.5 bg-background/95 hover:bg-muted backdrop-blur-xs cursor-pointer text-foreground font-medium"
+          >
+            <ArrowDown className="size-3.5 text-primary animate-bounce" />
+            <span>최신 메시지 보기</span>
+          </Button>
+        </div>
+      )}
 
       {/* Bottom Floating Prompt Box */}
       <div className="shrink-0 px-3 sm:px-6 pb-4 pt-1 bg-gradient-to-t from-background via-background/95 to-transparent">

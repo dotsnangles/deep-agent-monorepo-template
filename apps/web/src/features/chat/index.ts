@@ -9,6 +9,8 @@ export { MessageItem } from "./components/message-item";
 export { MessageBranchSwitcher } from "./components/message-branch-switcher";
 export { MarkdownRenderer } from "./components/markdown-renderer";
 export { useMessageTree } from "./hooks/use-message-tree";
+export { useSmartScroll } from "./hooks/use-smart-scroll";
+export { useCopyToClipboard } from "./hooks/use-copy-to-clipboard";
 export {
   traverseActivePath,
   getBranchInfo,

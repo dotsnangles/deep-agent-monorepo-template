@@ -12,3 +12,4 @@ Domain glossary and architectural concepts for the Next.js 16 Web Application:
 | Server Redis Helper | Background title trigger isolated in `server.ts` to prevent client bundle pollution | `src/features/chat/server.ts` |
 | Assistant Markdown Renderer | Client-side markdown, GFM, and KaTeX math parsing pipeline rendering rich AI output with code copy actions | `src/features/chat/components/markdown-renderer.tsx` |
 | Message Canvas Layout | Stream layout where AI responses render directly on the canvas without redundant outer cards while user inputs render as right-aligned bubbles | `src/features/chat/components/message-item.tsx` |
+| Smart Scroll Pinning | Scroll position tracking that pins user view when scrolled up during streaming and shows floating latest message jump button | `src/features/chat/hooks/use-smart-scroll.ts` |
