@@ -1,3 +1,4 @@
+import hashlib
 import json
 import logging
 import time
@@ -5,10 +6,65 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
 
+import redis
 import redis.asyncio as aioredis
+from langchain_core.caches import RETURN_VAL_TYPE, BaseCache
 from langchain_core.callbacks import AsyncCallbackHandler
+from langchain_core.load import dumpd, load
 
 logger = logging.getLogger("agent.event_broker")
+
+
+class StandardRedisCache(BaseCache):
+    """Standard Redis key-value LLM cache (does not require RedisJSON)."""
+
+    def __init__(self, redis_url: str, ttl: int = 86400, prefix: str = "llm_cache:"):
+        self.redis_url = redis_url
+        self.ttl = ttl
+        self.prefix = prefix
+        self._sync_client = redis.from_url(redis_url, decode_responses=True)
+        self._async_client = aioredis.from_url(redis_url, decode_responses=True)
+
+    def _key(self, prompt: str, llm_string: str) -> str:
+        prompt_hash = hashlib.sha256(f"{prompt}###{llm_string}".encode()).hexdigest()
+        return f"{self.prefix}{prompt_hash}"
+
+    def lookup(self, prompt: str, llm_string: str) -> RETURN_VAL_TYPE | None:
+        try:
+            val = self._sync_client.get(self._key(prompt, llm_string))
+            if val:
+                data = json.loads(val)
+                return [load(item) for item in data]
+        except Exception as exc:
+            logger.debug("Redis cache lookup failed: %s", exc)
+        return None
+
+    def update(self, prompt: str, llm_string: str, return_val: RETURN_VAL_TYPE) -> None:
+        try:
+            serialized = json.dumps([dumpd(item) for item in return_val])
+            self._sync_client.set(self._key(prompt, llm_string), serialized, ex=self.ttl)
+        except Exception as exc:
+            logger.debug("Redis cache update failed: %s", exc)
+
+    async def alookup(self, prompt: str, llm_string: str) -> RETURN_VAL_TYPE | None:
+        try:
+            val = await self._async_client.get(self._key(prompt, llm_string))
+            if val:
+                data = json.loads(val)
+                return [load(item) for item in data]
+        except Exception as exc:
+            logger.debug("Redis async cache lookup failed: %s", exc)
+        return None
+
+    async def aupdate(self, prompt: str, llm_string: str, return_val: RETURN_VAL_TYPE) -> None:
+        try:
+            serialized = json.dumps([dumpd(item) for item in return_val])
+            await self._async_client.set(self._key(prompt, llm_string), serialized, ex=self.ttl)
+        except Exception as exc:
+            logger.debug("Redis async cache update failed: %s", exc)
+
+    def clear(self, **kwargs: Any) -> None:
+        pass
 
 
 class RedisEventBroker:

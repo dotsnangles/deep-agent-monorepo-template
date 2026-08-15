@@ -9,13 +9,12 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from langchain_core.globals import set_llm_cache
-from langchain_redis import RedisCache
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.store.postgres.aio import AsyncPostgresStore
 from psycopg_pool import AsyncConnectionPool
 
 from agent import LLM_PROVIDER, build_agent
-from event_broker import RedisEventBroker, RedisStreamingCallbackHandler
+from event_broker import RedisEventBroker, RedisStreamingCallbackHandler, StandardRedisCache
 from observability import get_langfuse_callback
 
 load_dotenv()
@@ -79,8 +78,8 @@ async def lifespan(app: FastAPI):
             app.state.broker = broker
             default_agent.broker = broker
 
-            # Set global LLM response cache
-            set_llm_cache(RedisCache(redis_url=REDIS_URL, ttl=86400))
+            # Set global LLM response cache using standard Redis key-value
+            set_llm_cache(StandardRedisCache(redis_url=REDIS_URL, ttl=86400))
             print(f"[INIT] Redis connected, Pub/Sub broker & LLM cache active ({REDIS_URL}).")
         except Exception as e:
             print(f"[WARN] Redis connection failed: {e}. Running without Redis cache/broker.")
