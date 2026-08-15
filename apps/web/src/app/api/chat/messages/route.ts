@@ -1,29 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@repo/auth";
-import { db, chatSession, chatMessage } from "@repo/db";
+import { chatRepository } from "@repo/db";
 import {
   createChatMessageSchema,
   patchChatLeafSchema,
   deleteChatMessageSchema,
 } from "@repo/validators";
-import { and, asc, eq, inArray } from "drizzle-orm";
-import { headers } from "next/headers";
-import {
-  type MessageNode,
-  traverseActivePath,
-  pruneSubtree,
-  findNewActiveLeafAfterPrune,
-} from "@/features/chat/lib/tree";
 import { generateSmartTitleInBackground } from "@/features/chat/server";
+import { getAuthenticatedUserId } from "../_lib/auth-helper";
 
 export async function GET(req: NextRequest) {
   try {
-    const reqHeaders = await headers();
-    const session = await auth.api.getSession({
-      headers: reqHeaders,
-    });
-
-    if (!session?.user?.id) {
+    const userId = await getAuthenticatedUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -37,19 +25,9 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Check session ownership
-    const [sessionRecord] = await db
-      .select()
-      .from(chatSession)
-      .where(
-        and(
-          eq(chatSession.id, sessionId),
-          eq(chatSession.userId, session.user.id)
-        )
-      )
-      .limit(1);
+    const tree = await chatRepository.getTree(sessionId, userId);
 
-    if (!sessionRecord) {
+    if (!tree) {
       return NextResponse.json({
         sessionId,
         activeLeafId: null,
@@ -58,28 +36,11 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const messages = await db
-      .select()
-      .from(chatMessage)
-      .where(eq(chatMessage.sessionId, sessionId))
-      .orderBy(asc(chatMessage.createdAt));
-
-    const nodes: MessageNode[] = messages.map((m) => ({
-      id: m.id,
-      sessionId: m.sessionId,
-      parentId: m.parentId,
-      role: m.role as "user" | "assistant" | "system",
-      content: m.content,
-      createdAt: m.createdAt,
-    }));
-
-    const activePath = traverseActivePath(nodes, sessionRecord.activeLeafId);
-
     return NextResponse.json({
-      sessionId,
-      activeLeafId: sessionRecord.activeLeafId,
-      messages: nodes,
-      activePath,
+      sessionId: tree.sessionId,
+      activeLeafId: tree.activeLeafId,
+      messages: tree.messages,
+      activePath: tree.activePath,
     });
   } catch (error) {
     console.error("[API GET /api/chat/messages] Error:", error);
@@ -92,12 +53,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const reqHeaders = await headers();
-    const session = await auth.api.getSession({
-      headers: reqHeaders,
-    });
-
-    if (!session?.user?.id) {
+    const userId = await getAuthenticatedUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -112,54 +69,34 @@ export async function POST(req: NextRequest) {
     }
 
     const { sessionId, parentId = null, role, content, id } = parseResult.data;
-    const messageId = id || crypto.randomUUID();
 
-    // Check if session exists
-    const [existingSession] = await db
-      .select()
-      .from(chatSession)
-      .where(eq(chatSession.id, sessionId))
-      .limit(1);
-
-    const isNewSession = !existingSession;
-
-    // Ensure session exists or create it lazily
-    await db
-      .insert(chatSession)
-      .values({
-        id: sessionId,
-        userId: session.user.id,
-        title: content.slice(0, 30).trim() || "새로운 대화",
-        activeLeafId: messageId,
-      })
-      .onConflictDoUpdate({
-        target: chatSession.id,
-        set: {
-          activeLeafId: messageId,
-          updatedAt: new Date(),
-        },
-      });
-
-    // Trigger smart title generation in background if first user message
-    if (isNewSession && role === "user") {
-      generateSmartTitleInBackground(sessionId, content);
-    }
-
-    const [newMessage] = await db
-      .insert(chatMessage)
-      .values({
-        id: messageId,
+    const result = await chatRepository.saveMessage(
+      {
+        id,
         sessionId,
         parentId: parentId || null,
         role,
         content,
-      })
-      .returning();
+      },
+      userId
+    );
+
+    if (!result) {
+      return NextResponse.json(
+        { error: "Unauthorized or session belongs to another user" },
+        { status: 403 }
+      );
+    }
+
+    // Trigger smart title generation in background if first user message
+    if (result.isNewSession && role === "user") {
+      generateSmartTitleInBackground(sessionId, content);
+    }
 
     return NextResponse.json(
       {
-        message: newMessage,
-        activeLeafId: messageId,
+        message: result.message,
+        activeLeafId: result.session.activeLeafId,
       },
       { status: 201 }
     );
@@ -174,12 +111,8 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
-    const reqHeaders = await headers();
-    const session = await auth.api.getSession({
-      headers: reqHeaders,
-    });
-
-    if (!session?.user?.id) {
+    const userId = await getAuthenticatedUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -195,19 +128,11 @@ export async function PATCH(req: NextRequest) {
 
     const { sessionId, activeLeafId } = parseResult.data;
 
-    const [updated] = await db
-      .update(chatSession)
-      .set({
-        activeLeafId,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(chatSession.id, sessionId),
-          eq(chatSession.userId, session.user.id)
-        )
-      )
-      .returning();
+    const updated = await chatRepository.updateSessionActiveLeaf(
+      sessionId,
+      userId,
+      activeLeafId
+    );
 
     if (!updated) {
       return NextResponse.json(
@@ -228,12 +153,8 @@ export async function PATCH(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const reqHeaders = await headers();
-    const session = await auth.api.getSession({
-      headers: reqHeaders,
-    });
-
-    if (!session?.user?.id) {
+    const userId = await getAuthenticatedUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -249,73 +170,19 @@ export async function DELETE(req: NextRequest) {
 
     const { sessionId, messageId } = parseResult.data;
 
-    // Verify session ownership
-    const [sessionRecord] = await db
-      .select()
-      .from(chatSession)
-      .where(
-        and(
-          eq(chatSession.id, sessionId),
-          eq(chatSession.userId, session.user.id)
-        )
-      )
-      .limit(1);
+    const result = await chatRepository.deleteSubtree(sessionId, messageId, userId);
 
-    if (!sessionRecord) {
+    if (!result) {
       return NextResponse.json(
-        { error: "Session not found or unauthorized" },
+        { error: "Message or session not found or unauthorized" },
         { status: 404 }
       );
     }
-
-    const allMessages = await db
-      .select()
-      .from(chatMessage)
-      .where(eq(chatMessage.sessionId, sessionId))
-      .orderBy(asc(chatMessage.createdAt));
-
-    const nodes: MessageNode[] = allMessages.map((m) => ({
-      id: m.id,
-      sessionId: m.sessionId,
-      parentId: m.parentId,
-      role: m.role as "user" | "assistant" | "system",
-      content: m.content,
-      createdAt: m.createdAt,
-    }));
-
-    const targetNode = nodes.find((n) => n.id === messageId);
-    if (!targetNode) {
-      return NextResponse.json(
-        { error: "Message not found" },
-        { status: 404 }
-      );
-    }
-
-    const { remainingNodes, deletedIds } = pruneSubtree(nodes, messageId);
-
-    if (deletedIds.length > 0) {
-      await db
-        .delete(chatMessage)
-        .where(inArray(chatMessage.id, deletedIds));
-    }
-
-    const newActiveLeafId = findNewActiveLeafAfterPrune(
-      remainingNodes,
-      targetNode.parentId
-    );
-
-    await db
-      .update(chatSession)
-      .set({
-        activeLeafId: newActiveLeafId,
-        updatedAt: new Date(),
-      })
-      .where(eq(chatSession.id, sessionId));
 
     return NextResponse.json({
       success: true,
-      deletedIds,
-      activeLeafId: newActiveLeafId,
+      deletedIds: result.deletedIds,
+      activeLeafId: result.activeLeafId,
     });
   } catch (error) {
     console.error("[API DELETE /api/chat/messages] Error:", error);

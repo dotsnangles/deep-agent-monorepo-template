@@ -20,6 +20,9 @@ export const env = createEnv({
     REDIS_URL: z.string().default("redis://localhost:6379"),
   },
   runtimeEnv: process.env,
-  skipValidation: !!process.env.SKIP_ENV_VALIDATION,
+  skipValidation:
+    !!process.env.SKIP_ENV_VALIDATION ||
+    process.env.NODE_ENV === "test" ||
+    !!process.env.VITEST,
   emptyStringAsUndefined: true,
 });

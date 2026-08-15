@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@repo/auth";
-import { db, chatSession } from "@repo/db";
-import { and, eq } from "drizzle-orm";
-import { headers } from "next/headers";
+import { chatRepository } from "@repo/db";
+import { patchChatSessionSchema } from "@repo/validators";
+import { getAuthenticatedUserId } from "../../_lib/auth-helper";
 
 interface Params {
   params: Promise<{ id: string }>;
@@ -11,38 +10,25 @@ interface Params {
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
-    const reqHeaders = await headers();
-    const session = await auth.api.getSession({
-      headers: reqHeaders,
-    });
+    const userId = await getAuthenticatedUserId();
 
-    if (!session?.user?.id) {
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json().catch(() => ({}));
-    const title = body.title?.trim();
+    const rawBody = await req.json().catch(() => ({}));
+    const parseResult = patchChatSessionSchema.safeParse(rawBody);
 
-    if (!title) {
+    if (!parseResult.success) {
       return NextResponse.json(
-        { error: "Title is required" },
+        { error: "Validation failed", details: parseResult.error.flatten() },
         { status: 400 }
       );
     }
 
-    const [updated] = await db
-      .update(chatSession)
-      .set({
-        title,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(chatSession.id, id),
-          eq(chatSession.userId, session.user.id)
-        )
-      )
-      .returning();
+    const { title } = parseResult.data;
+
+    const updated = await chatRepository.updateSessionTitle(id, userId, title);
 
     if (!updated) {
       return NextResponse.json(
@@ -51,7 +37,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       );
     }
 
-    return NextResponse.json({ session: updated });
+    const updatedSession = await chatRepository.getSession(id, userId);
+    return NextResponse.json({ session: updatedSession });
   } catch (error) {
     console.error("[API PATCH /api/chat/sessions/[id]] Error:", error);
     return NextResponse.json(
@@ -64,24 +51,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 export async function DELETE(_req: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
-    const reqHeaders = await headers();
-    const session = await auth.api.getSession({
-      headers: reqHeaders,
-    });
+    const userId = await getAuthenticatedUserId();
 
-    if (!session?.user?.id) {
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const [deleted] = await db
-      .delete(chatSession)
-      .where(
-        and(
-          eq(chatSession.id, id),
-          eq(chatSession.userId, session.user.id)
-        )
-      )
-      .returning();
+    const deleted = await chatRepository.deleteSession(id, userId);
 
     if (!deleted) {
       return NextResponse.json(

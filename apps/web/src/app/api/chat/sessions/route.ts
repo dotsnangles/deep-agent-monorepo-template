@@ -1,26 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@repo/auth";
-import { db, chatSession } from "@repo/db";
-import { desc, eq } from "drizzle-orm";
-import { headers } from "next/headers";
+import { chatRepository } from "@repo/db";
+import { createChatSessionSchema } from "@repo/validators";
+import { getAuthenticatedUserId } from "../_lib/auth-helper";
 
 export async function GET(_req: NextRequest) {
   try {
-    const reqHeaders = await headers();
-    const session = await auth.api.getSession({
-      headers: reqHeaders,
-    });
-
-    if (!session?.user?.id) {
+    const userId = await getAuthenticatedUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const sessions = await db
-      .select()
-      .from(chatSession)
-      .where(eq(chatSession.userId, session.user.id))
-      .orderBy(desc(chatSession.updatedAt));
-
+    const sessions = await chatRepository.getSessions(userId);
     return NextResponse.json({ sessions });
   } catch (error) {
     console.error("[API GET /api/chat/sessions] Error:", error);
@@ -33,34 +23,28 @@ export async function GET(_req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const reqHeaders = await headers();
-    const session = await auth.api.getSession({
-      headers: reqHeaders,
-    });
-
-    if (!session?.user?.id) {
+    const userId = await getAuthenticatedUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json().catch(() => ({}));
-    const id = body.id || crypto.randomUUID();
-    const title = body.title?.trim() || "새로운 대화";
+    const rawBody = await req.json().catch(() => ({}));
+    const parseResult = createChatSessionSchema.safeParse(rawBody);
 
-    const [newSession] = await db
-      .insert(chatSession)
-      .values({
-        id,
-        userId: session.user.id,
-        title,
-      })
-      .onConflictDoUpdate({
-        target: chatSession.id,
-        set: {
-          title,
-          updatedAt: new Date(),
-        },
-      })
-      .returning();
+    if (!parseResult.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parseResult.error.flatten() },
+        { status: 400 }
+      );
+    }
+
+    const { id = crypto.randomUUID(), title } = parseResult.data;
+
+    const newSession = await chatRepository.createSession({
+      id,
+      userId,
+      title,
+    });
 
     return NextResponse.json({ session: newSession }, { status: 201 });
   } catch (error) {

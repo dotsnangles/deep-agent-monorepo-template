@@ -1,18 +1,13 @@
 import { Router, type Router as ExpressRouter } from "express";
-import { z } from "zod";
-import * as sessionsService from "./sessions.service";
+import { createChatSessionSchema } from "@repo/validators";
+import { chatRepository } from "@repo/db";
 
 export const sessionsRouter: ExpressRouter = Router();
-
-const CreateSessionSchema = z.object({
-  userId: z.string().min(1, "User ID is required"),
-  title: z.string().optional(),
-});
 
 sessionsRouter.get("/api/sessions/user/:userId", async (req, res, next) => {
   try {
     const { userId } = req.params;
-    const sessions = await sessionsService.getUserSessions(userId);
+    const sessions = await chatRepository.getSessions(userId);
     res.json({ sessions });
   } catch (error) {
     next(error);
@@ -21,8 +16,17 @@ sessionsRouter.get("/api/sessions/user/:userId", async (req, res, next) => {
 
 sessionsRouter.post("/api/sessions", async (req, res, next) => {
   try {
-    const { userId, title } = CreateSessionSchema.parse(req.body);
-    const session = await sessionsService.createSession(userId, title);
+    const parsed = createChatSessionSchema.parse(req.body);
+    const userId = parsed.userId || req.body.userId;
+    if (!userId) {
+      res.status(400).json({ error: "User ID is required" });
+      return;
+    }
+    const session = await chatRepository.createSession({
+      id: parsed.id || crypto.randomUUID(),
+      userId,
+      title: parsed.title,
+    });
     res.status(201).json({ session });
   } catch (error) {
     next(error);

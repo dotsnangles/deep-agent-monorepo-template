@@ -77,6 +77,10 @@ export class DrizzleChatRepository implements ChatRepository {
       })
       .returning();
 
+    if (!created) {
+      throw new Error("Failed to create chat session record");
+    }
+
     return toSessionEntity(created);
   }
 
@@ -182,6 +186,10 @@ export class DrizzleChatRepository implements ChatRepository {
         })
         .returning();
 
+      if (!sessionRecord) {
+        throw new Error("Failed to upsert chat session record");
+      }
+
       // Message insert
       const [messageRecord] = await (tx as unknown as DrizzleDb)
         .insert(chatMessage)
@@ -193,6 +201,10 @@ export class DrizzleChatRepository implements ChatRepository {
           content: params.content,
         })
         .returning();
+
+      if (!messageRecord) {
+        throw new Error("Failed to insert chat message record");
+      }
 
       return {
         message: toMessageNode(messageRecord),

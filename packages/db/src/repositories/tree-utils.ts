@@ -65,7 +65,9 @@ export function findDeepestDescendant(nodes: MessageNode[], startNodeId: string)
   while (true) {
     const children = childrenMap.get(currentId) || [];
     if (children.length === 0) break;
-    currentId = children[children.length - 1].id;
+    const lastChild = children[children.length - 1];
+    if (!lastChild) break;
+    currentId = lastChild.id;
   }
   return currentId;
 }
@@ -85,10 +87,14 @@ export function findNewActiveLeafAfterPrune(
 
   const roots = remainingNodes.filter((n) => !n.parentId);
   if (roots.length > 0) {
-    return findDeepestDescendant(remainingNodes, roots[roots.length - 1].id);
+    const lastRoot = roots[roots.length - 1];
+    if (lastRoot) {
+      return findDeepestDescendant(remainingNodes, lastRoot.id);
+    }
   }
 
-  return remainingNodes[remainingNodes.length - 1].id;
+  const lastNode = remainingNodes[remainingNodes.length - 1];
+  return lastNode ? lastNode.id : null;
 }
 
 export function resolveActiveLeafAfterPrune(

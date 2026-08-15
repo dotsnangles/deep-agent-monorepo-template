@@ -5,8 +5,7 @@ import {
 } from "@copilotkit/runtime";
 import { LangGraphHttpAgent } from "@copilotkit/runtime/langgraph";
 import { auth } from "@repo/auth";
-import { db, chatSession } from "@repo/db";
-import { eq } from "drizzle-orm";
+import { chatRepository } from "@repo/db";
 import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { generateSmartTitleInBackground } from "@/features/chat/server";
@@ -43,8 +42,8 @@ function findUserMessage(obj: any): string | null {
       typeof content === "string" &&
       content.trim().length > 0
     ) {
-      const clean = content.trim().replace(/[\r\n\t]+/g, " ");
-      return clean.length > 30 ? clean.slice(0, 30) + "..." : clean;
+      const clean = content.trim();
+      return clean.slice(0, 30);
     }
 
     for (const key of Object.keys(obj)) {
@@ -69,11 +68,7 @@ export async function POST(req: NextRequest) {
       req.nextUrl.searchParams.get("threadId");
 
     if (authSession?.user?.id && threadId) {
-      const existing = await db
-        .select()
-        .from(chatSession)
-        .where(eq(chatSession.id, threadId))
-        .limit(1);
+      const existing = await chatRepository.getSession(threadId, authSession.user.id);
 
       // Check if this request actually contains a user message (Write vs Read)
       let userMessageTitle: string | null = null;
@@ -84,36 +79,21 @@ export async function POST(req: NextRequest) {
         // Ignore unparseable payload
       }
 
-      if (existing.length > 0) {
-        // Ownership security check
-        if (existing[0].userId !== authSession.user.id) {
-          return NextResponse.json(
-            { error: "Forbidden: You do not have access to this chat session." },
-            { status: 403 }
-          );
-        }
-
-        // ONLY update timestamp when a new message is actively sent by the user!
-        // Simple clicks / read-only thread loads will NOT bump the session to top.
+      if (existing) {
+        // Update session timestamp when user message is sent
         if (userMessageTitle) {
-          await db
-            .update(chatSession)
-            .set({ updatedAt: new Date() })
-            .where(eq(chatSession.id, threadId));
+          await chatRepository.updateSessionTitle(threadId, authSession.user.id, existing.title);
         }
       } else {
         // ONLY create session record when user actually sends a non-empty message!
         if (userMessageTitle && userMessageTitle.trim().length > 0) {
-          await db
-            .insert(chatSession)
-            .values({
-              id: threadId,
-              userId: authSession.user.id,
-              title: userMessageTitle,
-            })
-            .onConflictDoNothing();
+          await chatRepository.createSession({
+            id: threadId,
+            userId: authSession.user.id,
+            title: userMessageTitle,
+          });
 
-          // Generate a concise smart title asynchronously in the background!
+          // Generate a concise smart title asynchronously in the background
           generateSmartTitleInBackground(threadId, userMessageTitle);
         }
       }

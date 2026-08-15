@@ -1,0 +1,229 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextRequest } from "next/server";
+import * as sessionsRoute from "../sessions/route";
+import * as sessionIdRoute from "../sessions/[id]/route";
+import * as messagesRoute from "../messages/route";
+import { auth } from "@repo/auth";
+
+const hoisted = vi.hoisted(() => {
+  return { fakeRepo: null as any };
+});
+
+vi.mock("@repo/db", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@repo/db")>();
+  const repo = new actual.FakeChatRepository();
+  hoisted.fakeRepo = repo;
+  return {
+    ...actual,
+    chatRepository: repo,
+  };
+});
+
+vi.mock("@repo/auth", () => ({
+  auth: {
+    api: {
+      getSession: vi.fn(),
+    },
+  },
+}));
+
+vi.mock("next/headers", () => ({
+  headers: vi.fn().mockResolvedValue(new Headers()),
+}));
+
+vi.mock("@/features/chat/server", () => ({
+  generateSmartTitleInBackground: vi.fn(),
+}));
+
+describe("Zero-DB Chat API Route Handlers Integration", () => {
+  const TEST_USER = {
+    user: {
+      id: "usr_mock_123",
+      email: "test@example.com",
+    },
+  };
+
+  beforeEach(() => {
+    hoisted.fakeRepo.clear();
+    vi.mocked(auth.api.getSession).mockResolvedValue(TEST_USER as any);
+  });
+
+  describe("/api/chat/sessions (GET, POST)", () => {
+    it("returns 401 Unauthorized when user is not authenticated", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(null as any);
+
+      const req = new NextRequest("http://localhost:3000/api/chat/sessions");
+      const res = await sessionsRoute.GET(req);
+      expect(res.status).toBe(401);
+    });
+
+    it("creates and lists chat sessions", async () => {
+      const createReq = new NextRequest("http://localhost:3000/api/chat/sessions", {
+        method: "POST",
+        body: JSON.stringify({ id: "sess-api-1", title: "API Created Chat" }),
+      });
+      const createRes = await sessionsRoute.POST(createReq);
+      expect(createRes.status).toBe(201);
+      const createData = await createRes.json();
+      expect(createData.session.id).toBe("sess-api-1");
+      expect(createData.session.title).toBe("API Created Chat");
+
+      const getReq = new NextRequest("http://localhost:3000/api/chat/sessions");
+      const getRes = await sessionsRoute.GET(getReq);
+      expect(getRes.status).toBe(200);
+      const getData = await getRes.json();
+      expect(getData.sessions).toHaveLength(1);
+      expect(getData.sessions[0].id).toBe("sess-api-1");
+    });
+  });
+
+  describe("/api/chat/sessions/[id] (PATCH, DELETE)", () => {
+    it("returns 400 when PATCH title is invalid or empty", async () => {
+      const patchReq = new NextRequest("http://localhost:3000/api/chat/sessions/sess-1", {
+        method: "PATCH",
+        body: JSON.stringify({ title: "" }),
+      });
+      const patchRes = await sessionIdRoute.PATCH(patchReq, {
+        params: Promise.resolve({ id: "sess-1" }),
+      });
+      expect(patchRes.status).toBe(400);
+      const data = await patchRes.json();
+      expect(data.error).toBe("Validation failed");
+    });
+
+    it("renames and deletes an existing session", async () => {
+      await hoisted.fakeRepo.createSession({
+        id: "sess-edit",
+        userId: TEST_USER.user.id,
+        title: "Old Title",
+      });
+
+      const patchReq = new NextRequest("http://localhost:3000/api/chat/sessions/sess-edit", {
+        method: "PATCH",
+        body: JSON.stringify({ title: "New Title" }),
+      });
+      const patchRes = await sessionIdRoute.PATCH(patchReq, {
+        params: Promise.resolve({ id: "sess-edit" }),
+      });
+      expect(patchRes.status).toBe(200);
+      const patchData = await patchRes.json();
+      expect(patchData.session.title).toBe("New Title");
+
+      const deleteReq = new NextRequest("http://localhost:3000/api/chat/sessions/sess-edit", {
+        method: "DELETE",
+      });
+      const deleteRes = await sessionIdRoute.DELETE(deleteReq, {
+        params: Promise.resolve({ id: "sess-edit" }),
+      });
+      expect(deleteRes.status).toBe(200);
+      const deleteData = await deleteRes.json();
+      expect(deleteData.success).toBe(true);
+
+      const verifyDeleted = await hoisted.fakeRepo.getSession("sess-edit", TEST_USER.user.id);
+      expect(verifyDeleted).toBeNull();
+    });
+
+    it("returns 404 when updating non-existent session", async () => {
+      const patchReq = new NextRequest("http://localhost:3000/api/chat/sessions/sess-missing", {
+        method: "PATCH",
+        body: JSON.stringify({ title: "Valid Title" }),
+      });
+      const patchRes = await sessionIdRoute.PATCH(patchReq, {
+        params: Promise.resolve({ id: "sess-missing" }),
+      });
+      expect(patchRes.status).toBe(404);
+    });
+  });
+
+  describe("/api/chat/messages (GET, POST, PATCH, DELETE)", () => {
+    it("returns 400 on invalid POST/PATCH/DELETE payloads", async () => {
+      // POST invalid schema (missing content & role)
+      const invalidPost = new NextRequest("http://localhost:3000/api/chat/messages", {
+        method: "POST",
+        body: JSON.stringify({ sessionId: "s1" }),
+      });
+      const postRes = await messagesRoute.POST(invalidPost);
+      expect(postRes.status).toBe(400);
+
+      // PATCH invalid schema (missing activeLeafId)
+      const invalidPatch = new NextRequest("http://localhost:3000/api/chat/messages", {
+        method: "PATCH",
+        body: JSON.stringify({ sessionId: "s1" }),
+      });
+      const patchRes = await messagesRoute.PATCH(invalidPatch);
+      expect(patchRes.status).toBe(400);
+
+      // DELETE invalid schema (missing messageId)
+      const invalidDelete = new NextRequest("http://localhost:3000/api/chat/messages", {
+        method: "DELETE",
+        body: JSON.stringify({ sessionId: "s1" }),
+      });
+      const deleteRes = await messagesRoute.DELETE(invalidDelete);
+      expect(deleteRes.status).toBe(400);
+    });
+
+    it("performs full tree lifecycle: save -> active leaf switch -> prune", async () => {
+      // 1. Send first message in lazy session
+      const postUserReq = new NextRequest("http://localhost:3000/api/chat/messages", {
+        method: "POST",
+        body: JSON.stringify({
+          id: "m-user-1",
+          sessionId: "sess-tree-1",
+          role: "user",
+          content: "Calculate 10 * 10",
+        }),
+      });
+      const postUserRes = await messagesRoute.POST(postUserReq);
+      expect(postUserRes.status).toBe(201);
+      const postUserData = await postUserRes.json();
+      expect(postUserData.message.id).toBe("m-user-1");
+      expect(postUserData.activeLeafId).toBe("m-user-1");
+
+      // 2. Save assistant response
+      const postAsstReq = new NextRequest("http://localhost:3000/api/chat/messages", {
+        method: "POST",
+        body: JSON.stringify({
+          id: "m-asst-1",
+          sessionId: "sess-tree-1",
+          parentId: "m-user-1",
+          role: "assistant",
+          content: "100",
+        }),
+      });
+      const postAsstRes = await messagesRoute.POST(postAsstReq);
+      expect(postAsstRes.status).toBe(201);
+
+      // 3. GET tree
+      const getTreeReq = new NextRequest("http://localhost:3000/api/chat/messages?sessionId=sess-tree-1");
+      const getTreeRes = await messagesRoute.GET(getTreeReq);
+      expect(getTreeRes.status).toBe(200);
+      const treeData = await getTreeRes.json();
+      expect(treeData.messages).toHaveLength(2);
+      expect(treeData.activePath.map((m: any) => m.id)).toEqual(["m-user-1", "m-asst-1"]);
+
+      // 4. Switch active leaf
+      const patchLeafReq = new NextRequest("http://localhost:3000/api/chat/messages", {
+        method: "PATCH",
+        body: JSON.stringify({
+          sessionId: "sess-tree-1",
+          activeLeafId: "m-user-1",
+        }),
+      });
+      const patchLeafRes = await messagesRoute.PATCH(patchLeafReq);
+      expect(patchLeafRes.status).toBe(200);
+
+      // 5. Delete subtree
+      const deleteReq = new NextRequest("http://localhost:3000/api/chat/messages", {
+        method: "DELETE",
+        body: JSON.stringify({
+          sessionId: "sess-tree-1",
+          messageId: "m-asst-1",
+        }),
+      });
+      const deleteRes = await messagesRoute.DELETE(deleteReq);
+      expect(deleteRes.status).toBe(200);
+      const deleteData = await deleteRes.json();
+      expect(deleteData.deletedIds).toContain("m-asst-1");
+    });
+  });
+});

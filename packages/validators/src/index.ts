@@ -16,6 +16,21 @@ export const healthCheckSchema = z.object({
 
 export type HealthCheck = z.infer<typeof healthCheckSchema>;
 
+// Chat Session DTO Schemas
+export const createChatSessionSchema = z.object({
+  id: z.string().optional(),
+  title: z.string().optional(),
+  userId: z.string().optional(),
+});
+
+export type CreateChatSessionDTO = z.infer<typeof createChatSessionSchema>;
+
+export const patchChatSessionSchema = z.object({
+  title: z.string().min(1, "Title cannot be empty"),
+});
+
+export type PatchChatSessionDTO = z.infer<typeof patchChatSessionSchema>;
+
 // Chat Message Tree DTO Schemas
 export const createChatMessageSchema = z.object({
   sessionId: z.string().min(1, "sessionId is required"),
