@@ -23,8 +23,6 @@ export interface TreeResult {
   activePath: MessageNode[];
 }
 
-export type TreeFetchResult = TreeResult;
-
 export interface DeleteSubtreeResult {
   deletedIds: string[];
   activeLeafId: string | null;
