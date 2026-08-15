@@ -2,27 +2,30 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { LayoutDashboard } from "lucide-react";
 
-import { Badge } from "@repo/ui/components/badge";
-import { authClient } from "@/lib/auth-client";
+import { auth } from "@repo/auth";
+import { env } from "@repo/env/server";
 import Dashboard from "./dashboard";
 
 export default async function DashboardPage() {
-  const session = await authClient.getSession({
-    fetchOptions: {
-      headers: await headers(),
-      throw: true,
-    },
+  const reqHeaders = await headers();
+  const session = await auth.api.getSession({
+    headers: reqHeaders,
   });
 
   if (!session?.user) {
     redirect("/login");
   }
 
-  const { data: customerState } = await authClient.customer.state({
-    fetchOptions: {
-      headers: await headers(),
-    },
-  });
+  let customerState = null;
+  if (env.POLAR_ACCESS_TOKEN && typeof (auth.api as any).state === "function") {
+    try {
+      customerState = await (auth.api as any).state({
+        headers: reqHeaders,
+      });
+    } catch {
+      customerState = null;
+    }
+  }
 
   return (
     <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-6">

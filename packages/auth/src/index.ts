@@ -30,24 +30,28 @@ export function createAuth() {
       },
     },
     plugins: [
-      polar({
-        client: polarClient,
-        createCustomerOnSignUp: Boolean(env.POLAR_ACCESS_TOKEN),
-        enableCustomerPortal: Boolean(env.POLAR_ACCESS_TOKEN),
-        use: [
-          checkout({
-            products: [
-              {
-                productId: "your-product-id",
-                slug: "pro",
-              },
-            ],
-            successUrl: env.POLAR_SUCCESS_URL,
-            authenticatedUsersOnly: true,
-          }),
-          portal(),
-        ],
-      }),
+      ...(env.POLAR_ACCESS_TOKEN
+        ? [
+            polar({
+              client: polarClient,
+              createCustomerOnSignUp: true,
+              enableCustomerPortal: true,
+              use: [
+                checkout({
+                  products: [
+                    {
+                      productId: "your-product-id",
+                      slug: "pro",
+                    },
+                  ],
+                  successUrl: env.POLAR_SUCCESS_URL,
+                  authenticatedUsersOnly: true,
+                }),
+                portal(),
+              ],
+            }),
+          ]
+        : []),
     ],
   });
 }
