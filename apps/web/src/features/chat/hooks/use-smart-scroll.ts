@@ -17,32 +17,34 @@ export function useSmartScroll() {
     if (!el) return;
 
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const shouldShow = distanceFromBottom > 20;
 
-    // Show floating return button if scrolled up by more than 20px
-    setShowScrollBottomButton(distanceFromBottom > 20);
+    // Only trigger setState if the boolean actually changed
+    setShowScrollBottomButton((prev) => (prev !== shouldShow ? shouldShow : prev));
 
     // Auto-scroll is ONLY re-enabled when the user reaches the absolute bottom (<= 2px)
     if (distanceFromBottom <= 2) {
       isPinnedToBottomRef.current = true;
     } else if (!isProgrammaticScrollRef.current) {
-      // If user is anywhere above the bottom, latch auto-scroll to false
       isPinnedToBottomRef.current = false;
     }
   }, []);
 
-  // Scroll to bottom helper
+  // Pure DOM scroll to bottom (NO React state mutations during streaming instant scroll)
   const scrollToBottom = useCallback((behavior: "smooth" | "instant" | "auto" = "instant") => {
     const el = scrollRef.current;
     if (!el) return;
 
     isProgrammaticScrollRef.current = true;
     isPinnedToBottomRef.current = true;
-    setShowScrollBottomButton(false);
 
     if (behavior === "instant" || behavior === "auto") {
+      // Pure DOM mutation: 0 React re-renders or state cascades
       el.scrollTop = el.scrollHeight;
       isProgrammaticScrollRef.current = false;
     } else {
+      // Smooth animated jump: hide button only if currently visible
+      setShowScrollBottomButton((prev) => (prev ? false : prev));
       el.scrollTo({
         top: el.scrollHeight,
         behavior: "smooth",
@@ -62,13 +64,13 @@ export function useSmartScroll() {
       // Any upward wheel tick immediately latches auto-scroll OFF with 0ms delay
       if (e.deltaY < 0) {
         isPinnedToBottomRef.current = false;
-        setShowScrollBottomButton(true);
+        setShowScrollBottomButton((prev) => (prev ? prev : true));
       } else if (e.deltaY > 0) {
         // Downward wheel: re-enable auto-scroll only if reaching the very bottom
         const dist = el.scrollHeight - (el.scrollTop + e.deltaY) - el.clientHeight;
         if (dist <= 2) {
           isPinnedToBottomRef.current = true;
-          setShowScrollBottomButton(false);
+          setShowScrollBottomButton((prev) => (prev ? false : prev));
         }
       }
     };
@@ -82,10 +84,9 @@ export function useSmartScroll() {
     const handleTouchMove = (e: TouchEvent) => {
       if (e.touches.length > 0) {
         const currentY = e.touches[0].clientY;
-        // Dragging finger downward moves content upward
         if (currentY - touchStartYRef.current > 3) {
           isPinnedToBottomRef.current = false;
-          setShowScrollBottomButton(true);
+          setShowScrollBottomButton((prev) => (prev ? prev : true));
         }
       }
     };
@@ -93,7 +94,7 @@ export function useSmartScroll() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (["PageUp", "ArrowUp", "Home"].includes(e.key)) {
         isPinnedToBottomRef.current = false;
-        setShowScrollBottomButton(true);
+        setShowScrollBottomButton((prev) => (prev ? prev : true));
       }
     };
 
