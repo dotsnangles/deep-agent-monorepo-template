@@ -1,37 +1,37 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Bot, Check, Copy, Edit2, RotateCw, Trash2, User, X } from "lucide-react";
+import { AlertCircle, Bot, Check, Copy, Edit2, RotateCw, Trash2, User, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@repo/ui/components/button";
 import { Textarea } from "@repo/ui/components/textarea";
-import {
-  type MessageNode,
-  getBranchInfo,
-  pruneSubtree,
-} from "../lib/tree";
+import type { MessageNode, BranchInfo } from "../lib/tree";
 import { MessageBranchSwitcher } from "./message-branch-switcher";
 import { MarkdownRenderer } from "./markdown-renderer";
 import { useCopyToClipboard } from "../hooks/use-copy-to-clipboard";
 
 interface MessageItemProps {
   message: MessageNode;
-  allNodes: MessageNode[];
+  branchInfo: BranchInfo;
+  affectedSubtreeCount?: number;
   isGenerating: boolean;
   onNavigateSibling: (direction: "prev" | "next") => void;
   onEdit: (newContent: string) => void;
   onRegenerate: () => void;
   onDelete: () => void;
+  onRetry?: () => void;
 }
 
 export function MessageItem({
   message,
-  allNodes,
+  branchInfo,
+  affectedSubtreeCount = 1,
   isGenerating,
   onNavigateSibling,
   onEdit,
   onRegenerate,
   onDelete,
+  onRetry,
 }: MessageItemProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editDraft, setEditDraft] = useState(message.content);
@@ -40,14 +40,6 @@ export function MessageItem({
 
   const isUser = message.role === "user";
 
-  const branchInfo = useMemo(() => {
-    return getBranchInfo(message.id, allNodes);
-  }, [message.id, allNodes]);
-
-  const affectedSubtreeCount = useMemo(() => {
-    const { deletedIds } = pruneSubtree(allNodes, message.id);
-    return deletedIds.length;
-  }, [allNodes, message.id]);
 
   const handleCopy = () => {
     copy(message.content);
@@ -138,7 +130,7 @@ export function MessageItem({
           </div>
         ) : (
           /* Assistant Message: Clean stream layout with Markdown & LaTeX */
-          <div className="w-full text-sm leading-relaxed text-foreground py-0.5">
+          <div className="w-full text-sm leading-relaxed text-foreground py-0.5 space-y-2">
             {message.content ? (
               <MarkdownRenderer content={message.content} isGenerating={isGenerating} />
             ) : isGenerating ? (
@@ -146,11 +138,34 @@ export function MessageItem({
                 <span className="flex size-2 rounded-full bg-primary animate-pulse" />
                 <span className="animate-pulse">답변을 생성하고 있습니다...</span>
               </div>
-            ) : (
+            ) : message.status === "error" || message.error ? null : (
               <span className="text-muted-foreground italic text-xs">(내용 없음)</span>
+            )}
+
+            {/* Error Message & Retry Banner */}
+            {(message.status === "error" || message.error) && (
+              <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-destructive/10 border border-destructive/30 text-xs text-destructive w-full max-w-md animate-in fade-in-50 duration-150">
+                <div className="flex items-center gap-2 min-w-0">
+                  <AlertCircle className="size-4 shrink-0" />
+                  <span className="truncate">{message.error || "답변 생성 중 오류가 발생했습니다."}</span>
+                </div>
+                {onRetry && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-6 px-2.5 text-[11px] border-destructive/40 hover:bg-destructive/20 text-destructive gap-1 shrink-0 cursor-pointer"
+                    onClick={onRetry}
+                    disabled={isGenerating}
+                  >
+                    <RotateCw className="size-3" />
+                    <span>재시도</span>
+                  </Button>
+                )}
+              </div>
             )}
           </div>
         )}
+
 
         {/* Action Bar (Branch Switcher + Quick Actions) */}
         {!isEditing && (

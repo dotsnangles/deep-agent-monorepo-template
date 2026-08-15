@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Bot, Sparkles, Square, Terminal } from "lucide-react";
 import { Button } from "@repo/ui/components/button";
 import { Textarea } from "@repo/ui/components/textarea";
-import { useMessageTree } from "../hooks/use-message-tree";
+import { useChatEngine } from "../hooks/use-chat-engine";
 import { useSmartScroll } from "../hooks/use-smart-scroll";
 import { MessageItem } from "./message-item";
 
@@ -32,17 +32,19 @@ const STARTER_PROMPTS = [
 
 export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
   const {
-    allNodes,
     activePath,
     isLoading,
     isGenerating,
-    sendMessage,
-    editUserMessage,
-    regenerateAssistantMessage,
-    deleteMessage,
-    navigateSibling,
-    stopGeneration,
-  } = useMessageTree(sessionId);
+    generatingAssistantId,
+    send,
+    forkAndEdit,
+    regenerate,
+    deleteNode,
+    selectBranch,
+    retry,
+    stop,
+    getBranchInfo,
+  } = useChatEngine(sessionId);
 
   const [inputPrompt, setInputPrompt] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -104,7 +106,7 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
       textareaRef.current.style.height = "auto";
     }
     isPinnedToBottomRef.current = true;
-    sendMessage(content);
+    send(content);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -148,7 +150,7 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
                     type="button"
                     onClick={() => {
                       isPinnedToBottomRef.current = true;
-                      sendMessage(item.prompt);
+                      send(item.prompt);
                     }}
                     className="flex flex-col items-start p-3.5 rounded-2xl bg-card border border-border/70 hover:border-primary/50 hover:bg-muted/30 transition-all text-left group shadow-xs cursor-pointer"
                   >
@@ -169,24 +171,31 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
           <div className="space-y-4">
             {activePath.map((msg, index) => {
               const isLast = index === activePath.length - 1;
-              const isStreamingThisMessage = isGenerating && isLast && msg.role === "assistant";
+              const isStreamingThisMessage =
+                isGenerating &&
+                ((generatingAssistantId && msg.id === generatingAssistantId) ||
+                  (!generatingAssistantId && isLast && msg.role === "assistant"));
 
               return (
                 <MessageItem
                   key={msg.id}
                   message={msg}
-                  allNodes={allNodes}
+                  branchInfo={getBranchInfo(msg.id)}
                   isGenerating={isStreamingThisMessage}
-                  onNavigateSibling={(direction) => navigateSibling(msg.id, direction)}
+                  onNavigateSibling={(direction) => selectBranch(msg.id, direction)}
                   onEdit={(newContent) => {
                     isPinnedToBottomRef.current = true;
-                    editUserMessage(msg.id, newContent);
+                    forkAndEdit(msg.id, newContent);
                   }}
                   onRegenerate={() => {
                     isPinnedToBottomRef.current = true;
-                    regenerateAssistantMessage(msg.id);
+                    regenerate(msg.id);
                   }}
-                  onDelete={() => deleteMessage(msg.id)}
+                  onDelete={() => deleteNode(msg.id)}
+                  onRetry={() => {
+                    isPinnedToBottomRef.current = true;
+                    retry(msg.id);
+                  }}
                 />
               );
             })}
@@ -217,14 +226,16 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
             value={inputPrompt}
             onChange={(e) => setInputPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
+            disabled={isGenerating}
             placeholder={
               isGenerating
                 ? "AI가 답변을 작성하고 있습니다... (필요시 중지 가능)"
                 : "무엇이든 물어보세요... (Enter: 전송, Shift+Enter: 줄바꿈)"
             }
-            className="min-h-[52px] max-h-[180px] resize-none border-none shadow-none focus-visible:ring-0 text-sm px-4 py-3 bg-transparent leading-relaxed"
+            className="min-h-[52px] max-h-[180px] resize-none border-none shadow-none focus-visible:ring-0 text-sm px-4 py-3 bg-transparent leading-relaxed disabled:opacity-60 disabled:cursor-not-allowed"
             rows={1}
           />
+
           <div className="flex items-center justify-between px-3.5 pb-2.5 pt-0.5">
             <span className="text-[11px] text-muted-foreground/80 select-none">
               {isGenerating ? "답변 생성 진행 중" : "대화 분기 지원 (수정 시 새 브랜치 생성)"}
@@ -234,7 +245,7 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
                 type="button"
                 size="icon"
                 className="size-8 rounded-xl shadow-xs bg-foreground text-background hover:bg-foreground/90 transition-all cursor-pointer animate-in zoom-in-90 duration-150"
-                onClick={stopGeneration}
+                onClick={stop}
                 title="답변 생성 중단 (Stop)"
               >
                 <Square className="size-3.5 fill-current" />
@@ -257,3 +268,4 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
     </div>
   );
 }
+
