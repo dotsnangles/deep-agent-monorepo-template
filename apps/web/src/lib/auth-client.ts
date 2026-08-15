@@ -1,4 +1,4 @@
-import { env } from "@hollow-echo-distant-signal/env/web";
+import { env } from "@repo/env/web";
 import { polarClient } from "@polar-sh/better-auth/client";
 import { createAuthClient } from "better-auth/react";
 

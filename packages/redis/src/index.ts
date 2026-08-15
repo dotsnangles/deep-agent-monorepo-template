@@ -1,5 +1,5 @@
 import { Redis } from "ioredis";
-import { env } from "@hollow-echo-distant-signal/env/server";
+import { env } from "@repo/env/server";
 
 export const redis = new Redis(env.REDIS_URL, {
   maxRetriesPerRequest: 3,

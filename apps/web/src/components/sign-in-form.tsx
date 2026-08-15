@@ -1,6 +1,6 @@
-import { Button } from "@hollow-echo-distant-signal/ui/components/button";
-import { Input } from "@hollow-echo-distant-signal/ui/components/input";
-import { Label } from "@hollow-echo-distant-signal/ui/components/label";
+import { Button } from "@repo/ui/components/button";
+import { Input } from "@repo/ui/components/input";
+import { Label } from "@repo/ui/components/label";
 import { useForm } from "@tanstack/react-form";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";

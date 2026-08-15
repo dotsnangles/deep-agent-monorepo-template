@@ -13,8 +13,8 @@
   "iconLibrary": "lucide",
   "aliases": {
     "components": "@/components",
-    "utils": "@hollow-echo-distant-signal/ui/lib/utils",
-    "ui": "@hollow-echo-distant-signal/ui/components",
+    "utils": "@repo/ui/lib/utils",
+    "ui": "@repo/ui/components",
     "lib": "@/lib",
     "hooks": "@/hooks"
   },

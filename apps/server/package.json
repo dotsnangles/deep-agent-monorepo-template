@@ -10,12 +10,12 @@
     "start": "node dist/index.mjs"
   },
   "dependencies": {
-    "@hollow-echo-distant-signal/auth": "workspace:*",
-    "@hollow-echo-distant-signal/db": "workspace:*",
-    "@hollow-echo-distant-signal/env": "workspace:*",
-    "@hollow-echo-distant-signal/redis": "workspace:*",
-    "@hollow-echo-distant-signal/storage": "workspace:*",
-    "@hollow-echo-distant-signal/validators": "workspace:*",
+    "@repo/auth": "workspace:*",
+    "@repo/db": "workspace:*",
+    "@repo/env": "workspace:*",
+    "@repo/redis": "workspace:*",
+    "@repo/storage": "workspace:*",
+    "@repo/validators": "workspace:*",
     "better-auth": "catalog:",
     "cors": "^2.8.6",
     "dotenv": "catalog:",
@@ -23,7 +23,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@hollow-echo-distant-signal/config": "workspace:*",
+    "@repo/config": "workspace:*",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^22.20.1",

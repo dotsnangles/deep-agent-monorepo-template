@@ -1,5 +1,5 @@
 {
-  "name": "@hollow-echo-distant-signal/auth",
+  "name": "@repo/auth",
   "type": "module",
   "exports": {
     ".": {
@@ -11,8 +11,8 @@
   },
   "scripts": {},
   "dependencies": {
-    "@hollow-echo-distant-signal/db": "workspace:*",
-    "@hollow-echo-distant-signal/env": "workspace:*",
+    "@repo/db": "workspace:*",
+    "@repo/env": "workspace:*",
     "@polar-sh/better-auth": "catalog:",
     "@polar-sh/sdk": "^0.47.0",
     "better-auth": "catalog:",
@@ -20,7 +20,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@hollow-echo-distant-signal/config": "workspace:*",
+    "@repo/config": "workspace:*",
     "typescript": "catalog:"
   }
 }

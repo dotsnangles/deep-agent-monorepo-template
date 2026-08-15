@@ -6,6 +6,6 @@ export default defineConfig({
   outDir: "./dist",
   clean: true,
   deps: {
-    alwaysBundle: [/@hollow-echo-distant-signal\/.*/],
+    alwaysBundle: [/@repo\/.*/],
   },
 });

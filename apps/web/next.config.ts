@@ -1,4 +1,4 @@
-import "@hollow-echo-distant-signal/env/web";
+import "@repo/env/web";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {

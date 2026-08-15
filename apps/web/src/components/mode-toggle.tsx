@@ -1,12 +1,12 @@
 "use client";
 
-import { Button } from "@hollow-echo-distant-signal/ui/components/button";
+import { Button } from "@repo/ui/components/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@hollow-echo-distant-signal/ui/components/dropdown-menu";
+} from "@repo/ui/components/dropdown-menu";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import * as React from "react";

@@ -53,7 +53,7 @@ importers:
 
   .:
     dependencies:
-      '@hollow-echo-distant-signal/env':
+      '@repo/env':
         specifier: workspace:*
         version: link:packages/env
       dotenv:
@@ -63,7 +63,7 @@ importers:
         specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
-      '@hollow-echo-distant-signal/config':
+      '@repo/config':
         specifier: workspace:*
         version: link:packages/config
       '@types/node':
@@ -80,22 +80,22 @@ importers:
 
   apps/server:
     dependencies:
-      '@hollow-echo-distant-signal/auth':
+      '@repo/auth':
         specifier: workspace:*
         version: link:../../packages/auth
-      '@hollow-echo-distant-signal/db':
+      '@repo/db':
         specifier: workspace:*
         version: link:../../packages/db
-      '@hollow-echo-distant-signal/env':
+      '@repo/env':
         specifier: workspace:*
         version: link:../../packages/env
-      '@hollow-echo-distant-signal/redis':
+      '@repo/redis':
         specifier: workspace:*
         version: link:../../packages/redis
-      '@hollow-echo-distant-signal/storage':
+      '@repo/storage':
         specifier: workspace:*
         version: link:../../packages/storage
-      '@hollow-echo-distant-signal/validators':
+      '@repo/validators':
         specifier: workspace:*
         version: link:../../packages/validators
       better-auth:
@@ -109,12 +109,12 @@ importers:
         version: 17.4.2
       express:
         specifier: ^5.2.1
-        version: 5.2.1
+        version: 5.2.1(supports-color@7.2.0)
       zod:
         specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
-      '@hollow-echo-distant-signal/config':
+      '@repo/config':
         specifier: workspace:*
         version: link:../../packages/config
       '@types/cors':
@@ -150,18 +150,18 @@ importers:
       '@copilotkit/runtime-client-gql':
         specifier: ^1.67.1
         version: 1.67.1(@ag-ui/core@0.0.57)(graphql@16.14.2)(react@19.2.8)
-      '@hollow-echo-distant-signal/env':
-        specifier: workspace:*
-        version: link:../../packages/env
-      '@hollow-echo-distant-signal/ui':
-        specifier: workspace:*
-        version: link:../../packages/ui
-      '@hollow-echo-distant-signal/validators':
-        specifier: workspace:*
-        version: link:../../packages/validators
       '@polar-sh/better-auth':
         specifier: 'catalog:'
         version: 1.8.4(@polar-sh/sdk@0.47.1)(@stripe/react-stripe-js@4.0.2(@stripe/stripe-js@7.9.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@stripe/stripe-js@7.9.0)(better-auth@1.6.25(@opentelemetry/api@1.9.1)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.21.0)(kysely@0.29.5)(pg@8.23.0))(next@16.3.0(@opentelemetry/api@1.9.1)(@types/node@20.19.43)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(zod@4.4.3)
+      '@repo/env':
+        specifier: workspace:*
+        version: link:../../packages/env
+      '@repo/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      '@repo/validators':
+        specifier: workspace:*
+        version: link:../../packages/validators
       '@swc/helpers':
         specifier: ^0.5.23
         version: 0.5.23
@@ -202,7 +202,7 @@ importers:
         specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
-      '@hollow-echo-distant-signal/config':
+      '@repo/config':
         specifier: workspace:*
         version: link:../../packages/config
       '@tailwindcss/postcss':
@@ -226,18 +226,18 @@ importers:
 
   packages/auth:
     dependencies:
-      '@hollow-echo-distant-signal/db':
-        specifier: workspace:*
-        version: link:../db
-      '@hollow-echo-distant-signal/env':
-        specifier: workspace:*
-        version: link:../env
       '@polar-sh/better-auth':
         specifier: 'catalog:'
         version: 1.8.4(@polar-sh/sdk@0.47.1)(@stripe/react-stripe-js@4.0.2(@stripe/stripe-js@7.9.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@stripe/stripe-js@7.9.0)(better-auth@1.6.25(@opentelemetry/api@1.9.1)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.21.0)(kysely@0.29.5)(pg@8.23.0))(next@16.3.0(@opentelemetry/api@1.9.1)(@types/node@22.20.1)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(zod@4.4.3)
       '@polar-sh/sdk':
         specifier: ^0.47.0
         version: 0.47.1
+      '@repo/db':
+        specifier: workspace:*
+        version: link:../db
+      '@repo/env':
+        specifier: workspace:*
+        version: link:../env
       better-auth:
         specifier: 'catalog:'
         version: 1.6.25(@opentelemetry/api@1.9.1)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.21.0)(kysely@0.29.5)(pg@8.23.0))(next@16.3.0(@opentelemetry/api@1.9.1)(@types/node@22.20.1)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -248,7 +248,7 @@ importers:
         specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
-      '@hollow-echo-distant-signal/config':
+      '@repo/config':
         specifier: workspace:*
         version: link:../config
       typescript:
@@ -259,7 +259,7 @@ importers:
 
   packages/db:
     dependencies:
-      '@hollow-echo-distant-signal/env':
+      '@repo/env':
         specifier: workspace:*
         version: link:../env
       dotenv:
@@ -275,7 +275,7 @@ importers:
         specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
-      '@hollow-echo-distant-signal/config':
+      '@repo/config':
         specifier: workspace:*
         version: link:../config
       '@types/pg':
@@ -303,7 +303,7 @@ importers:
         specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
-      '@hollow-echo-distant-signal/config':
+      '@repo/config':
         specifier: workspace:*
         version: link:../config
       '@types/node':
@@ -315,14 +315,14 @@ importers:
 
   packages/redis:
     dependencies:
-      '@hollow-echo-distant-signal/env':
+      '@repo/env':
         specifier: workspace:*
         version: link:../env
       ioredis:
         specifier: ^5.5.0
         version: 5.11.1(supports-color@7.2.0)
     devDependencies:
-      '@hollow-echo-distant-signal/config':
+      '@repo/config':
         specifier: workspace:*
         version: link:../config
       '@types/node':
@@ -340,11 +340,11 @@ importers:
       '@aws-sdk/s3-request-presigner':
         specifier: ^3.758.0
         version: 3.1109.0
-      '@hollow-echo-distant-signal/env':
+      '@repo/env':
         specifier: workspace:*
         version: link:../env
     devDependencies:
-      '@hollow-echo-distant-signal/config':
+      '@repo/config':
         specifier: workspace:*
         version: link:../config
       '@types/node':
@@ -393,7 +393,7 @@ importers:
         specifier: ^1.4.0
         version: 1.4.0
     devDependencies:
-      '@hollow-echo-distant-signal/config':
+      '@repo/config':
         specifier: workspace:*
         version: link:../config
       '@tailwindcss/postcss':
@@ -418,7 +418,7 @@ importers:
         specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
-      '@hollow-echo-distant-signal/config':
+      '@repo/config':
         specifier: workspace:*
         version: link:../config
       '@types/node':
@@ -8394,7 +8394,7 @@ snapshots:
       cross-spawn: 7.0.6
       eventsource: 3.0.7
       eventsource-parser: 3.1.1
-      express: 5.2.1
+      express: 5.2.1(supports-color@7.2.0)
       express-rate-limit: 8.6.2(express@5.2.1)
       hono: 4.13.2
       jose: 6.2.8
@@ -8950,7 +8950,7 @@ snapshots:
       '@slack/web-api': 7.19.0
       '@types/express': 5.0.6
       axios: 1.18.1(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0)
-      express: 5.2.1
+      express: 5.2.1(supports-color@7.2.0)
       path-to-regexp: 8.4.2
       raw-body: 3.0.2
       tsscmp: 1.0.6
@@ -9769,7 +9769,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  body-parser@2.3.0:
+  body-parser@2.3.0(supports-color@7.2.0):
     dependencies:
       bytes: 3.1.2
       content-type: 2.0.0
@@ -10497,7 +10497,7 @@ snapshots:
   express-rate-limit@8.6.2(express@5.2.1):
     dependencies:
       debug: 4.4.3(supports-color@7.2.0)
-      express: 5.2.1
+      express: 5.2.1(supports-color@7.2.0)
       ip-address: 10.5.0
     transitivePeerDependencies:
       - supports-color
@@ -10538,10 +10538,10 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  express@5.2.1:
+  express@5.2.1(supports-color@7.2.0):
     dependencies:
       accepts: 2.0.0
-      body-parser: 2.3.0
+      body-parser: 2.3.0(supports-color@7.2.0)
       content-disposition: 1.1.0
       content-type: 1.0.5
       cookie: 0.7.2
@@ -10551,7 +10551,7 @@ snapshots:
       encodeurl: 2.0.0
       escape-html: 1.0.3
       etag: 1.8.1
-      finalhandler: 2.1.1
+      finalhandler: 2.1.1(supports-color@7.2.0)
       fresh: 2.0.0
       http-errors: 2.0.1
       merge-descriptors: 2.0.0
@@ -10562,8 +10562,8 @@ snapshots:
       proxy-addr: 2.0.7
       qs: 6.15.3
       range-parser: 1.3.0
-      router: 2.2.0
-      send: 1.2.1
+      router: 2.2.0(supports-color@7.2.0)
+      send: 1.2.1(supports-color@7.2.0)
       serve-static: 2.2.1
       statuses: 2.0.2
       type-is: 2.1.0
@@ -10634,7 +10634,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  finalhandler@2.1.1:
+  finalhandler@2.1.1(supports-color@7.2.0):
     dependencies:
       debug: 4.4.3(supports-color@7.2.0)
       encodeurl: 2.0.0
@@ -12970,7 +12970,7 @@ snapshots:
       points-on-curve: 0.2.0
       points-on-path: 0.2.1
 
-  router@2.2.0:
+  router@2.2.0(supports-color@7.2.0):
     dependencies:
       debug: 4.4.3(supports-color@7.2.0)
       depd: 2.0.0
@@ -13030,7 +13030,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  send@1.2.1:
+  send@1.2.1(supports-color@7.2.0):
     dependencies:
       debug: 4.4.3(supports-color@7.2.0)
       encodeurl: 2.0.0
@@ -13060,7 +13060,7 @@ snapshots:
       encodeurl: 2.0.0
       escape-html: 1.0.3
       parseurl: 1.3.3
-      send: 1.2.1
+      send: 1.2.1(supports-color@7.2.0)
     transitivePeerDependencies:
       - supports-color
 

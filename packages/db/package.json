@@ -1,5 +1,5 @@
 {
-  "name": "@hollow-echo-distant-signal/db",
+  "name": "@repo/db",
   "type": "module",
   "exports": {
     ".": {
@@ -17,14 +17,14 @@
     "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
-    "@hollow-echo-distant-signal/env": "workspace:*",
+    "@repo/env": "workspace:*",
     "dotenv": "catalog:",
     "drizzle-orm": "^0.45.2",
     "pg": "^8.22.0",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@hollow-echo-distant-signal/config": "workspace:*",
+    "@repo/config": "workspace:*",
     "@types/pg": "^8.20.0",
     "drizzle-kit": "^0.31.10",
     "typescript": "catalog:"

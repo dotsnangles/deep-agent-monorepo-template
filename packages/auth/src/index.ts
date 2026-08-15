@@ -1,6 +1,6 @@
-import { createDb } from "@hollow-echo-distant-signal/db";
-import * as schema from "@hollow-echo-distant-signal/db/schema/auth";
-import { env } from "@hollow-echo-distant-signal/env/server";
+import { createDb } from "@repo/db";
+import * as schema from "@repo/db/schema/auth";
+import { env } from "@repo/env/server";
 import { polar, checkout, portal } from "@polar-sh/better-auth";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";

@@ -13,9 +13,9 @@
     "@copilotkit/react-ui": "^1.67.1",
     "@copilotkit/runtime": "^1.67.1",
     "@copilotkit/runtime-client-gql": "^1.67.1",
-    "@hollow-echo-distant-signal/env": "workspace:*",
-    "@hollow-echo-distant-signal/ui": "workspace:*",
-    "@hollow-echo-distant-signal/validators": "workspace:*",
+    "@repo/env": "workspace:*",
+    "@repo/ui": "workspace:*",
+    "@repo/validators": "workspace:*",
     "@polar-sh/better-auth": "catalog:",
     "@swc/helpers": "^0.5.23",
     "@tanstack/react-form": "^1.33.2",
@@ -32,7 +32,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@hollow-echo-distant-signal/config": "workspace:*",
+    "@repo/config": "workspace:*",
     "@tailwindcss/postcss": "catalog:",
     "@types/node": "^20.19.43",
     "@types/react": "catalog:",

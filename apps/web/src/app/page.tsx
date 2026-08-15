@@ -18,16 +18,16 @@ import {
   Zap,
 } from "lucide-react";
 
-import { Badge } from "@hollow-echo-distant-signal/ui/components/badge";
-import { Button } from "@hollow-echo-distant-signal/ui/components/button";
+import { Badge } from "@repo/ui/components/badge";
+import { Button } from "@repo/ui/components/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@hollow-echo-distant-signal/ui/components/card";
-import { Separator } from "@hollow-echo-distant-signal/ui/components/separator";
+} from "@repo/ui/components/card";
+import { Separator } from "@repo/ui/components/separator";
 
 export default function Home() {
   const [health, setHealth] = useState<{

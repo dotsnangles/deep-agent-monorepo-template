@@ -1,4 +1,4 @@
-import { env } from "@hollow-echo-distant-signal/env/server";
+import { env } from "@repo/env/server";
 import { drizzle } from "drizzle-orm/node-postgres";
 
 import * as schema from "./schema";

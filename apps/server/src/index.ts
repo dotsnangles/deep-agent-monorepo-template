@@ -1,5 +1,5 @@
-import { auth } from "@hollow-echo-distant-signal/auth";
-import { env } from "@hollow-echo-distant-signal/env/server";
+import { auth } from "@repo/auth";
+import { env } from "@repo/env/server";
 import { toNodeHandler } from "better-auth/node";
 import cors from "cors";
 import express from "express";

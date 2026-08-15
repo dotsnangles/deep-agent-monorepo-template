@@ -1,5 +1,5 @@
 import * as React from "react";
-import { cn } from "@hollow-echo-distant-signal/ui/lib/utils";
+import { cn } from "@repo/ui/lib/utils";
 
 function Separator({
   className,

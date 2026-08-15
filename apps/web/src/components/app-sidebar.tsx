@@ -18,7 +18,7 @@ import {
   Sparkles,
 } from "lucide-react";
 
-import { Badge } from "@hollow-echo-distant-signal/ui/components/badge";
+import { Badge } from "@repo/ui/components/badge";
 import {
   Sidebar,
   SidebarContent,
@@ -34,7 +34,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
   SidebarSeparator,
-} from "@hollow-echo-distant-signal/ui/components/sidebar";
+} from "@repo/ui/components/sidebar";
 import { NavUser } from "@/components/nav-user";
 
 const navGroups = [

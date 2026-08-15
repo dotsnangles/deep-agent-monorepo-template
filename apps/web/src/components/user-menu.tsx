@@ -1,4 +1,4 @@
-import { Button } from "@hollow-echo-distant-signal/ui/components/button";
+import { Button } from "@repo/ui/components/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -7,8 +7,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@hollow-echo-distant-signal/ui/components/dropdown-menu";
-import { Skeleton } from "@hollow-echo-distant-signal/ui/components/skeleton";
+} from "@repo/ui/components/dropdown-menu";
+import { Skeleton } from "@repo/ui/components/skeleton";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 

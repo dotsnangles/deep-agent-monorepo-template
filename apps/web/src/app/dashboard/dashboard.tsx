@@ -1,8 +1,8 @@
 "use client";
 
 import { CreditCard, Sparkles, Zap } from "lucide-react";
-import { Badge } from "@hollow-echo-distant-signal/ui/components/badge";
-import { Button } from "@hollow-echo-distant-signal/ui/components/button";
+import { Badge } from "@repo/ui/components/badge";
+import { Button } from "@repo/ui/components/button";
 import {
   Card,
   CardContent,
@@ -10,7 +10,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@hollow-echo-distant-signal/ui/components/card";
+} from "@repo/ui/components/card";
 import { authClient } from "@/lib/auth-client";
 
 export default function Dashboard({

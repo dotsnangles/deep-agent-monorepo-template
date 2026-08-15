@@ -3,7 +3,7 @@
 import { CopilotKit } from "@copilotkit/react-core";
 import { CopilotSidebar } from "@copilotkit/react-ui";
 import "@copilotkit/react-ui/styles.css";
-import { Toaster } from "@hollow-echo-distant-signal/ui/components/sonner";
+import { Toaster } from "@repo/ui/components/sonner";
 
 import { ThemeProvider } from "./theme-provider";
 

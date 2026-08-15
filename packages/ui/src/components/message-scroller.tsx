@@ -1,7 +1,7 @@
 "use client";
 
-import { Button } from "@hollow-echo-distant-signal/ui/components/button";
-import { cn } from "@hollow-echo-distant-signal/ui/lib/utils";
+import { Button } from "@repo/ui/components/button";
+import { cn } from "@repo/ui/lib/utils";
 import {
   MessageScroller as MessageScrollerPrimitive,
   useMessageScroller,

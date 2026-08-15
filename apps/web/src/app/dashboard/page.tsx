@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { LayoutDashboard } from "lucide-react";
 
-import { Badge } from "@hollow-echo-distant-signal/ui/components/badge";
+import { Badge } from "@repo/ui/components/badge";
 import { authClient } from "@/lib/auth-client";
 import Dashboard from "./dashboard";
 

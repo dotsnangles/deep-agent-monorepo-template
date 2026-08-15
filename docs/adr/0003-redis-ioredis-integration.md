@@ -13,8 +13,8 @@ The application requires fast key-value storage, caching, rate limiting, and pot
 ## Decision
 
 1. Run Redis locally via `docker-compose.yml` (`redis:7-alpine` image on port 6379).
-2. Create `@hollow-echo-distant-signal/redis` in `packages/redis` using `ioredis`.
-3. Expose `REDIS_URL` in `@hollow-echo-distant-signal/env`.
+2. Create `@repo/redis` in `packages/redis` using `ioredis`.
+3. Expose `REDIS_URL` in `@repo/env`.
 
 ## Consequences
 

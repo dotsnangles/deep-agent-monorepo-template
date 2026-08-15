@@ -1,5 +1,5 @@
 {
-  "name": "@hollow-echo-distant-signal/env",
+  "name": "@repo/env",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -14,7 +14,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@hollow-echo-distant-signal/config": "workspace:*",
+    "@repo/config": "workspace:*",
     "@types/node": "^22.20.1",
     "typescript": "catalog:"
   }

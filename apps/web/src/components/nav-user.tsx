@@ -17,8 +17,8 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@hollow-echo-distant-signal/ui/components/avatar";
-import { Badge } from "@hollow-echo-distant-signal/ui/components/badge";
+} from "@repo/ui/components/avatar";
+import { Badge } from "@repo/ui/components/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,14 +26,14 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@hollow-echo-distant-signal/ui/components/dropdown-menu";
+} from "@repo/ui/components/dropdown-menu";
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from "@hollow-echo-distant-signal/ui/components/sidebar";
-import { Skeleton } from "@hollow-echo-distant-signal/ui/components/skeleton";
+} from "@repo/ui/components/sidebar";
+import { Skeleton } from "@repo/ui/components/skeleton";
 import { authClient } from "@/lib/auth-client";
 
 export function NavUser() {

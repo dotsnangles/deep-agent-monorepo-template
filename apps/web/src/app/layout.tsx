@@ -8,7 +8,7 @@ import Providers from "@/components/providers";
 import {
   SidebarInset,
   SidebarProvider,
-} from "@hollow-echo-distant-signal/ui/components/sidebar";
+} from "@repo/ui/components/sidebar";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

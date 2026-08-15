@@ -13,8 +13,8 @@ The application requires object storage (file uploads, image storage, attachment
 ## Decision
 
 1. Run MinIO locally via `docker-compose.yml` (`minio/minio` image on API port 9000 and Console port 9001).
-2. Create `@hollow-echo-distant-signal/storage` in `packages/storage` using `@aws-sdk/client-s3` and `@aws-sdk/s3-request-presigner`.
-3. Configure MinIO credentials and endpoint in `@hollow-echo-distant-signal/env`.
+2. Create `@repo/storage` in `packages/storage` using `@aws-sdk/client-s3` and `@aws-sdk/s3-request-presigner`.
+3. Configure MinIO credentials and endpoint in `@repo/env`.
 
 ## Consequences
 

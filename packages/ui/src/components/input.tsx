@@ -1,5 +1,5 @@
 import { Input as InputPrimitive } from "@base-ui/react/input";
-import { cn } from "@hollow-echo-distant-signal/ui/lib/utils";
+import { cn } from "@repo/ui/lib/utils";
 import * as React from "react";
 
 function Input({ className, type, ...props }: React.ComponentProps<"input">) {

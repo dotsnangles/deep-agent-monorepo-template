@@ -1,5 +1,5 @@
 {
-  "name": "@hollow-echo-distant-signal/storage",
+  "name": "@repo/storage",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,10 +11,10 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.758.0",
     "@aws-sdk/s3-request-presigner": "^3.758.0",
-    "@hollow-echo-distant-signal/env": "workspace:*"
+    "@repo/env": "workspace:*"
   },
   "devDependencies": {
-    "@hollow-echo-distant-signal/config": "workspace:*",
+    "@repo/config": "workspace:*",
     "@types/node": "^22.20.1",
     "typescript": "catalog:"
   }

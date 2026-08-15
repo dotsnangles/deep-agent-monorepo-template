@@ -5,9 +5,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronRight, Sparkles, Terminal } from "lucide-react";
 
-import { Badge } from "@hollow-echo-distant-signal/ui/components/badge";
-import { Separator } from "@hollow-echo-distant-signal/ui/components/separator";
-import { SidebarTrigger } from "@hollow-echo-distant-signal/ui/components/sidebar";
+import { Badge } from "@repo/ui/components/badge";
+import { Separator } from "@repo/ui/components/separator";
+import { SidebarTrigger } from "@repo/ui/components/sidebar";
 import { ModeToggle } from "@/components/mode-toggle";
 import UserMenu from "@/components/user-menu";
 
