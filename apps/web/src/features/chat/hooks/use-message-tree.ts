@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { CreateChatMessageDTO, PatchChatLeafDTO, DeleteChatMessageDTO } from "@repo/validators";
 import {
@@ -33,6 +33,7 @@ export function useMessageTree(sessionId: string) {
   const [isGenerating, setIsGenerating] = useState<boolean>(() =>
     globalStreamManager.isSessionGenerating(sessionId)
   );
+  const isSendingRef = useRef<boolean>(false);
 
   // Compute the current active linear path based on allNodes and activeLeafId
   const activePath = useMemo(() => {
@@ -209,35 +210,41 @@ export function useMessageTree(sessionId: string) {
   // Send a new message at the end of current active path
   const sendMessage = useCallback(
     async (content: string) => {
-      if (!content.trim() || isGenerating) return;
+      const trimmed = content.trim();
+      if (!trimmed || isGenerating || isSendingRef.current) return;
 
-      const parentId = activePath.length > 0 ? activePath[activePath.length - 1].id : null;
-      const userMessageId = crypto.randomUUID();
+      isSendingRef.current = true;
+      try {
+        const parentId = activePath.length > 0 ? activePath[activePath.length - 1].id : null;
+        const userMessageId = crypto.randomUUID();
 
-      const newUserNode: MessageNode = {
-        id: userMessageId,
-        sessionId,
-        parentId,
-        role: "user",
-        content: content.trim(),
-        createdAt: new Date(),
-      };
+        const newUserNode: MessageNode = {
+          id: userMessageId,
+          sessionId,
+          parentId,
+          role: "user",
+          content: trimmed,
+          createdAt: new Date(),
+        };
 
-      // Optimistically append user message
-      setAllNodes((prev) => [...prev, newUserNode]);
-      setActiveLeafId(userMessageId);
+        // Optimistically append user message
+        setAllNodes((prev) => [...prev, newUserNode]);
+        setActiveLeafId(userMessageId);
 
-      // Persist user message to DB
-      await saveMessageToDB({
-        id: userMessageId,
-        sessionId,
-        parentId,
-        role: "user",
-        content: content.trim(),
-      });
+        // Persist user message to DB
+        await saveMessageToDB({
+          id: userMessageId,
+          sessionId,
+          parentId,
+          role: "user",
+          content: trimmed,
+        });
 
-      // Execute AI generation with current active path as context
-      await executeAgentStream(newUserNode, activePath);
+        // Execute AI generation with current active path as context
+        await executeAgentStream(newUserNode, activePath);
+      } finally {
+        isSendingRef.current = false;
+      }
     },
     [activePath, isGenerating, sessionId, executeAgentStream]
   );
@@ -245,41 +252,47 @@ export function useMessageTree(sessionId: string) {
   // Fork & Edit a previous user message
   const editUserMessage = useCallback(
     async (targetUserNodeId: string, newContent: string) => {
-      if (!newContent.trim() || isGenerating) return;
+      const trimmed = newContent.trim();
+      if (!trimmed || isGenerating || isSendingRef.current) return;
 
       const targetNode = allNodes.find((n) => n.id === targetUserNodeId);
       if (!targetNode) return;
 
-      const parentId = targetNode.parentId; // Fork at the same parent level
-      const newUserNodeId = crypto.randomUUID();
+      isSendingRef.current = true;
+      try {
+        const parentId = targetNode.parentId; // Fork at the same parent level
+        const newUserNodeId = crypto.randomUUID();
 
-      const newUserNode: MessageNode = {
-        id: newUserNodeId,
-        sessionId,
-        parentId,
-        role: "user",
-        content: newContent.trim(),
-        createdAt: new Date(),
-      };
+        const newUserNode: MessageNode = {
+          id: newUserNodeId,
+          sessionId,
+          parentId,
+          role: "user",
+          content: trimmed,
+          createdAt: new Date(),
+        };
 
-      // Compute ancestor context up to the parent
-      const parentAncestors = parentId
-        ? traverseActivePath(allNodes, parentId)
-        : [];
+        // Compute ancestor context up to the parent
+        const parentAncestors = parentId
+          ? traverseActivePath(allNodes, parentId)
+          : [];
 
-      setAllNodes((prev) => [...prev, newUserNode]);
-      setActiveLeafId(newUserNodeId);
+        setAllNodes((prev) => [...prev, newUserNode]);
+        setActiveLeafId(newUserNodeId);
 
-      await saveMessageToDB({
-        id: newUserNodeId,
-        sessionId,
-        parentId,
-        role: "user",
-        content: newContent.trim(),
-      });
+        await saveMessageToDB({
+          id: newUserNodeId,
+          sessionId,
+          parentId,
+          role: "user",
+          content: trimmed,
+        });
 
-      // Execute agent response from the new forked point
-      await executeAgentStream(newUserNode, parentAncestors);
+        // Execute agent response from the new forked point
+        await executeAgentStream(newUserNode, parentAncestors);
+      } finally {
+        isSendingRef.current = false;
+      }
     },
     [allNodes, isGenerating, sessionId, executeAgentStream]
   );
@@ -287,7 +300,7 @@ export function useMessageTree(sessionId: string) {
   // Regenerate an assistant response
   const regenerateAssistantMessage = useCallback(
     async (assistantNodeId: string) => {
-      if (isGenerating) return;
+      if (isGenerating || isSendingRef.current) return;
 
       const assistantNode = allNodes.find((n) => n.id === assistantNodeId);
       if (!assistantNode || !assistantNode.parentId) return;
@@ -295,11 +308,16 @@ export function useMessageTree(sessionId: string) {
       const userParentNode = allNodes.find((n) => n.id === assistantNode.parentId);
       if (!userParentNode) return;
 
-      const parentAncestors = userParentNode.parentId
-        ? traverseActivePath(allNodes, userParentNode.parentId)
-        : [];
+      isSendingRef.current = true;
+      try {
+        const parentAncestors = userParentNode.parentId
+          ? traverseActivePath(allNodes, userParentNode.parentId)
+          : [];
 
-      await executeAgentStream(userParentNode, parentAncestors);
+        await executeAgentStream(userParentNode, parentAncestors);
+      } finally {
+        isSendingRef.current = false;
+      }
     },
     [allNodes, isGenerating, executeAgentStream]
   );

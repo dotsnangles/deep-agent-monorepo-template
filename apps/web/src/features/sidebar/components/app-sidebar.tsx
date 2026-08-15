@@ -247,7 +247,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
           <SidebarGroupContent>
             <SidebarMenu>
-              {isLoading ? (
+              {isLoading && sessions.length === 0 ? (
                 <div className="px-3 py-2 text-xs text-muted-foreground animate-pulse">
                   대화 목록 로딩 중...
                 </div>
