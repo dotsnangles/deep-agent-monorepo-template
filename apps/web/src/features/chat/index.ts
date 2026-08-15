@@ -19,6 +19,11 @@ export {
   type BranchInfo,
 } from "./lib/tree";
 export {
+  fuzzyMatch,
+  type FuzzySegment,
+  type FuzzyMatchResult,
+} from "./lib/fuzzy-match";
+export {
   StreamManager,
   globalStreamManager,
   type StreamState,

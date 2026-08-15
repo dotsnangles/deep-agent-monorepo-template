@@ -1,9 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { Search, X, MessageSquare, ArrowRight, Clock } from "lucide-react";
+import { Search, X, MessageSquare, ArrowRight } from "lucide-react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { useChatSessions, type ChatSession } from "../context/chat-session-context";
 import { Badge } from "@repo/ui/components/badge";
+import { fuzzyMatch, type FuzzySegment } from "../lib/fuzzy-match";
 
 function formatSessionDate(dateString: string): string {
   if (!dateString) return "";
@@ -41,6 +43,12 @@ function formatSessionDate(dateString: string): string {
   return `${date.getFullYear()}년 ${month}월 ${day}일`;
 }
 
+interface FilteredSessionItem {
+  session: ChatSession;
+  segments: FuzzySegment[];
+  score: number;
+}
+
 export function ChatSearchDialog() {
   const {
     sessions,
@@ -68,11 +76,46 @@ export function ChatSearchDialog() {
     }
   }, [isSearchOpen]);
 
-  const filteredSessions = React.useMemo(() => {
-    if (!query.trim()) return sessions;
-    const lower = query.toLowerCase();
-    return sessions.filter((s) => s.title.toLowerCase().includes(lower));
+  // Compute fuzzy match and rank by relevance score
+  const filteredSessions = React.useMemo<FilteredSessionItem[]>(() => {
+    if (!query.trim()) {
+      return sessions.map((session) => ({
+        session,
+        segments: [{ text: session.title, highlight: false }],
+        score: 0,
+      }));
+    }
+
+    const matchedItems: FilteredSessionItem[] = [];
+    for (const session of sessions) {
+      const match = fuzzyMatch(session.title, query);
+      if (match.matched) {
+        matchedItems.push({
+          session,
+          segments: match.segments,
+          score: match.score,
+        });
+      }
+    }
+
+    // Sort by relevance score descending
+    return matchedItems.sort((a, b) => b.score - a.score);
   }, [sessions, query]);
+
+  // High-performance DOM Virtualizer
+  const virtualizer = useVirtualizer({
+    count: filteredSessions.length,
+    getScrollElement: () => listRef.current,
+    estimateSize: () => 48,
+    overscan: 6,
+  });
+
+  // Keep virtual scroll aligned with keyboard selected index
+  React.useEffect(() => {
+    if (filteredSessions.length > 0 && selectedIndex >= 0 && selectedIndex < filteredSessions.length) {
+      virtualizer.scrollToIndex(selectedIndex, { align: "auto" });
+    }
+  }, [selectedIndex, filteredSessions.length, virtualizer]);
 
   // Handle keyboard navigation (Arrow Up/Down, Enter, Esc)
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -87,12 +130,12 @@ export function ChatSearchDialog() {
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setSelectedIndex((prev) =>
-        prev > 0 ? prev - 1 : filteredSessions.length - 1
+        prev > 0 ? prev - 1 : Math.max(0, filteredSessions.length - 1)
       );
     } else if (e.key === "Enter") {
       e.preventDefault();
       if (filteredSessions[selectedIndex]) {
-        handleSelectSession(filteredSessions[selectedIndex].id);
+        handleSelectSession(filteredSessions[selectedIndex].session.id);
       }
     }
   };
@@ -133,9 +176,10 @@ export function ChatSearchDialog() {
                 type="button"
                 onClick={() => {
                   setQuery("");
+                  setSelectedIndex(0);
                   inputRef.current?.focus();
                 }}
-                className="size-5 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted ml-2"
+                className="size-5 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted ml-2 cursor-pointer"
               >
                 <X className="size-3.5" />
                 <span className="sr-only">검색어 삭제</span>
@@ -149,7 +193,7 @@ export function ChatSearchDialog() {
         </div>
 
         {/* Sessions List Area */}
-        <div className="flex-1 overflow-y-auto p-3" ref={listRef}>
+        <div className="flex-1 overflow-y-auto p-3 min-h-[220px]" ref={listRef}>
           <div className="flex items-center justify-between px-3 py-1.5 mb-1">
             <span className="text-xs font-semibold text-muted-foreground">
               {query ? `검색 결과 (${filteredSessions.length})` : "최근 대화"}
@@ -167,18 +211,35 @@ export function ChatSearchDialog() {
               <span>{query ? "일치하는 대화가 없습니다." : "대화 기록이 없습니다."}</span>
             </div>
           ) : (
-            <div className="space-y-1">
-              {filteredSessions.map((session, index) => {
+            <div
+              style={{
+                height: `${virtualizer.getTotalSize()}px`,
+                width: "100%",
+                position: "relative",
+              }}
+            >
+              {virtualizer.getVirtualItems().map((virtualRow) => {
+                const item = filteredSessions[virtualRow.index];
+                if (!item) return null;
+                const { session, segments } = item;
                 const isActive = session.id === activeSessionId;
-                const isSelected = index === selectedIndex;
+                const isSelected = virtualRow.index === selectedIndex;
                 const dateLabel = formatSessionDate(session.updatedAt || session.createdAt);
 
                 return (
                   <div
                     key={session.id}
                     onClick={() => handleSelectSession(session.id)}
-                    onMouseEnter={() => setSelectedIndex(index)}
-                    className={`group flex items-center justify-between px-4 py-3 rounded-xl cursor-pointer transition-all duration-100 ${
+                    onMouseEnter={() => setSelectedIndex(virtualRow.index)}
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      width: "100%",
+                      height: `${virtualRow.size}px`,
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                    className={`group flex items-center justify-between px-4 rounded-xl cursor-pointer transition-colors duration-100 ${
                       isSelected
                         ? "bg-muted/80 text-foreground"
                         : "hover:bg-muted/40 text-foreground/90"
@@ -195,7 +256,18 @@ export function ChatSearchDialog() {
                         }`}
                       />
                       <span className="truncate text-xs font-medium">
-                        {session.title}
+                        {segments.map((seg, sIdx) =>
+                          seg.highlight ? (
+                            <span
+                              key={sIdx}
+                              className="text-primary font-semibold underline underline-offset-2"
+                            >
+                              {seg.text}
+                            </span>
+                          ) : (
+                            <span key={sIdx}>{seg.text}</span>
+                          )
+                        )}
                       </span>
                       {isSessionGenerating(session.id) && (
                         <span className="relative flex size-2 shrink-0 ml-1.5" title="답변 생성 중...">

@@ -15,6 +15,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 
 import { Badge } from "@repo/ui/components/badge";
 import { Button } from "@repo/ui/components/button";
@@ -33,14 +34,11 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
-  SidebarInput,
   SidebarMenu,
   SidebarMenuAction,
-  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-  SidebarSeparator,
   useSidebar,
 } from "@repo/ui/components/sidebar";
 import {
@@ -51,15 +49,12 @@ import {
 import { NavUser } from "@/features/auth";
 import { useChatSessions } from "@/features/chat";
 
-const PAGE_SIZE = 25;
-
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
   const { state, toggleSidebar } = useSidebar();
-  const [visibleCount, setVisibleCount] = React.useState(PAGE_SIZE);
   const [editingSessionId, setEditingSessionId] = React.useState<string | null>(null);
   const [editTitle, setEditTitle] = React.useState("");
-  const sentinelRef = React.useRef<HTMLLIElement>(null);
+  const scrollRef = React.useRef<HTMLDivElement>(null);
 
   const {
     sessions,
@@ -74,26 +69,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     isSessionGenerating,
   } = useChatSessions();
 
-  // Seamless lazy loading: load next batch instantly as user approaches bottom
-  React.useEffect(() => {
-    if (visibleCount >= sessions.length) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) {
-          setVisibleCount((prev) => Math.min(prev + PAGE_SIZE, sessions.length));
-        }
-      },
-      { threshold: 0, rootMargin: "200px" }
-    );
-
-    const target = sentinelRef.current;
-    if (target) observer.observe(target);
-
-    return () => {
-      if (target) observer.unobserve(target);
-    };
-  }, [visibleCount, sessions.length]);
+  // High-performance DOM Virtualizer for sidebar
+  const virtualizer = useVirtualizer({
+    count: sessions.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 36,
+    overscan: 8,
+  });
 
   const handleStartRename = (id: string, currentTitle: string) => {
     setEditingSessionId(id);
@@ -106,9 +88,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     }
     setEditingSessionId(null);
   };
-
-  const displayedSessions = sessions.slice(0, visibleCount);
-  const hasMore = visibleCount < sessions.length;
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border" {...props}>
@@ -221,8 +200,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarGroup>
       </div>
 
-      {/* Scrollable Middle: Recent Chat Sessions ONLY (with Lazy Loading / Infinite Scroll) */}
-      <SidebarContent className="flex-1 min-h-0 overflow-y-auto px-2 py-1 group-data-[collapsible=icon]:hidden overscroll-contain">
+      {/* Scrollable Middle: Recent Chat Sessions ONLY (with High-Performance DOM Virtualization) */}
+      <SidebarContent
+        ref={scrollRef}
+        className="flex-1 min-h-0 overflow-y-auto px-2 py-1 group-data-[collapsible=icon]:hidden overscroll-contain"
+      >
         {/* User Chat Sessions Section */}
         <SidebarGroup className="p-0 pt-1">
           <div className="flex items-center justify-between px-2 pb-1.5">
@@ -246,125 +228,132 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </div>
 
           <SidebarGroupContent>
-            <SidebarMenu>
-              {isLoading && sessions.length === 0 ? (
-                <div className="px-3 py-2 text-xs text-muted-foreground animate-pulse">
-                  대화 목록 로딩 중...
-                </div>
-              ) : (
-                <>
-                  {sessions.length === 0 ? (
-                    <div className="px-3 py-3 text-center text-xs text-muted-foreground border border-dashed rounded-md mx-1 my-1">
-                      저장된 대화 기록이 없습니다.
-                    </div>
-                  ) : (
-                    displayedSessions.map((session) => {
-                      const isActive = pathname === "/" && session.id === activeSessionId;
-                      const isEditing = editingSessionId === session.id;
+            {isLoading && sessions.length === 0 ? (
+              <div className="px-3 py-2 text-xs text-muted-foreground animate-pulse">
+                대화 목록 로딩 중...
+              </div>
+            ) : sessions.length === 0 ? (
+              <div className="px-3 py-3 text-center text-xs text-muted-foreground border border-dashed rounded-md mx-1 my-1">
+                저장된 대화 기록이 없습니다.
+              </div>
+            ) : (
+              <div
+                style={{
+                  height: `${virtualizer.getTotalSize()}px`,
+                  width: "100%",
+                  position: "relative",
+                }}
+              >
+                {virtualizer.getVirtualItems().map((virtualRow) => {
+                  const session = sessions[virtualRow.index];
+                  if (!session) return null;
+                  const isActive = pathname === "/" && session.id === activeSessionId;
+                  const isEditing = editingSessionId === session.id;
 
-                      return (
-                        <SidebarMenuItem key={session.id}>
-                          {isEditing ? (
-                            <div className="flex items-center gap-1 px-1 py-1">
-                              <input
-                                type="text"
-                                value={editTitle}
-                                onChange={(e) => setEditTitle(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") handleSaveRename(session.id);
-                                  if (e.key === "Escape") setEditingSessionId(null);
-                                }}
-                                className="flex-1 h-7 text-xs px-2 rounded bg-background border border-input focus:outline-hidden focus:ring-1 focus:ring-primary"
-                                autoFocus
-                              />
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="size-6 text-emerald-500 hover:text-emerald-600"
-                                onClick={() => handleSaveRename(session.id)}
-                              >
-                                <Check className="size-3.5" />
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="size-6 text-muted-foreground"
-                                onClick={() => setEditingSessionId(null)}
-                              >
-                                <X className="size-3.5" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <>
-                              <SidebarMenuButton
-                                isActive={isActive}
-                                onClick={() => switchSession(session.id)}
-                                tooltip={session.title}
-                                className="font-normal text-xs justify-between group/btn"
-                              >
-                                <div className="flex items-center gap-2 truncate">
-                                  <MessageSquare
-                                    className={`size-3.5 shrink-0 ${
-                                      isActive ? "text-primary font-medium" : "text-muted-foreground"
-                                    }`}
+                  return (
+                    <div
+                      key={session.id}
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: "100%",
+                        height: `${virtualRow.size}px`,
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
+                    >
+                      <SidebarMenuItem className="h-full list-none">
+                        {isEditing ? (
+                          <div className="flex items-center gap-1 px-1 py-1">
+                            <input
+                              type="text"
+                              value={editTitle}
+                              onChange={(e) => setEditTitle(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") handleSaveRename(session.id);
+                                if (e.key === "Escape") setEditingSessionId(null);
+                              }}
+                              className="flex-1 h-7 text-xs px-2 rounded bg-background border border-input focus:outline-hidden focus:ring-1 focus:ring-primary"
+                              autoFocus
+                            />
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="size-6 text-emerald-500 hover:text-emerald-600"
+                              onClick={() => handleSaveRename(session.id)}
+                            >
+                              <Check className="size-3.5" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="size-6 text-muted-foreground"
+                              onClick={() => setEditingSessionId(null)}
+                            >
+                              <X className="size-3.5" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            <SidebarMenuButton
+                              isActive={isActive}
+                              onClick={() => switchSession(session.id)}
+                              tooltip={session.title}
+                              className="font-normal text-xs justify-between group/btn"
+                            >
+                              <div className="flex items-center gap-2 truncate">
+                                <MessageSquare
+                                  className={`size-3.5 shrink-0 ${
+                                    isActive ? "text-primary font-medium" : "text-muted-foreground"
+                                  }`}
+                                />
+                                <span className="truncate">{session.title}</span>
+                              </div>
+                              {isSessionGenerating(session.id) && (
+                                <span className="relative flex size-2 shrink-0 ml-1.5" title="답변 생성 중...">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                                  <span className="relative inline-flex rounded-full size-2 bg-primary" />
+                                </span>
+                              )}
+                            </SidebarMenuButton>
+
+                            <DropdownMenu>
+                              <DropdownMenuTrigger
+                                render={
+                                  <SidebarMenuAction
+                                    showOnHover
+                                    className="text-muted-foreground hover:text-foreground"
                                   />
-                                  <span className="truncate">{session.title}</span>
-                                </div>
-                                {isSessionGenerating(session.id) && (
-                                  <span className="relative flex size-2 shrink-0 ml-1.5" title="답변 생성 중...">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-                                    <span className="relative inline-flex rounded-full size-2 bg-primary" />
-                                  </span>
-                                )}
-                              </SidebarMenuButton>
-
-                              <DropdownMenu>
-                                <DropdownMenuTrigger
-                                  render={
-                                    <SidebarMenuAction
-                                      showOnHover
-                                      className="text-muted-foreground hover:text-foreground"
-                                    />
-                                  }
+                                }
+                              >
+                                <MoreHorizontal className="size-3.5" />
+                                <span className="sr-only">더 보기</span>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent side="right" align="start" className="w-36">
+                                <DropdownMenuItem
+                                  onClick={() => handleStartRename(session.id, session.title)}
+                                  className="gap-2 text-xs cursor-pointer"
                                 >
-                                  <MoreHorizontal className="size-3.5" />
-                                  <span className="sr-only">더 보기</span>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent side="right" align="start" className="w-36">
-                                  <DropdownMenuItem
-                                    onClick={() => handleStartRename(session.id, session.title)}
-                                    className="gap-2 text-xs cursor-pointer"
-                                  >
-                                    <Pencil className="size-3.5" />
-                                    <span>제목 변경</span>
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => deleteSession(session.id)}
-                                    className="gap-2 text-xs text-destructive focus:text-destructive cursor-pointer"
-                                  >
-                                    <Trash2 className="size-3.5" />
-                                    <span>대화 삭제</span>
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </>
-                          )}
-                        </SidebarMenuItem>
-                      );
-                    })
-                  )}
-
-                  {/* Invisible Lazy Loading Trigger Sentinel */}
-                  {hasMore && (
-                    <SidebarMenuItem
-                      ref={sentinelRef}
-                      className="h-px opacity-0 pointer-events-none p-0 m-0 overflow-hidden"
-                      aria-hidden="true"
-                    />
-                  )}
-                </>
-              )}
-            </SidebarMenu>
+                                  <Pencil className="size-3.5" />
+                                  <span>제목 변경</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => deleteSession(session.id)}
+                                  className="gap-2 text-xs text-destructive focus:text-destructive cursor-pointer"
+                                >
+                                  <Trash2 className="size-3.5" />
+                                  <span>대화 삭제</span>
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </>
+                        )}
+                      </SidebarMenuItem>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>

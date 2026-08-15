@@ -14,3 +14,6 @@ Domain glossary and architectural concepts for the Next.js 16 Web Application:
 | Message Canvas Layout | Stream layout where AI responses render directly on the canvas without redundant outer cards while user inputs render as right-aligned bubbles | `src/features/chat/components/message-item.tsx` |
 | Smart Scroll Pinning | Scroll position tracking that pins user view when scrolled up during streaming and shows floating latest message jump button | `src/features/chat/hooks/use-smart-scroll.ts` |
 | Abortable Stream Controller | Client-side AbortController signal manager enabling instantaneous user cancellation of streaming responses while persisting partial outputs | `src/features/chat/hooks/use-message-tree.ts` |
+| Virtual Session List | High-performance DOM virtualization engine maintaining fixed-window DOM elements for thousands of chat sessions | `src/features/chat/components/chat-search-dialog.tsx`, `src/features/sidebar/components/app-sidebar.tsx` |
+| Fuzzy Session Matcher | In-memory fuzzy search matcher supporting multi-token matching, scoring, and text highlight tokenization | `src/features/chat/lib/fuzzy-match.ts` |
+| Keyboard-Virtual Synchronizer | Bi-directional focus and viewport synchronizer aligning keyboard arrow navigation with virtualized scroll offsets | `src/features/chat/components/chat-search-dialog.tsx` |
