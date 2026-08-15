@@ -4,7 +4,7 @@ import { CopilotKit } from "@copilotkit/react-core";
 import "@copilotkit/react-ui/styles.css";
 import { Toaster } from "@repo/ui/components/sonner";
 
-import { ChatSessionProvider, useChatSessions } from "@/context/chat-session-context";
+import { ChatSessionProvider, useChatSessions } from "@/features/chat";
 import { ThemeProvider } from "./theme-provider";
 
 function CopilotKitWithSession({ children }: { children: React.ReactNode }) {

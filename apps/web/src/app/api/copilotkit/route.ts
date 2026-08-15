@@ -9,7 +9,7 @@ import { db, chatSession } from "@repo/db";
 import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import { generateSmartTitleInBackground } from "@/lib/session-title";
+import { generateSmartTitleInBackground } from "@/features/chat/server";
 
 const AGENT_SERVER_URL = process.env.AGENT_SERVER_URL || "http://127.0.0.1:8000";
 

@@ -3,8 +3,9 @@ import json
 import os
 from typing import Any
 
-from agent import LLM_PROVIDER, generate_title
-from event_broker import RedisEventBroker
+from src.core.config import LLM_PROVIDER
+from src.core.redis import RedisEventBroker
+from src.graphs.chat.graph import generate_title
 
 QUEUE_KEY = "queue:title_generation"
 MAX_CONCURRENCY = int(os.getenv("TITLE_WORKER_CONCURRENCY", "3"))
@@ -36,7 +37,8 @@ class TitleGenerationWorker:
             self._stop_event.clear()
             self._task = asyncio.create_task(self._run_loop())
             print(
-                f"[WORKER] Title generation task worker started (concurrency limit={MAX_CONCURRENCY}, queue={QUEUE_KEY})."
+                f"[WORKER] Title generation worker started "
+                f"(concurrency={MAX_CONCURRENCY}, queue={QUEUE_KEY})."
             )
 
     async def stop(self):
@@ -93,7 +95,7 @@ class TitleGenerationWorker:
                         )
 
                 print(
-                    f"[WORKER] (Queue Processor [{LLM_PROVIDER}]) Session {session_id} title updated to: '{smart_title}'"
+                    f"[WORKER] ({LLM_PROVIDER}) Session {session_id} title updated: '{smart_title}'"
                 )
             except Exception as e:
                 print(f"[WORKER ERROR] Failed to process title job: {e}")

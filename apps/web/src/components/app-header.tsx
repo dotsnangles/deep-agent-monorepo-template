@@ -9,7 +9,7 @@ import { Badge } from "@repo/ui/components/badge";
 import { Separator } from "@repo/ui/components/separator";
 import { SidebarTrigger } from "@repo/ui/components/sidebar";
 import { ModeToggle } from "@/components/mode-toggle";
-import UserMenu from "@/components/user-menu";
+import { UserMenu } from "@/features/auth";
 
 export function AppHeader() {
   const pathname = usePathname();

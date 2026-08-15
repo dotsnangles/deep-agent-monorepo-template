@@ -1,11 +1,14 @@
 # Context Map
 
-Overview of bounded contexts and packages in `hollow-echo-distant-signal`:
+Overview of bounded contexts and package documentation in `hollow-echo-distant-signal`:
 
-| Context / Package | Location / Package Name | Description |
+| Context / Package | Location / Context Doc | Description |
 | --- | --- | --- |
 | Root Context | `CONTEXT.md` | Core domain glossary and cross-cutting architectural concepts |
-| Python Agent | `apps/agent` | Python Deep Agents, CopilotKit Remote Endpoint, LangGraph (`uv`) |
+| Architecture Guide | `docs/architecture/project-structure.md` | Complete monorepo structure and directory guide |
+| Python Agent | `apps/agent/CONTEXT.md` (`apps/agent`) | Python Deep Agents, CopilotKit Remote Endpoint, LangGraph (`uv`) |
+| Express Server | `apps/server/CONTEXT.md` (`apps/server`) | Express REST API server, Better-Auth handler, Drizzle DB integration |
+| Web Application | `apps/web/CONTEXT.md` (`apps/web`) | Next.js 16 App Router UI, CopilotKit runtime integration, Feature modules |
 | Storage | `@repo/storage` (`packages/storage`) | MinIO & AWS S3 Object Storage handling (`@aws-sdk/client-s3`) |
 | Redis / KV | `@repo/redis` (`packages/redis`) | In-memory key-value cache and client (`ioredis`) |
 | Validators | `@repo/validators` (`packages/validators`) | Shared Zod schemas and DTO validations |

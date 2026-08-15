@@ -51,8 +51,8 @@ import {
   SidebarRail,
   SidebarSeparator,
 } from "@repo/ui/components/sidebar";
-import { NavUser } from "@/components/nav-user";
-import { useChatSessions } from "@/context/chat-session-context";
+import { NavUser } from "@/features/auth";
+import { useChatSessions } from "@/features/chat";
 
 const navGroups = [
   {
