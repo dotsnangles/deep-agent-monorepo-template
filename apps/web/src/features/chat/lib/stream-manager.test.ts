@@ -59,6 +59,66 @@ describe("StreamManager", () => {
     unsubscribe();
   });
 
+  it("preserves active stream state across component unmount (unsubscribe before stream ends)", async () => {
+    const sessionId = "session-unmount-switch";
+
+    let streamController: ReadableStreamDefaultController<Uint8Array>;
+    const mockStream = new ReadableStream({
+      start(controller) {
+        streamController = controller;
+      },
+    });
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      body: mockStream,
+    });
+
+    // 1. Initial mount of component A
+    const unsubA = manager.subscribe(sessionId, () => {});
+
+    // 2. Stream starts
+    const promise = manager.startStream({
+      sessionId,
+      assistantMessageId: "asst-u1",
+      userMessageId: "user-u1",
+      titleSnippet: "Test Unmount",
+      contextMessages: [{ role: "user", content: "Start" }],
+      fetchFn: mockFetch as any,
+    });
+
+    streamController!.enqueue(new TextEncoder().encode("Chunk 1..."));
+    await new Promise((r) => setTimeout(r, 10));
+
+    // 3. User switches to another chat: Component A UNMOUNTS (calls unsubA)
+    unsubA();
+
+    // CRITICAL: Even after unmount, the stream MUST remain active in manager!
+    expect(manager.isSessionGenerating(sessionId)).toBe(true);
+    expect(manager.getGeneratingSessionIds()).toContain(sessionId);
+    expect(manager.getActiveStreamStates().length).toBe(1);
+    expect(manager.getStreamState(sessionId)?.content).toBe("Chunk 1...");
+
+    // More chunks arrive while on another chat
+    streamController!.enqueue(new TextEncoder().encode("Chunk 2..."));
+    await new Promise((r) => setTimeout(r, 10));
+
+    // 4. User switches BACK to this chat: Component B mounts and subscribes
+    let latestContent = "";
+    const unsubB = manager.subscribe(sessionId, (state) => {
+      latestContent = state.content;
+    });
+
+    // Should immediately get the accumulated content including what arrived in background
+    expect(latestContent).toBe("Chunk 1...Chunk 2...");
+
+    streamController!.close();
+    await promise;
+
+    expect(manager.isSessionGenerating(sessionId)).toBe(false);
+    unsubB();
+  });
+
   it("supports late subscriber reconnection and replay of accumulated buffer", async () => {
     const sessionId = "session-reconnect";
 

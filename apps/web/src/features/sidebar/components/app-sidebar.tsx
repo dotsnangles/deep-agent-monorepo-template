@@ -311,10 +311,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                   <span className="truncate">{session.title}</span>
                                 </div>
                                 {isSessionGenerating(session.id) && (
-                                  <span
-                                    className="size-2 rounded-full bg-primary animate-pulse shrink-0 ml-1.5"
-                                    title="답변 생성 중..."
-                                  />
+                                  <span className="relative flex size-2 shrink-0 ml-1.5" title="답변 생성 중...">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                                    <span className="relative inline-flex rounded-full size-2 bg-primary" />
+                                  </span>
                                 )}
                               </SidebarMenuButton>
 

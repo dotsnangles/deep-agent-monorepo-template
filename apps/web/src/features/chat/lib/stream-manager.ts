@@ -77,13 +77,13 @@ export class StreamManager {
   }
 
   public getStreamState(sessionId: string): StreamState | null {
-    return this.activeStreams.get(sessionId)?.state || null;
+    const stream = this.activeStreams.get(sessionId);
+    return stream ? { ...stream.state } : null;
   }
 
   public subscribe(sessionId: string, callback: StreamSubscriber): () => void {
     let stream = this.activeStreams.get(sessionId);
     if (!stream) {
-      // Create lazy stream entry so subscribers can register before/after
       stream = {
         state: {
           sessionId,
@@ -99,16 +99,18 @@ export class StreamManager {
     }
 
     stream.subscribers.add(callback);
-    // Immediately emit current state
-    callback(stream.state);
+    // Immediately emit current snapshot
+    callback({ ...stream.state });
 
     return () => {
-      stream?.subscribers.delete(callback);
-      if (
-        !stream?.state.isGenerating &&
-        stream?.subscribers.size === 0
-      ) {
-        this.activeStreams.delete(sessionId);
+      // Look up current dynamic map entry rather than relying on stale closure
+      const current = this.activeStreams.get(sessionId);
+      if (current) {
+        current.subscribers.delete(callback);
+        // CRITICAL: NEVER delete from activeStreams if generating is in progress!
+        if (!current.state.isGenerating && current.subscribers.size === 0) {
+          this.activeStreams.delete(sessionId);
+        }
       }
     };
   }
@@ -121,14 +123,26 @@ export class StreamManager {
   }
 
   private notifyGlobal(): void {
-    this.globalSubscribers.forEach((cb) => cb());
+    this.globalSubscribers.forEach((cb) => {
+      try {
+        cb();
+      } catch (e) {
+        console.error("[StreamManager] Global subscriber error:", e);
+      }
+    });
   }
 
   private notifySession(sessionId: string): void {
     const stream = this.activeStreams.get(sessionId);
     if (stream) {
       const stateCopy = { ...stream.state };
-      stream.subscribers.forEach((cb) => cb(stateCopy));
+      stream.subscribers.forEach((cb) => {
+        try {
+          cb(stateCopy);
+        } catch (e) {
+          console.error("[StreamManager] Session subscriber error:", e);
+        }
+      });
     }
     this.notifyGlobal();
   }
@@ -151,28 +165,33 @@ export class StreamManager {
       saveMessageFn,
     } = options;
 
-    const controller = new AbortController();
-    const existing = this.activeStreams.get(sessionId);
-    const subscribers = existing?.subscribers || new Set();
-
-    const streamEntry: {
-      state: StreamState;
-      controller: AbortController;
-      subscribers: Set<StreamSubscriber>;
-    } = {
-      state: {
+    let streamEntry = this.activeStreams.get(sessionId);
+    if (!streamEntry) {
+      streamEntry = {
+        state: {
+          sessionId,
+          assistantMessageId,
+          userMessageId,
+          content: "",
+          isGenerating: true,
+          titleSnippet,
+        },
+        controller: new AbortController(),
+        subscribers: new Set(),
+      };
+      this.activeStreams.set(sessionId, streamEntry);
+    } else {
+      streamEntry.controller = new AbortController();
+      streamEntry.state = {
         sessionId,
         assistantMessageId,
         userMessageId,
         content: "",
         isGenerating: true,
         titleSnippet,
-      },
-      controller,
-      subscribers,
-    };
+      };
+    }
 
-    this.activeStreams.set(sessionId, streamEntry);
     this.notifySession(sessionId);
 
     let accumulatedContent = "";
@@ -185,7 +204,7 @@ export class StreamManager {
 
       const response = await fetchFn("/api/chat/stream", {
         method: "POST",
-        signal: controller.signal,
+        signal: streamEntry.controller.signal,
         headers: {
           "Content-Type": "application/json",
         },
@@ -226,7 +245,7 @@ export class StreamManager {
         fetchFn
       );
     } catch (error: any) {
-      if (error.name === "AbortError" || controller.signal.aborted) {
+      if (error.name === "AbortError" || streamEntry.controller.signal.aborted) {
         const finalContent = accumulatedContent.trim() || "(답변 생성이 중단되었습니다.)";
         streamEntry.state.content = finalContent;
         await persistMessageNode(
@@ -268,5 +287,17 @@ export class StreamManager {
   }
 }
 
-// Global Singleton for Client Application
-export const globalStreamManager = new StreamManager();
+// Global Singleton for Client Application (attached to window to prevent HMR/chunk split re-creation)
+declare global {
+  interface Window {
+    __GLOBAL_STREAM_MANAGER__?: StreamManager;
+  }
+}
+
+export const globalStreamManager: StreamManager =
+  (typeof window !== "undefined" && window.__GLOBAL_STREAM_MANAGER__) ||
+  new StreamManager();
+
+if (typeof window !== "undefined") {
+  window.__GLOBAL_STREAM_MANAGER__ = globalStreamManager;
+}
