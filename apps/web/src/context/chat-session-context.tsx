@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
 
@@ -29,6 +30,8 @@ const ChatSessionContext = createContext<ChatSessionContextType | null>(null);
 const STORAGE_KEY = "hollow_echo_active_thread_id";
 
 export function ChatSessionProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string>(() => {
     if (typeof window !== "undefined") {
@@ -85,9 +88,14 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
   const isDraft = !sessions.some((s) => s.id === activeSessionId);
 
   const createNewSession = () => {
+    // If not on main chat page, navigate to main chat page
+    if (pathname !== "/") {
+      router.push("/");
+    }
+
     // If current session is already an unsaved draft, don't create unnecessary duplicate IDs
     if (isDraft) {
-      toast.info("이미 새로운 대화가 준비되어 있습니다.");
+      toast.info("새로운 대화 준비 상태입니다.");
       return;
     }
 
@@ -98,6 +106,10 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
 
   const switchSession = (id: string) => {
     updateActiveSessionId(id);
+    // If user is on /dashboard or other pages, route to main chat playground
+    if (pathname !== "/") {
+      router.push("/");
+    }
   };
 
   const deleteSession = async (id: string) => {
