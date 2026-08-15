@@ -166,24 +166,29 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
         ) : (
           /* Message List */
           <div className="space-y-4">
-            {activePath.map((msg) => (
-              <MessageItem
-                key={msg.id}
-                message={msg}
-                allNodes={allNodes}
-                isGenerating={isGenerating}
-                onNavigateSibling={(direction) => navigateSibling(msg.id, direction)}
-                onEdit={(newContent) => {
-                  isPinnedToBottomRef.current = true;
-                  editUserMessage(msg.id, newContent);
-                }}
-                onRegenerate={() => {
-                  isPinnedToBottomRef.current = true;
-                  regenerateAssistantMessage(msg.id);
-                }}
-                onDelete={() => deleteMessage(msg.id)}
-              />
-            ))}
+            {activePath.map((msg, index) => {
+              const isLast = index === activePath.length - 1;
+              const isStreamingThisMessage = isGenerating && isLast && msg.role === "assistant";
+
+              return (
+                <MessageItem
+                  key={msg.id}
+                  message={msg}
+                  allNodes={allNodes}
+                  isGenerating={isStreamingThisMessage}
+                  onNavigateSibling={(direction) => navigateSibling(msg.id, direction)}
+                  onEdit={(newContent) => {
+                    isPinnedToBottomRef.current = true;
+                    editUserMessage(msg.id, newContent);
+                  }}
+                  onRegenerate={() => {
+                    isPinnedToBottomRef.current = true;
+                    regenerateAssistantMessage(msg.id);
+                  }}
+                  onDelete={() => deleteMessage(msg.id)}
+                />
+              );
+            })}
           </div>
         )}
       </div>
