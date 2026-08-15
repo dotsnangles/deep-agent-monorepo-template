@@ -248,7 +248,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   {isDraft && (
                     <SidebarMenuItem>
                       <SidebarMenuButton
-                        isActive={true}
+                        isActive={pathname === "/"}
                         tooltip="새로운 대화 (작성 중)"
                         className="font-normal text-xs justify-between text-primary/90 bg-primary/5 border border-dashed border-primary/30"
                       >
@@ -266,7 +266,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     </div>
                   ) : (
                     filteredSessions.map((session) => {
-                      const isActive = session.id === activeSessionId;
+                      const isActive = pathname === "/" && session.id === activeSessionId;
                       const isEditing = editingSessionId === session.id;
 
                       return (
