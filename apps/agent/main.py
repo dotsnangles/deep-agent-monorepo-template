@@ -12,10 +12,12 @@ from langchain_core.globals import set_llm_cache
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.store.postgres.aio import AsyncPostgresStore
 from psycopg_pool import AsyncConnectionPool
+from pydantic import BaseModel
 
-from agent import LLM_PROVIDER, build_agent
+from agent import LLM_PROVIDER, build_agent, generate_title
 from event_broker import RedisEventBroker, RedisStreamingCallbackHandler, StandardRedisCache
 from observability import get_langfuse_callback
+from title_worker import TitleGenerationWorker
 
 load_dotenv()
 
@@ -111,9 +113,22 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"[WARN] PostgreSQL connection failed: {e}. Using in-memory fallback.")
 
+    # 3. Initialize & Start Title Generation Queue Worker
+    title_worker = None
+    if app.state.redis and app.state.pg_pool:
+        title_worker = TitleGenerationWorker(
+            redis_client=app.state.redis,
+            pg_pool=app.state.pg_pool,
+            event_broker=app.state.broker,
+        )
+        title_worker.start()
+        app.state.title_worker = title_worker
+
     yield
 
     # Teardown resources
+    if title_worker:
+        await title_worker.stop()
     if app.state.pg_pool:
         await app.state.pg_pool.close()
         print("[SHUTDOWN] PostgreSQL connection pool closed.")
@@ -204,6 +219,22 @@ async def stream_events(thread_id: str):
             "X-Accel-Buffering": "no",
         },
     )
+
+
+class TitleRequest(BaseModel):
+    prompt: str
+
+
+class TitleResponse(BaseModel):
+    title: str
+    provider: str
+
+
+@app.post("/api/title", response_model=TitleResponse)
+async def create_title(body: TitleRequest):
+    """Generates a smart summary title using LangChain and the configured LLM provider."""
+    summary_title = await generate_title(body.prompt)
+    return {"title": summary_title, "provider": LLM_PROVIDER}
 
 
 if __name__ == "__main__":

@@ -7,3 +7,7 @@ Key terms and definitions used across `hollow-echo-distant-signal`:
 | Object Storage | File and asset storage system powered by MinIO locally and AWS S3 in production | Storage (`@repo/storage`) |
 | Key-Value Cache | High-speed in-memory data store powered by Redis for caching and rate limiting | Cache (`@repo/redis`) |
 | Validator Schema | Zod-based runtime validation schema shared between server and web DTOs | Validation (`@repo/validators`) |
+| Chat Session | A user-owned conversation container with persistent metadata (title, timestamps) | Web & DB (`@repo/db`) |
+| Thread | Unique execution ID (`thread_id`) mapping 1:1 with a LangGraph state graph & checkpoints | Python Agent (`apps/agent`) |
+| Lazy Session | A client-only draft conversation state that is only persisted to database upon sending the first user message | Web Client (`apps/web`) |
+| Smart Title Worker | Redis Task Queue (`queue:title_generation`) background worker on Python Agent server that throttles and processes title generation via LangChain LCEL | Python Agent & Redis (`apps/agent`, `@repo/redis`) |

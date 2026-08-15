@@ -150,3 +150,49 @@ def build_agent(
     st_name = type(store).__name__ if store is not None else "None"
     print(f"[AGENT] Deep Agent graph compiled (checkpointer={cp_name}, store={st_name}).")
     return agent_graph
+
+
+# =====================================================================
+# 4. LangChain Title Generation Chain (LCEL)
+# =====================================================================
+
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+
+TITLE_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            "사용자 질문의 핵심 주제를 나타내는 간결하고 명확한 제목을 한국어 명사형(20자 이내)으로 작성해줘. "
+            "부가 설명, 따옴표, 접두어(예: '제목:') 없이 오직 요약된 제목 텍스트만 출력해.",
+        ),
+        ("human", "{user_prompt}"),
+    ]
+)
+
+
+def get_title_chain():
+    """Builds a LangChain LCEL runnable for session title summarization using configured LLM."""
+    return TITLE_PROMPT | get_llm() | StrOutputParser()
+
+
+async def generate_title(user_prompt: str) -> str:
+    """Generates a concise Korean summary title for a chat session via LangChain."""
+    try:
+        chain = get_title_chain()
+        result = await chain.ainvoke({"user_prompt": user_prompt})
+        clean = (
+            str(result)
+            .strip()
+            .replace('"', "")
+            .replace("'", "")
+            .replace("`", "")
+            .replace("제목:", "")
+            .strip()
+        )
+        lines = [line.strip() for line in clean.splitlines() if line.strip()]
+        final_title = lines[0] if lines else user_prompt[:25]
+        return final_title[:25].strip()
+    except Exception as e:
+        print(f"[WARN] LangChain title generation failed: {e}")
+        return user_prompt[:25].strip()
