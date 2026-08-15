@@ -45,6 +45,8 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
 
   const [inputPrompt, setInputPrompt] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const prevActiveLengthRef = useRef(activePath.length);
+  const prevGeneratingRef = useRef(isGenerating);
 
   const {
     scrollRef,
@@ -54,9 +56,26 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
     handleScroll,
   } = useSmartScroll();
 
-  // Auto-scroll on streaming or new messages ONLY if pinned to bottom
+  // Smart Auto-Scroll: Handle new message insertion, generation start, and token streaming
   useEffect(() => {
-    if (isPinnedToBottomRef.current) {
+    const isNewMessageAdded = activePath.length > prevActiveLengthRef.current;
+    const isGenerationStarted = !prevGeneratingRef.current && isGenerating;
+
+    prevActiveLengthRef.current = activePath.length;
+    prevGeneratingRef.current = isGenerating;
+
+    if (isNewMessageAdded || isGenerationStarted) {
+      // Action-driven scroll: New message sent or generation started -> force pin and smooth scroll to bottom
+      isPinnedToBottomRef.current = true;
+      requestAnimationFrame(() => {
+        scrollToBottom("smooth");
+      });
+      const timer = setTimeout(() => {
+        scrollToBottom("smooth");
+      }, 60);
+      return () => clearTimeout(timer);
+    } else if (isGenerating && isPinnedToBottomRef.current) {
+      // Normal streaming token arrival -> instant scroll without fighting user gestures
       scrollToBottom("instant");
     }
   }, [activePath, isGenerating, scrollToBottom, isPinnedToBottomRef]);
@@ -83,8 +102,8 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
+    isPinnedToBottomRef.current = true;
     sendMessage(content);
-    scrollToBottom("smooth");
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -126,8 +145,8 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
                     key={idx}
                     type="button"
                     onClick={() => {
+                      isPinnedToBottomRef.current = true;
                       sendMessage(item.prompt);
-                      scrollToBottom("smooth");
                     }}
                     className="flex flex-col items-start p-3.5 rounded-2xl bg-card border border-border/70 hover:border-primary/50 hover:bg-muted/30 transition-all text-left group shadow-xs cursor-pointer"
                   >
@@ -153,10 +172,13 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
                 allNodes={allNodes}
                 isGenerating={isGenerating}
                 onNavigateSibling={(direction) => navigateSibling(msg.id, direction)}
-                onEdit={(newContent) => editUserMessage(msg.id, newContent)}
+                onEdit={(newContent) => {
+                  isPinnedToBottomRef.current = true;
+                  editUserMessage(msg.id, newContent);
+                }}
                 onRegenerate={() => {
+                  isPinnedToBottomRef.current = true;
                   regenerateAssistantMessage(msg.id);
-                  scrollToBottom("smooth");
                 }}
                 onDelete={() => deleteMessage(msg.id)}
               />
