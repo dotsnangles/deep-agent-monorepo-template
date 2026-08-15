@@ -5,11 +5,15 @@ export interface MessageNode {
   role: "user" | "assistant" | "system";
   content: string;
   createdAt: Date | string;
+  status?: "sending" | "streaming" | "complete" | "error";
+  error?: string | null;
 }
 
 export interface BranchInfo {
   currentIndex: number;
   totalBranches: number;
+  current: number;
+  total: number;
   siblingIds: string[];
 }
 
@@ -82,8 +86,9 @@ export function traverseActivePath(
 export function getBranchInfo(nodeId: string, nodes: MessageNode[]): BranchInfo {
   const target = nodes.find((n) => n.id === nodeId);
   if (!target) {
-    return { currentIndex: 1, totalBranches: 1, siblingIds: [nodeId] };
+    return { currentIndex: 1, totalBranches: 1, current: 1, total: 1, siblingIds: [nodeId] };
   }
+
 
   // Siblings are nodes with the same parentId within the same session
   const siblings = nodes.filter(
@@ -94,13 +99,19 @@ export function getBranchInfo(nodeId: string, nodes: MessageNode[]): BranchInfo 
 
   const siblingIds = siblings.map((s) => s.id);
   const targetIndex = siblingIds.indexOf(nodeId);
+  const curr = targetIndex >= 0 ? targetIndex + 1 : 1;
+  const tot = Math.max(1, siblings.length);
 
   return {
-    currentIndex: targetIndex >= 0 ? targetIndex + 1 : 1,
-    totalBranches: Math.max(1, siblings.length),
+    currentIndex: curr,
+    totalBranches: tot,
+    current: curr,
+    total: tot,
     siblingIds: siblingIds.length > 0 ? siblingIds : [nodeId],
   };
 }
+
+
 
 /**
  * Recursively finds all descendant node IDs of targetId and partitions

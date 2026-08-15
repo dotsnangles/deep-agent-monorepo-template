@@ -29,4 +29,6 @@ export {
   type StreamState,
   type StartStreamOptions,
 } from "./lib/stream-manager";
+export * from "./engine";
+
 

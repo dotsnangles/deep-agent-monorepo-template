@@ -17,3 +17,7 @@ Domain glossary and architectural concepts for the Next.js 16 Web Application:
 | Virtual Session List | High-performance DOM virtualization engine maintaining fixed-window DOM elements for thousands of chat sessions | `src/features/chat/components/chat-search-dialog.tsx`, `src/features/sidebar/components/app-sidebar.tsx` |
 | Fuzzy Session Matcher | In-memory fuzzy search matcher supporting multi-token matching, scoring, and text highlight tokenization | `src/features/chat/lib/fuzzy-match.ts` |
 | Keyboard-Virtual Synchronizer | Bi-directional focus and viewport synchronizer aligning keyboard arrow navigation with virtualized scroll offsets | `src/features/chat/components/chat-search-dialog.tsx` |
+| Chat Engine | Pure in-process state machine coordinating message tree graph mutations, stream chunk buffers, and active leaf tracking | `src/features/chat/engine/` |
+| Chat Engine Registry | Global singleton registry coordinating active session engine instances, route transition survival, and session event pub/sub | `src/features/chat/engine/` |
+| Chat Transport | Port interface and HTTP adapter isolating network fetch/streaming from state transitions and enabling zero-DOM tests | `src/features/chat/engine/` |
+

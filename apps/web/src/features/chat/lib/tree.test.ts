@@ -84,6 +84,8 @@ describe("Message Tree Pure Traversal Engine (tree.ts)", () => {
       expect(info).toEqual({
         currentIndex: 1,
         totalBranches: 1,
+        current: 1,
+        total: 1,
         siblingIds: ["msg-2"],
       });
     });
@@ -99,20 +101,27 @@ describe("Message Tree Pure Traversal Engine (tree.ts)", () => {
       expect(getBranchInfo("msg-2a", nodes)).toEqual({
         currentIndex: 1,
         totalBranches: 3,
+        current: 1,
+        total: 3,
         siblingIds: ["msg-2a", "msg-2b", "msg-2c"],
       });
 
       expect(getBranchInfo("msg-2b", nodes)).toEqual({
         currentIndex: 2,
         totalBranches: 3,
+        current: 2,
+        total: 3,
         siblingIds: ["msg-2a", "msg-2b", "msg-2c"],
       });
 
       expect(getBranchInfo("msg-2c", nodes)).toEqual({
         currentIndex: 3,
         totalBranches: 3,
+        current: 3,
+        total: 3,
         siblingIds: ["msg-2a", "msg-2b", "msg-2c"],
       });
+
     });
   });
 

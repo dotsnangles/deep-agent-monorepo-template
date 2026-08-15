@@ -17,4 +17,8 @@ Key terms and definitions used across `hollow-echo-distant-signal`:
 | Cascade Delete | A pruning strategy where deleting a message node permanently removes all of its descendant child nodes | Web & DB (`@repo/db`, `apps/web`) |
 | Global Stream Manager | Client-side lifecycle coordinator managing active HTTP stream connections and buffers decoupled from view unmounts | Web Client (`apps/web`) |
 | Stream Reconnection | Restoring buffered stream chunks and re-attaching live chunk rendering upon re-entering an actively generating session | Web Client (`apps/web`) |
+| Chat Engine | In-process state machine encapsulating message tree mutations, stream chunk accumulation, and optimistic rollback | Web Client (`apps/web`) |
+| Chat Engine Registry | Global singleton coordinating session engine lifecycles, stream persistence across routes, and event-driven updates | Web Client (`apps/web`) |
+| Chat Transport | Ports-and-adapters network interface decoupling state management from HTTP streaming and database endpoints | Web Client (`apps/web`) |
+
 
