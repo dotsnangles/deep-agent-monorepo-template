@@ -111,14 +111,14 @@ export function useMessageTree(sessionId: string) {
       setActiveLeafId(assistantMessageId);
 
       try {
-        // Send request with only active path context messages
-        const response = await fetch("/api/copilotkit", {
+        // Send request with only active path context messages to streaming endpoint
+        const response = await fetch("/api/chat/stream", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-copilotkit-thread-id": sessionId,
           },
           body: JSON.stringify({
+            threadId: sessionId,
             messages: [
               ...contextMessages.map((m) => ({
                 role: m.role,
