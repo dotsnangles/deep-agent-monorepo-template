@@ -115,8 +115,16 @@ SUBAGENTS: list[dict[str, Any]] = [
 # =====================================================================
 
 
-def build_agent():
-    """Build and compile the basic Deep Agent graph equipped with CopilotKitMiddleware."""
+def build_agent(
+    checkpointer: Any = None,
+    store: Any = None,
+):
+    """Build and compile the Deep Agent graph equipped with CopilotKitMiddleware.
+
+    Args:
+        checkpointer: Persistent checkpointer (e.g. AsyncPostgresSaver) or None.
+        store: Long-term store (e.g. AsyncPostgresStore) or None.
+    """
     llm = get_llm()
 
     tools = [
@@ -126,14 +134,19 @@ def build_agent():
         finalize,
     ]
 
+    effective_checkpointer = checkpointer if checkpointer is not None else MemorySaver()
+
     agent_graph = create_deep_agent(
         model=llm,
         system_prompt=MAIN_SYSTEM_PROMPT,
         tools=tools,
         subagents=SUBAGENTS if SUBAGENTS else None,
         middleware=[CopilotKitMiddleware()],
-        checkpointer=MemorySaver(),
+        checkpointer=effective_checkpointer,
+        store=store,
     )
 
-    print("[AGENT] Basic Deep Agent graph compiled successfully with CopilotKitMiddleware.")
+    cp_name = type(effective_checkpointer).__name__
+    st_name = type(store).__name__ if store is not None else "None"
+    print(f"[AGENT] Deep Agent graph compiled (checkpointer={cp_name}, store={st_name}).")
     return agent_graph

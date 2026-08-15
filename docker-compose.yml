@@ -212,8 +212,15 @@ services:
       - path: apps/agent/.env
         required: false
     environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/hollow-echo-distant-signal
+      REDIS_URL: redis://redis:6379/0
       OLLAMA_BASE_URL: http://host.docker.internal:11434
       LANGFUSE_HOST: http://langfuse:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
       test:
         [

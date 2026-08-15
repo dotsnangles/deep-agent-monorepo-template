@@ -31,6 +31,7 @@ The service listens on `http://localhost:8000` by default.
 - Agent endpoint: `POST http://localhost:8000/copilotkit`
 - Agent health: `GET http://localhost:8000/copilotkit/health`
 - Service health: `GET http://localhost:8000/health`
+- Real-time SSE Pub/Sub stream: `GET http://localhost:8000/events/{thread_id}`
 
 ## Configuration
 
@@ -42,9 +43,17 @@ OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=gemma4:e4b-it-q4_K_M
 SERVER_HOST=0.0.0.0
 SERVER_PORT=8000
+
+# Persistence, Caching & Pub/Sub
+DATABASE_URL=postgresql://postgres:password@localhost:5432/hollow-echo-distant-signal
+REDIS_URL=redis://localhost:6379/0
 ```
 
 Supported `LLM_PROVIDER` values are `ollama`, `openai`, `anthropic`, and `google`.
+
+- **PostgreSQL**: When `DATABASE_URL` is set, the server uses `AsyncPostgresSaver` (for conversation checkpoints & thread recovery) and `AsyncPostgresStore` (for cross-thread long-term memory).
+- **Redis**: When `REDIS_URL` is set, `RedisCache` provides global LLM response caching, `RedisEventBroker` broadcasts real-time token/tool execution events over Pub/Sub, and distributed locking protects thread state concurrency.
+- If these variables are omitted, the server falls back to in-memory `MemorySaver`.
 
 ## Official references
 
