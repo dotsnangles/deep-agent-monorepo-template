@@ -10,6 +10,7 @@
     "dev": "nx run-many -t dev --output-style=stream",
     "build": "nx run-many -t build",
     "check-types": "nx run-many -t check-types",
+    "test": "vitest run",
     "dev:web": "nx run-many -t dev --projects=web",
     "dev:server": "nx run-many -t dev --projects=server",
     "dev:agent": "nx run-many -t dev --projects=agent",
@@ -35,7 +36,8 @@
     "@repo/config": "workspace:*",
     "@types/node": "^22.20.1",
     "nx": "^23.1.0",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "^4.1.10"
   },
   "packageManager": "pnpm@11.9.0"
 }

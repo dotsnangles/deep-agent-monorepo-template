@@ -1,42 +1,17 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import { CopilotChat } from "@copilotkit/react-ui";
-import { Bot } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Bot, GitFork } from "lucide-react";
 import { Badge } from "@repo/ui/components/badge";
-import { useChatSessions } from "@/features/chat";
+import { MessageTreeFeed, useChatSessions } from "@/features/chat";
 
 export default function Home() {
   const { activeSessionId } = useChatSessions();
-  const chatContainerRef = useRef<HTMLDivElement>(null);
   const [health, setHealth] = useState<{
     status?: string;
     provider?: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
-
-  // Auto-focus chat input whenever session changes or page loads
-  useEffect(() => {
-    const focusInput = () => {
-      if (!chatContainerRef.current) return;
-      const textarea = chatContainerRef.current.querySelector(
-        "textarea, input[type=text], .copilotKitInput textarea, [data-copilotkit-input]"
-      ) as HTMLTextAreaElement | HTMLInputElement | null;
-
-      if (textarea) {
-        textarea.focus();
-      }
-    };
-
-    focusInput();
-    const t1 = setTimeout(focusInput, 50);
-    const t2 = setTimeout(focusInput, 200);
-
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
-  }, [activeSessionId]);
 
   useEffect(() => {
     async function checkHealth() {
@@ -72,8 +47,9 @@ export default function Home() {
           <div>
             <h2 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
               <span>Hollow Echo Deep Agent</span>
-              <Badge variant="outline" className="h-4 px-1.5 text-[9px] font-mono leading-none">
-                LangGraph
+              <Badge variant="outline" className="h-4 px-1.5 text-[9px] font-mono leading-none gap-1">
+                <GitFork className="size-2.5 text-primary" />
+                Message Tree
               </Badge>
             </h2>
           </div>
@@ -93,14 +69,9 @@ export default function Home() {
         </Badge>
       </div>
 
-      {/* Main Fullscreen Chat Area */}
-      <div ref={chatContainerRef} className="flex-1 min-h-0 relative flex flex-col pt-1 pb-1">
-        <CopilotChat
-          className="h-full rounded-2xl border border-border/50 shadow-sm overflow-hidden bg-background/50 backdrop-blur-xs"
-          labels={{
-            placeholder: "무엇이든 물어보거나 작업을 요청하세요... (예: '현재 시각 알려줘', '계산해줘')",
-          }}
-        />
+      {/* Main Fullscreen Message Tree Feed */}
+      <div className="flex-1 min-h-0 relative flex flex-col pt-1 pb-1 rounded-2xl border border-border/50 shadow-sm overflow-hidden bg-background/50 backdrop-blur-xs">
+        <MessageTreeFeed key={activeSessionId} sessionId={activeSessionId} />
       </div>
     </div>
   );
