@@ -13,7 +13,6 @@ export {
   useChatRegistry,
   type UseChatEngineReturn,
 } from "./hooks/use-chat-engine";
-export { useMessageTree } from "./hooks/use-message-tree";
 export { useSmartScroll } from "./hooks/use-smart-scroll";
 export { useCopyToClipboard } from "./hooks/use-copy-to-clipboard";
 
@@ -29,12 +28,7 @@ export {
   type FuzzySegment,
   type FuzzyMatchResult,
 } from "./lib/fuzzy-match";
-export {
-  StreamManager,
-  globalStreamManager,
-  type StreamState,
-  type StartStreamOptions,
-} from "./lib/stream-manager";
 export * from "./engine";
+
 
 

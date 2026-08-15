@@ -1,10 +1,10 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
-import { globalStreamManager } from "../lib/stream-manager";
+import { globalChatEngineRegistry } from "../engine";
 
 export interface ChatSession {
   id: string;
@@ -37,6 +37,16 @@ const ChatSessionContext = createContext<ChatSessionContextType | null>(null);
 
 const STORAGE_KEY = "hollow_echo_active_thread_id";
 
+function createDraftSession(id: string, title = "새로운 대화", userId = "guest"): ChatSession {
+  return {
+    id,
+    userId,
+    title,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 export function ChatSessionProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -50,10 +60,9 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
   });
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [generatingSessionIds, setGeneratingSessionIds] = useState<string[]>(() =>
-    globalStreamManager.getGeneratingSessionIds()
+    globalChatEngineRegistry.getGeneratingSessionIds()
   );
   const { data: sessionData } = authClient.useSession();
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   const openSearch = useCallback(() => setIsSearchOpen(true), []);
   const closeSearch = useCallback(() => setIsSearchOpen(false), []);
@@ -78,64 +87,52 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
     }
   }, []);
 
-  const fetchSessions = useCallback(async (silent = false) => {
-    if (!sessionData?.user) {
-      setIsLoading(false);
-      return;
-    }
-    try {
-      if (!silent) setIsLoading(true);
-      const res = await fetch("/api/chat/sessions");
-      if (res.ok) {
-        const data = await res.json();
-        const fetchedSessions: ChatSession[] = data.sessions || [];
-        setSessions((prev) => {
-          const generatingIds = globalStreamManager.getGeneratingSessionIds();
-          const activeStreams = globalStreamManager.getActiveStreamStates();
-          
-          // Keep in-flight generating sessions that may not have persisted to DB yet
-          const activeInMemorySessions: ChatSession[] = activeStreams.map((st) => {
-            const existing = prev.find((p) => p.id === st.sessionId);
-            if (existing) return existing;
-            const snippet = st.titleSnippet
-              ? st.titleSnippet.length > 30
-                ? st.titleSnippet.slice(0, 30) + "..."
-                : st.titleSnippet
-              : "새로운 대화";
-            return {
-              id: st.sessionId,
-              userId: sessionData?.user?.id || "guest",
-              title: snippet,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            };
-          });
-
-          const dbOnlySessions = fetchedSessions.filter(
-            (dbS) => !activeInMemorySessions.some((mem) => mem.id === dbS.id)
-          );
-
-          return [...activeInMemorySessions, ...dbOnlySessions];
-        });
+  const fetchSessions = useCallback(
+    async (silent = false) => {
+      if (!sessionData?.user) {
+        setIsLoading(false);
+        return;
       }
-    } catch (error) {
-      console.error("Failed to fetch chat sessions:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [sessionData?.user]);
+      try {
+        if (!silent) setIsLoading(true);
+        const res = await fetch("/api/chat/sessions");
+        if (res.ok) {
+          const data = await res.json();
+          const fetchedSessions: ChatSession[] = data.sessions || [];
+          setSessions((prev) => {
+            // Keep active generating sessions that might not be in DB yet
+            const currentGeneratingIds = globalChatEngineRegistry.getGeneratingSessionIds();
+            const memorySessions: ChatSession[] = currentGeneratingIds
+              .filter((genId) => !fetchedSessions.some((s) => s.id === genId))
+              .map((genId) => {
+                const existing = prev.find((p) => p.id === genId);
+                return existing || createDraftSession(genId, "새로운 대화", sessionData?.user?.id);
+              });
 
-  // Initial fetch and periodic background sync
+            return [...memorySessions, ...fetchedSessions];
+          });
+        }
+      } catch (error) {
+        console.error("[ChatSessionProvider] Failed to fetch chat sessions:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [sessionData?.user]
+  );
+
+  // Initial fetch on user auth readiness
   useEffect(() => {
     fetchSessions();
+  }, [fetchSessions]);
 
-    pollingRef.current = setInterval(() => {
+  // Event-driven revalidation on window focus (replaces 4s polling timer)
+  useEffect(() => {
+    const onFocus = () => {
       fetchSessions(true);
-    }, 4000);
-
-    return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
     };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
   }, [fetchSessions]);
 
   // Optimistically add session to local list
@@ -143,39 +140,30 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
     (id: string, title = "새로운 대화") => {
       setSessions((prev) => {
         if (prev.some((s) => s.id === id)) return prev;
-        const newSession: ChatSession = {
-          id,
-          userId: sessionData?.user?.id || "guest",
-          title,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        return [newSession, ...prev];
+        return [createDraftSession(id, title, sessionData?.user?.id), ...prev];
       });
     },
     [sessionData?.user?.id]
   );
 
-  // Subscribe to global stream updates for sidebar/UI indicators & auto-adding generating sessions
-  useEffect(() => {
-    return globalStreamManager.subscribeGlobal(() => {
-      const activeStreams = globalStreamManager.getActiveStreamStates();
-      const activeIds = activeStreams.map((s) => s.sessionId);
-      setGeneratingSessionIds(activeIds);
 
-      // Auto-ensure any generating session is in the sessions list immediately!
-      activeStreams.forEach((stream) => {
-        if (stream.sessionId) {
-          const snippet = stream.titleSnippet
-            ? stream.titleSnippet.length > 30
-              ? stream.titleSnippet.slice(0, 30) + "..."
-              : stream.titleSnippet
-            : "새로운 대화";
-          optimisticAddSession(stream.sessionId, snippet);
-        }
-      });
+  // Subscribe to ChatEngineRegistry event bus (replaces legacy StreamManager polling & subscriptions)
+  useEffect(() => {
+    return globalChatEngineRegistry.subscribe((event) => {
+      setGeneratingSessionIds(globalChatEngineRegistry.getGeneratingSessionIds());
+
+      if (event.type === "sessionCreated") {
+        optimisticAddSession(event.sessionId, event.payload?.title || "새로운 대화");
+      } else if (event.type === "titleUpdated") {
+        setSessions((prev) =>
+          prev.map((s) => (s.id === event.sessionId ? { ...s, title: event.payload.title } : s))
+        );
+      } else if (event.type === "streamCompleted") {
+        // Silently revalidate database state on stream completion
+        fetchSessions(true);
+      }
     });
-  }, [optimisticAddSession]);
+  }, [optimisticAddSession, fetchSessions]);
 
   const isSessionGenerating = useCallback(
     (id: string) => generatingSessionIds.includes(id),
@@ -185,7 +173,6 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
   const isDraft = !sessions.some((s) => s.id === activeSessionId);
 
   const createNewSession = () => {
-    // If not on main chat page, navigate to main chat page
     if (pathname !== "/") {
       router.push("/");
     }
@@ -196,13 +183,14 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
 
   const switchSession = (id: string) => {
     updateActiveSessionId(id);
-    // If user is on /dashboard or other pages, route to main chat playground
     if (pathname !== "/") {
       router.push("/");
     }
   };
 
   const deleteSession = async (id: string) => {
+    globalChatEngineRegistry.notifySessionDeleted(id);
+
     if (sessionData?.user) {
       try {
         const res = await fetch(`/api/chat/sessions/${id}`, {
@@ -210,7 +198,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
         });
         if (!res.ok) throw new Error("Delete failed");
       } catch (error) {
-        console.error("Failed to delete session:", error);
+        console.error("[ChatSessionProvider] Failed to delete session:", error);
         toast.error("세션 삭제에 실패했습니다.");
         return;
       }
@@ -242,7 +230,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
         });
         if (!res.ok) throw new Error("Rename failed");
       } catch (error) {
-        console.error("Failed to rename session:", error);
+        console.error("[ChatSessionProvider] Failed to rename session:", error);
         toast.error("세션 이름 변경에 실패했습니다.");
         return;
       }
@@ -251,6 +239,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
     setSessions((prev) =>
       prev.map((s) => (s.id === id ? { ...s, title: trimmed } : s))
     );
+    globalChatEngineRegistry.notifyTitleUpdated(id, trimmed);
     toast.success("세션 이름이 변경되었습니다.");
   };
 
