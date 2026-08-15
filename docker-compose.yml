@@ -117,20 +117,87 @@ services:
       retries: 5
     restart: unless-stopped
 
+  clickhouse:
+    image: docker.io/clickhouse/clickhouse-server:25.12
+    container_name: hollow-echo-distant-signal-clickhouse
+    volumes:
+      - hollow-echo-distant-signal_clickhouse_data:/var/lib/clickhouse
+    ports:
+      - "8123:8123"
+      - "9002:9000"
+    environment:
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: clickhouse
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   langfuse:
-    image: langfuse/langfuse:2
+    image: langfuse/langfuse:3
     container_name: hollow-echo-distant-signal-langfuse
     ports:
       - "3002:3000"
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/hollow-echo-distant-signal
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/hollow-echo-distant-signal?schema=langfuse
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-langfuse-secret-key-1234567890}
       SALT: ${SALT:-langfuse-salt-key-1234567890}
       NEXTAUTH_URL: http://localhost:3002
       TELEMETRY_ENABLED: "false"
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_CLUSTER_ENABLED: "false"
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY:-minioadmin}
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: us-east-1
+      REDIS_CONNECTION_STRING: redis://redis:6379
     depends_on:
       postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  langfuse-worker:
+    image: langfuse/langfuse-worker:3
+    container_name: hollow-echo-distant-signal-langfuse-worker
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/hollow-echo-distant-signal?schema=langfuse
+      SALT: ${SALT:-langfuse-salt-key-1234567890}
+      TELEMETRY_ENABLED: "false"
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_CLUSTER_ENABLED: "false"
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY:-minioadmin}
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: us-east-1
+      REDIS_CONNECTION_STRING: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
 
@@ -141,6 +208,9 @@ services:
     container_name: hollow-echo-distant-signal-agent
     ports:
       - "8000:8000"
+    env_file:
+      - path: apps/agent/.env
+        required: false
     environment:
       OLLAMA_BASE_URL: http://host.docker.internal:11434
       LANGFUSE_HOST: http://langfuse:3000
@@ -162,4 +232,5 @@ volumes:
   hollow-echo-distant-signal_postgres_data:
   hollow-echo-distant-signal_redis_data:
   hollow-echo-distant-signal_minio_data:
+  hollow-echo-distant-signal_clickhouse_data:
 
