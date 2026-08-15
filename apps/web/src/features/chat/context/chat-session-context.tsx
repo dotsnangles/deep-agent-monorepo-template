@@ -22,6 +22,7 @@ interface ChatSessionContextType {
   isSearchOpen: boolean;
   generatingSessionIds: string[];
   isSessionGenerating: (id: string) => boolean;
+  optimisticAddSession: (id: string, title?: string) => void;
   setIsSearchOpen: (open: boolean) => void;
   openSearch: () => void;
   closeSearch: () => void;
@@ -53,18 +54,6 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
   );
   const { data: sessionData } = authClient.useSession();
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Subscribe to global stream updates for sidebar/UI indicators
-  useEffect(() => {
-    return globalStreamManager.subscribeGlobal(() => {
-      setGeneratingSessionIds(globalStreamManager.getGeneratingSessionIds());
-    });
-  }, []);
-
-  const isSessionGenerating = useCallback(
-    (id: string) => generatingSessionIds.includes(id),
-    [generatingSessionIds]
-  );
 
   const openSearch = useCallback(() => setIsSearchOpen(true), []);
   const closeSearch = useCallback(() => setIsSearchOpen(false), []);
@@ -109,7 +98,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
     }
   }, [sessionData?.user]);
 
-  // Initial fetch and periodic background sync to detect when a draft session gets saved
+  // Initial fetch and periodic background sync
   useEffect(() => {
     fetchSessions();
 
@@ -140,52 +129,31 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
     [sessionData?.user?.id]
   );
 
-  // Auto-detect when user sends a message in a draft session and immediately add to list
+  // Subscribe to global stream updates for sidebar/UI indicators & auto-adding generating sessions
   useEffect(() => {
-    const handleUserInteraction = (e: KeyboardEvent | MouseEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (!target) return;
+    return globalStreamManager.subscribeGlobal(() => {
+      const activeStreams = globalStreamManager.getActiveStreamStates();
+      const activeIds = activeStreams.map((s) => s.sessionId);
+      setGeneratingSessionIds(activeIds);
 
-      if (e instanceof KeyboardEvent && e.key === "Enter" && !e.shiftKey) {
-        // Only trigger if inside a textarea or text input with non-empty content
-        if (target instanceof HTMLTextAreaElement || target instanceof HTMLInputElement) {
-          // Ignore search dialog / filter inputs
-          if (target.placeholder?.includes("검색") || target.closest("[role=dialog]")) {
-            return;
-          }
-          const text = target.value?.trim();
-          if (text && text.length > 0) {
-            if (!sessions.some((s) => s.id === activeSessionId)) {
-              const snippet = text.length > 30 ? text.slice(0, 30) + "..." : text;
-              optimisticAddSession(activeSessionId, snippet);
-              setTimeout(() => fetchSessions(true), 1500);
-            }
-          }
+      // Auto-ensure any generating session is in the sessions list immediately!
+      activeStreams.forEach((stream) => {
+        if (stream.sessionId) {
+          const snippet = stream.titleSnippet
+            ? stream.titleSnippet.length > 30
+              ? stream.titleSnippet.slice(0, 30) + "..."
+              : stream.titleSnippet
+            : "새로운 대화";
+          optimisticAddSession(stream.sessionId, snippet);
         }
-      } else if (e instanceof MouseEvent) {
-        const sendBtn = target.closest("button[type=submit], .copilotKitSendButton, [data-copilotkit-send]");
-        if (sendBtn) {
-          const formOrContainer = sendBtn.closest("form, .copilotKitInput, div");
-          const textarea = formOrContainer?.querySelector("textarea, input") as HTMLTextAreaElement | HTMLInputElement | null;
-          const text = textarea?.value?.trim();
-          if (text && text.length > 0) {
-            if (!sessions.some((s) => s.id === activeSessionId)) {
-              const snippet = text.length > 30 ? text.slice(0, 30) + "..." : text;
-              optimisticAddSession(activeSessionId, snippet);
-              setTimeout(() => fetchSessions(true), 1500);
-            }
-          }
-        }
-      }
-    };
+      });
+    });
+  }, [optimisticAddSession]);
 
-    window.addEventListener("keydown", handleUserInteraction, true);
-    window.addEventListener("click", handleUserInteraction, true);
-    return () => {
-      window.removeEventListener("keydown", handleUserInteraction, true);
-      window.removeEventListener("click", handleUserInteraction, true);
-    };
-  }, [activeSessionId, sessions, optimisticAddSession, fetchSessions]);
+  const isSessionGenerating = useCallback(
+    (id: string) => generatingSessionIds.includes(id),
+    [generatingSessionIds]
+  );
 
   const isDraft = !sessions.some((s) => s.id === activeSessionId);
 
@@ -269,6 +237,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
         isSearchOpen,
         generatingSessionIds,
         isSessionGenerating,
+        optimisticAddSession,
         setIsSearchOpen,
         openSearch,
         closeSearch,

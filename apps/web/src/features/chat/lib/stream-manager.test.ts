@@ -216,4 +216,70 @@ describe("StreamManager", () => {
     expect(saveAlpha).toHaveBeenCalledWith(expect.objectContaining({ content: "Alpha" }));
     expect(saveBeta).toHaveBeenCalledWith(expect.objectContaining({ content: "Beta" }));
   });
+
+  it("handles 3 concurrent streams and tracks activeStreamStates with titles", async () => {
+    const s1 = "sess-1";
+    const s2 = "sess-2";
+    const s3 = "sess-3";
+
+    let c1: ReadableStreamDefaultController<Uint8Array>;
+    let c2: ReadableStreamDefaultController<Uint8Array>;
+    let c3: ReadableStreamDefaultController<Uint8Array>;
+
+    const mockFetch = vi.fn().mockImplementation((_url, init) => {
+      const parsed = JSON.parse(init.body);
+      const stream = new ReadableStream({
+        start(c) {
+          if (parsed.threadId === s1) c1 = c;
+          if (parsed.threadId === s2) c2 = c;
+          if (parsed.threadId === s3) c3 = c;
+        },
+      });
+      return Promise.resolve({ ok: true, body: stream });
+    });
+
+    const p1 = manager.startStream({
+      sessionId: s1,
+      assistantMessageId: "a1",
+      userMessageId: "u1",
+      titleSnippet: "Question 1",
+      contextMessages: [{ role: "user", content: "Q1" }],
+      fetchFn: mockFetch as any,
+    });
+
+    const p2 = manager.startStream({
+      sessionId: s2,
+      assistantMessageId: "a2",
+      userMessageId: "u2",
+      titleSnippet: "Question 2",
+      contextMessages: [{ role: "user", content: "Q2" }],
+      fetchFn: mockFetch as any,
+    });
+
+    const p3 = manager.startStream({
+      sessionId: s3,
+      assistantMessageId: "a3",
+      userMessageId: "u3",
+      titleSnippet: "Question 3",
+      contextMessages: [{ role: "user", content: "Q3" }],
+      fetchFn: mockFetch as any,
+    });
+
+    const activeStates = manager.getActiveStreamStates();
+    expect(activeStates.length).toBe(3);
+    expect(activeStates.map((s) => s.titleSnippet)).toEqual([
+      "Question 1",
+      "Question 2",
+      "Question 3",
+    ]);
+
+    // Close all
+    c1!.close();
+    c2!.close();
+    c3!.close();
+
+    await Promise.all([p1, p2, p3]);
+
+    expect(manager.getActiveStreamStates().length).toBe(0);
+  });
 });

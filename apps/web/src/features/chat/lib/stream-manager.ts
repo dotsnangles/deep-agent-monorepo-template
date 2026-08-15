@@ -12,6 +12,7 @@ export interface StreamState {
   content: string;
   isGenerating: boolean;
   error?: string | null;
+  titleSnippet?: string;
 }
 
 export interface StartStreamOptions {
@@ -19,6 +20,7 @@ export interface StartStreamOptions {
   assistantMessageId: string;
   userMessageId: string | null;
   contextMessages: StreamMessageContext[];
+  titleSnippet?: string;
   fetchFn?: typeof fetch;
   saveMessageFn?: (msg: CreateChatMessageDTO) => Promise<any>;
 }
@@ -66,6 +68,12 @@ export class StreamManager {
     return Array.from(this.activeStreams.keys()).filter((id) =>
       this.isSessionGenerating(id)
     );
+  }
+
+  public getActiveStreamStates(): StreamState[] {
+    return Array.from(this.activeStreams.values())
+      .filter((s) => s.state.isGenerating)
+      .map((s) => ({ ...s.state }));
   }
 
   public getStreamState(sessionId: string): StreamState | null {
@@ -138,6 +146,7 @@ export class StreamManager {
       assistantMessageId,
       userMessageId,
       contextMessages,
+      titleSnippet,
       fetchFn = typeof window !== "undefined" ? window.fetch.bind(window) : fetch,
       saveMessageFn,
     } = options;
@@ -157,6 +166,7 @@ export class StreamManager {
         userMessageId,
         content: "",
         isGenerating: true,
+        titleSnippet,
       },
       controller,
       subscribers,

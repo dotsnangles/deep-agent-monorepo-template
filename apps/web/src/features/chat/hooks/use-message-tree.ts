@@ -49,14 +49,21 @@ export function useMessageTree(sessionId: string) {
       if (res.ok) {
         const data = await res.json();
         const messages: MessageNode[] = data.messages || [];
-        setAllNodes(messages);
-        setActiveLeafId(data.activeLeafId || null);
+
+        let finalNodes = messages;
+        let finalLeaf = data.activeLeafId || null;
 
         // Check if there is an active stream in progress for this session to reconnect to
         const activeStream = globalStreamManager.getStreamState(sessionId);
         if (activeStream?.isGenerating && activeStream.assistantMessageId) {
-          const assistantExists = messages.some((m) => m.id === activeStream.assistantMessageId);
-          if (!assistantExists) {
+          const assistantIndex = messages.findIndex((m) => m.id === activeStream.assistantMessageId);
+          if (assistantIndex >= 0) {
+            finalNodes = messages.map((m) =>
+              m.id === activeStream.assistantMessageId
+                ? { ...m, content: activeStream.content }
+                : m
+            );
+          } else {
             const reconnectedNode: MessageNode = {
               id: activeStream.assistantMessageId,
               sessionId,
@@ -65,10 +72,13 @@ export function useMessageTree(sessionId: string) {
               content: activeStream.content,
               createdAt: new Date(),
             };
-            setAllNodes([...messages, reconnectedNode]);
+            finalNodes = [...messages, reconnectedNode];
           }
-          setActiveLeafId(activeStream.assistantMessageId);
+          finalLeaf = activeStream.assistantMessageId;
         }
+
+        setAllNodes(finalNodes);
+        setActiveLeafId(finalLeaf);
       }
     } catch (err) {
       console.error("[useMessageTree] Failed to fetch message tree:", err);
@@ -202,6 +212,7 @@ export function useMessageTree(sessionId: string) {
         assistantMessageId,
         userMessageId: userMsgNode.id,
         contextMessages: formattedContext,
+        titleSnippet: userMsgNode.content,
       });
     },
     [sessionId]
