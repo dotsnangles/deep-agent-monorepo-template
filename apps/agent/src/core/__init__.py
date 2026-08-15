@@ -1,3 +1,4 @@
+from src.core.checkpointer import CheckpointerFactory
 from src.core.config import (
     DATABASE_URL,
     LLM_PROVIDER,
@@ -13,9 +14,12 @@ from src.core.redis import (
     RedisStreamingCallbackHandler,
     StandardRedisCache,
 )
+from src.core.testing import FakeChatModel
 
 __all__ = [
+    "CheckpointerFactory",
     "DATABASE_URL",
+    "FakeChatModel",
     "LLM_PROVIDER",
     "REDIS_URL",
     "SERVER_HOST",

@@ -1,12 +1,12 @@
-from typing import List, Optional
+
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
 
 from src.core.config import get_llm
-from src.graphs.chat.prompts import MAIN_SYSTEM_PROMPT
 from src.core.observability import get_langfuse_callback
+from src.graphs.chat.prompts import MAIN_SYSTEM_PROMPT
 
 chat_router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -23,8 +23,8 @@ class ChatMessageInput(BaseModel):
 
 
 class ChatStreamRequest(BaseModel):
-    thread_id: Optional[str] = None
-    messages: List[ChatMessageInput]
+    thread_id: str | None = None
+    messages: list[ChatMessageInput]
 
 
 @chat_router.post("/stream")
@@ -34,7 +34,7 @@ async def stream_chat(req: ChatStreamRequest):
     lf_callback = get_langfuse_callback()
     callbacks = [lf_callback] if lf_callback else []
 
-    lc_messages: List[BaseMessage] = [SystemMessage(content=MAIN_SYSTEM_PROMPT)]
+    lc_messages: list[BaseMessage] = [SystemMessage(content=MAIN_SYSTEM_PROMPT)]
     for msg in req.messages:
         msg_cls = ROLE_MESSAGE_MAP.get(msg.role.lower(), HumanMessage)
         lc_messages.append(msg_cls(content=msg.content))
