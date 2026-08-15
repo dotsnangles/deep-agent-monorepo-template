@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, Bot, Sparkles, Terminal } from "lucide-react";
+import { ArrowDown, ArrowUp, Bot, Sparkles, Square, Terminal } from "lucide-react";
 import { Button } from "@repo/ui/components/button";
 import { Textarea } from "@repo/ui/components/textarea";
 import { useMessageTree } from "../hooks/use-message-tree";
@@ -41,6 +41,7 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
     regenerateAssistantMessage,
     deleteMessage,
     navigateSibling,
+    stopGeneration,
   } = useMessageTree(sessionId);
 
   const [inputPrompt, setInputPrompt] = useState("");
@@ -202,7 +203,7 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
         </div>
       )}
 
-      {/* Bottom Floating Prompt Box */}
+      {/* Bottom Floating Prompt Box with Dynamic Send/Stop Toggle Button */}
       <div className="shrink-0 px-3 sm:px-6 pb-4 pt-1 bg-gradient-to-t from-background via-background/95 to-transparent">
         <div className="relative flex flex-col rounded-2xl bg-card border border-border/80 shadow-md focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/15 transition-all">
           <Textarea
@@ -210,23 +211,40 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
             value={inputPrompt}
             onChange={(e) => setInputPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="무엇이든 물어보세요... (Enter: 전송, Shift+Enter: 줄바꿈)"
+            placeholder={
+              isGenerating
+                ? "AI가 답변을 작성하고 있습니다... (필요시 중지 가능)"
+                : "무엇이든 물어보세요... (Enter: 전송, Shift+Enter: 줄바꿈)"
+            }
             className="min-h-[52px] max-h-[180px] resize-none border-none shadow-none focus-visible:ring-0 text-sm px-4 py-3 bg-transparent leading-relaxed"
-            disabled={isGenerating}
             rows={1}
           />
           <div className="flex items-center justify-between px-3.5 pb-2.5 pt-0.5">
             <span className="text-[11px] text-muted-foreground/80 select-none">
-              대화 분기 지원 (수정 시 새 브랜치 생성)
+              {isGenerating ? "답변 생성 진행 중" : "대화 분기 지원 (수정 시 새 브랜치 생성)"}
             </span>
-            <Button
-              size="icon"
-              className="size-8 rounded-xl shadow-xs"
-              onClick={handleSend}
-              disabled={isGenerating || !inputPrompt.trim()}
-            >
-              <ArrowUp className="size-4" />
-            </Button>
+            {isGenerating ? (
+              <Button
+                type="button"
+                size="icon"
+                className="size-8 rounded-xl shadow-xs bg-foreground text-background hover:bg-foreground/90 transition-all cursor-pointer animate-in zoom-in-90 duration-150"
+                onClick={stopGeneration}
+                title="답변 생성 중단 (Stop)"
+              >
+                <Square className="size-3.5 fill-current" />
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                size="icon"
+                className="size-8 rounded-xl shadow-xs"
+                onClick={handleSend}
+                disabled={!inputPrompt.trim()}
+                title="메시지 전송 (Enter)"
+              >
+                <ArrowUp className="size-4" />
+              </Button>
+            )}
           </div>
         </div>
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   type MessageNode,
@@ -15,6 +15,7 @@ export function useMessageTree(sessionId: string) {
   const [activeLeafId, setActiveLeafId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Compute the current active linear path based on allNodes and activeLeafId
   const activePath = useMemo(() => {
@@ -42,6 +43,16 @@ export function useMessageTree(sessionId: string) {
   useEffect(() => {
     fetchTree();
   }, [fetchTree]);
+
+  // Stop active AI generation
+  const stopGeneration = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      setIsGenerating(false);
+      toast.info("답변 생성을 중단했습니다.");
+    }
+  }, []);
 
   // Switch to a specific branch by message ID
   const switchBranch = useCallback(
@@ -89,6 +100,10 @@ export function useMessageTree(sessionId: string) {
       setIsGenerating(true);
       const assistantMessageId = crypto.randomUUID();
 
+      // Create abort controller for streaming cancellation
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
       // Create initial empty assistant placeholder node
       const placeholderAssistantNode: MessageNode = {
         id: assistantMessageId,
@@ -102,10 +117,12 @@ export function useMessageTree(sessionId: string) {
       setAllNodes((prev) => [...prev, placeholderAssistantNode]);
       setActiveLeafId(assistantMessageId);
 
+      let assistantContent = "";
       try {
         // Send request with only active path context messages to streaming endpoint
         const response = await fetch("/api/chat/stream", {
           method: "POST",
+          signal: controller.signal,
           headers: {
             "Content-Type": "application/json",
           },
@@ -121,7 +138,6 @@ export function useMessageTree(sessionId: string) {
           }),
         });
 
-        let assistantContent = "";
         if (response.ok && response.body) {
           const reader = response.body.getReader();
           const decoder = new TextDecoder();
@@ -132,7 +148,6 @@ export function useMessageTree(sessionId: string) {
             done = doneReading;
             if (value) {
               const chunk = decoder.decode(value, { stream: true });
-              // Simple extraction of raw text stream or json payload
               assistantContent += chunk;
               setAllNodes((prev) =>
                 prev.map((n) =>
@@ -164,10 +179,33 @@ export function useMessageTree(sessionId: string) {
         setAllNodes((prev) =>
           prev.map((n) => (n.id === assistantMessageId ? { ...n, content: cleanContent } : n))
         );
-      } catch (error) {
-        console.error("[useMessageTree] Stream error:", error);
-        toast.error("에이전트 응답 수신 중 오류가 발생했습니다.");
+      } catch (error: any) {
+        if (error.name === "AbortError" || controller.signal.aborted) {
+          const finalContent = assistantContent.trim() || "(답변 생성이 중단되었습니다.)";
+          try {
+            await fetch("/api/chat/messages", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                id: assistantMessageId,
+                sessionId,
+                parentId: userMsgNode.id,
+                role: "assistant",
+                content: finalContent,
+              }),
+            });
+            setAllNodes((prev) =>
+              prev.map((n) => (n.id === assistantMessageId ? { ...n, content: finalContent } : n))
+            );
+          } catch (e) {
+            console.error("[useMessageTree] Failed to save aborted message:", e);
+          }
+        } else {
+          console.error("[useMessageTree] Stream error:", error);
+          toast.error("에이전트 응답 수신 중 오류가 발생했습니다.");
+        }
       } finally {
+        abortControllerRef.current = null;
         setIsGenerating(false);
       }
     },
@@ -335,6 +373,7 @@ export function useMessageTree(sessionId: string) {
     deleteMessage,
     switchBranch,
     navigateSibling,
+    stopGeneration,
     refetch: fetchTree,
   };
 }
