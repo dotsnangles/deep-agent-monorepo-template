@@ -37,9 +37,9 @@ export default function Home() {
   const isOnline = health?.status === "healthy" || health?.status === "ok" || !loading;
 
   return (
-    <div className="flex flex-col h-full max-w-5xl w-full mx-auto px-4 sm:px-6 pt-5 pb-4">
+    <div className="flex flex-col h-full max-w-4xl w-full mx-auto px-3 sm:px-6 pt-3 sm:pt-4 pb-2">
       {/* Top Status Header */}
-      <div className="flex items-center justify-between py-1 pb-3 shrink-0">
+      <div className="flex items-center justify-between py-1 pb-2 shrink-0 border-b border-border/40 mb-1">
         <div className="flex items-center gap-2.5">
           <div className="flex items-center justify-center size-7 rounded-lg bg-primary/10 text-primary shadow-xs">
             <Bot className="size-4" />
@@ -70,7 +70,7 @@ export default function Home() {
       </div>
 
       {/* Main Fullscreen Message Tree Feed */}
-      <div className="flex-1 min-h-0 relative flex flex-col pt-1 pb-1 rounded-2xl border border-border/50 shadow-sm overflow-hidden bg-background/50 backdrop-blur-xs">
+      <div className="flex-1 min-h-0 relative flex flex-col overflow-hidden">
         <MessageTreeFeed key={activeSessionId} sessionId={activeSessionId} />
       </div>
     </div>

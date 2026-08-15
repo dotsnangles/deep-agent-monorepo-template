@@ -10,3 +10,5 @@ Domain glossary and architectural concepts for the Next.js 16 Web Application:
 | Chat Session Context | Client-side React context managing active thread IDs, local drafts, and session switching | `src/features/chat/` |
 | Lazy Session | A client-only draft conversation state that only persists to the database upon first message | `src/features/chat/context/` |
 | Server Redis Helper | Background title trigger isolated in `server.ts` to prevent client bundle pollution | `src/features/chat/server.ts` |
+| Assistant Markdown Renderer | Client-side markdown, GFM, and KaTeX math parsing pipeline rendering rich AI output with code copy actions | `src/features/chat/components/markdown-renderer.tsx` |
+| Message Canvas Layout | Stream layout where AI responses render directly on the canvas without redundant outer cards while user inputs render as right-aligned bubbles | `src/features/chat/components/message-item.tsx` |
