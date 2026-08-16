@@ -169,3 +169,49 @@ class TestArtifactSyncAndStreamPipeline:
         assert art_ev.data.name == "growth_plot.png"
         assert art_ev.data.session_id == sess_id
         assert "growth_plot.png" in art_ev.data.url
+
+    @pytest.mark.asyncio
+    async def test_s3_storage_service_upload_and_presigned_url(self, tmp_path: Path):
+        from src.core.artifacts import S3StorageService
+
+        test_file = tmp_path / "test_chart.png"
+        test_file.write_bytes(b"\x89PNG\r\n\x1a\nfake_image_bytes")
+
+        # Mock boto3 s3 client
+        mock_boto_client = MagicMock()
+        storage = S3StorageService(s3_client=mock_boto_client, bucket_name="test-bucket")
+
+        await storage.upload_file(test_file, "artifacts/sessions/s1/test_chart.png", "image/png")
+        assert mock_boto_client.upload_file.called
+        call_args = mock_boto_client.upload_file.call_args
+        assert call_args[0][0] == str(test_file)
+        assert call_args[0][1] == "test-bucket"
+        assert call_args[0][2] == "artifacts/sessions/s1/test_chart.png"
+
+        mock_boto_client.generate_presigned_url.return_value = "https://s3.example.com/test_chart.png?sig=123"
+        url = await storage.generate_presigned_download_url("artifacts/sessions/s1/test_chart.png")
+        assert url == "https://s3.example.com/test_chart.png?sig=123"
+
+    @pytest.mark.asyncio
+    async def test_app_lifespan_wires_artifact_processor_with_pool_and_storage(self):
+        from src.api.app import create_app
+
+        app = create_app()
+        # Mock CheckpointerFactory to return a pool
+        mock_pool = MagicMock()
+        mock_conn = MagicMock()
+        mock_pool.connection.return_value.__aenter__.return_value = mock_conn
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setenv("DATABASE_URL", "postgresql://user:pass@localhost:5432/testdb")
+            mp.setattr("src.core.checkpointer.CheckpointerFactory.create_pool", AsyncMock(return_value=mock_pool))
+            mp.setattr("src.core.checkpointer.CheckpointerFactory.create_checkpointer", MagicMock(return_value=MemorySaver()))
+            mp.setattr("src.core.checkpointer.CheckpointerFactory.create_store", MagicMock(return_value=None))
+            mp.setattr("src.core.checkpointer.CheckpointerFactory.close_pool", AsyncMock())
+            mp.setattr("src.core.artifacts.S3StorageService", MagicMock())
+
+            async with app.router.lifespan_context(app):
+                assert app.state.gateway is not None
+                assert app.state.gateway.artifact_processor is not None
+                assert app.state.gateway.artifact_processor.db_pool is not None
+                assert app.state.gateway.artifact_processor.storage_service is not None

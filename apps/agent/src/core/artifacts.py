@@ -24,6 +24,10 @@ MIME_TYPE_OVERRIDES = {
 }
 
 
+import asyncio
+import os
+from botocore.client import Config
+
 def guess_artifact_mime_type(file_path: Path | str) -> str:
     path = Path(file_path)
     suffix = path.suffix.lower()
@@ -31,6 +35,98 @@ def guess_artifact_mime_type(file_path: Path | str) -> str:
         return MIME_TYPE_OVERRIDES[suffix]
     guessed, _ = mimetypes.guess_type(str(path))
     return guessed or "application/octet-stream"
+
+
+class S3StorageService:
+    """Asynchronous S3 / MinIO storage service for uploading artifacts and generating presigned URLs."""
+
+    def __init__(
+        self,
+        s3_client: Any = None,
+        bucket_name: str | None = None,
+    ) -> None:
+        self.bucket_name = (
+            bucket_name
+            or os.getenv("MINIO_BUCKET_NAME")
+            or os.getenv("S3_BUCKET_NAME")
+            or "hollow-echo-bucket"
+        )
+        if s3_client is not None:
+            self.client = s3_client
+        else:
+            import boto3
+
+            endpoint_url = os.getenv("MINIO_ENDPOINT") or os.getenv("S3_ENDPOINT")
+            if endpoint_url and not endpoint_url.startswith("http"):
+                port = os.getenv("MINIO_PORT", "9000")
+                use_ssl = os.getenv("MINIO_USE_SSL", "false").lower() == "true"
+                proto = "https" if use_ssl else "http"
+                endpoint_url = f"{proto}://{endpoint_url}:{port}"
+
+            access_key = (
+                os.getenv("MINIO_ACCESS_KEY")
+                or os.getenv("AWS_ACCESS_KEY_ID")
+                or "minioadmin"
+            )
+            secret_key = (
+                os.getenv("MINIO_SECRET_KEY")
+                or os.getenv("AWS_SECRET_ACCESS_KEY")
+                or "minioadmin"
+            )
+
+            client_kwargs: dict[str, Any] = {
+                "service_name": "s3",
+                "aws_access_key_id": access_key,
+                "aws_secret_access_key": secret_key,
+                "config": Config(signature_version="s3v4"),
+            }
+            if endpoint_url:
+                client_kwargs["endpoint_url"] = endpoint_url
+
+            self.client = boto3.client(**client_kwargs)
+            self._ensure_bucket()
+
+    def _ensure_bucket(self) -> None:
+        try:
+            self.client.head_bucket(Bucket=self.bucket_name)
+        except Exception:
+            try:
+                self.client.create_bucket(Bucket=self.bucket_name)
+                logger.info("Created S3/MinIO bucket: %s", self.bucket_name)
+            except Exception as e:
+                logger.warning("Failed ensuring bucket %s: %s", self.bucket_name, e)
+
+    async def upload_file(
+        self,
+        file_path: Path | str,
+        storage_key: str,
+        mime_type: str = "application/octet-stream",
+    ) -> None:
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None,
+            lambda: self.client.upload_file(
+                str(file_path),
+                self.bucket_name,
+                storage_key,
+                ExtraArgs={"ContentType": mime_type},
+            ),
+        )
+
+    async def generate_presigned_download_url(
+        self,
+        storage_key: str,
+        expires_in: int = 3600,
+    ) -> str:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None,
+            lambda: self.client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": self.bucket_name, "Key": storage_key},
+                ExpiresIn=expires_in,
+            ),
+        )
 
 
 class ArtifactSyncProcessor:

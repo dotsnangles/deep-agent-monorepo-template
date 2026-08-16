@@ -77,11 +77,35 @@ def create_app() -> FastAPI:
             except Exception as e:
                 logger.warning("PostgreSQL connection failed: %s. Using in-memory fallback.", e)
 
-        # 3. Initialize AgentExecutionGateway
+        # 3. Initialize ArtifactSyncProcessor & AgentExecutionGateway
+        storage_service = None
+        try:
+            from src.core.artifacts import (
+                ArtifactSyncProcessor,
+                S3StorageService,
+                set_artifact_sync_processor,
+            )
+
+            storage_service = S3StorageService()
+        except Exception as s3_err:
+            logger.warning("S3StorageService init skipped/fallback: %s", s3_err)
+
+        from src.core.artifacts import (
+            ArtifactSyncProcessor,
+            set_artifact_sync_processor,
+        )
+
+        artifact_processor = ArtifactSyncProcessor(
+            db_pool=app.state.pg_pool,
+            storage_service=storage_service,
+        )
+        set_artifact_sync_processor(artifact_processor)
+
         app.state.gateway = AgentExecutionGateway(
             checkpointer=app.state.checkpointer,
             store=app.state.store,
             event_broker=app.state.broker,
+            artifact_processor=artifact_processor,
         )
 
         # 4. Initialize & Start Title Generation Queue Worker
