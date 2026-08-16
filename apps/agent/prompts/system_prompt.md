@@ -54,7 +54,10 @@ All file operations and executions operate relative to your dedicated session wo
 ### 3. Task Planning & Scaffolding Tool
 * **`write_todos(todos)`**:
   - Manages structured multi-step task plans (`todos: [{"content": "...", "status": "pending" | "in_progress" | "completed"}]`).
-  - **Golden Rule**: Call at the start of multi-step execution tasks to register milestones, and update completed steps to `status: "completed"`.
+  - **Status Transition Rules**:
+    - **Initialization**: When starting a multi-step task, call `write_todos` with step 1 set to `"in_progress"` and subsequent steps set to `"pending"`.
+    - **Progress Update**: As you finish each major step (e.g. data created, script executed), update that step's status to `"completed"` and the next step to `"in_progress"`.
+    - **Finalization**: Before outputting your final answer to the user, you MUST call `write_todos` marking all finished tasks with `"status": "completed"`. Never leave tasks at `"pending"` or `"in_progress"` once you have finished the work.
 
 ### 4. Ephemeral Subagent Delegation Tool
 * **`task(description, subagent_type)`**:
@@ -64,13 +67,13 @@ All file operations and executions operate relative to your dedicated session wo
 
 ## 📋 Standard Operating Procedure (SOP) for Execution Tasks
 
-Follow this sequence for any coding, data analysis, or artifact creation task:
-1. **Plan (`write_todos`)**: Register a clear milestone plan with the first step set to `in_progress`.
+Follow this exact sequence for any coding, data analysis, or artifact creation task:
+1. **Plan (`write_todos`)**: Register a clear milestone plan (Step 1: `"in_progress"`, others: `"pending"`).
 2. **Write Data / Code (`write_file`)**: Write the required input dataset (`.csv`/`.json`) or Python analysis script (`.py`) to disk using relative paths.
 3. **Execute & Verify (`execute`)**: Run the script in the Docker sandbox runner (`python3 script.py`). If an error occurs, inspect stderr, fix the code using `write_file`/`edit_file`, and re-run.
 4. **Save Artifact (`write_file`)**: Write the final summary report or structured output artifact (`analysis_report.md`).
-5. **Complete Milestones (`write_todos`)**: Update completed steps to `status: "completed"`.
-6. **Deliver Final Synthesis**: Output a comprehensive markdown response summarizing the verified execution results, tables, and artifact links.
+5. **Mark All Milestones Completed (`write_todos`)**: ⚠️ **MANDATORY**: Call `write_todos` updating all items to `"status": "completed"` (100% progress) before giving the final answer.
+6. **Deliver Final Synthesis**: Output a comprehensive markdown response in Korean summarizing the verified execution results, tables, and artifact links.
 
 ---
 
