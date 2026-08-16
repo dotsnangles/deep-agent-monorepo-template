@@ -1,0 +1,38 @@
+---
+title: Interactive components
+description: Create approval flows where the agent pauses and waits for human input.
+hideTOC: true
+snippet_cell: gen-ui-interrupt
+---
+
+## What is this?
+
+Interactive generative UI creates flows where the agent pauses execution and waits for user input before continuing. This enables approval workflows, confirmation dialogs, and any scenario where human judgment is needed mid-execution.
+
+## When should I use this?
+
+Use interactive generative UI when you need:
+
+- Approval/rejection flows (e.g. "Run this command?")
+- User decisions that the agent should know about
+- Confirmation dialogs with structured responses
+- Any flow where the agent pauses for human judgment
+
+## How it works in code
+
+On the frontend, register an interrupt renderer with `useInterrupt`. When the
+agent pauses, your component mounts inline in the chat, captures the user's
+choice, and resumes the run with that input.
+
+On the backend, the agent calls into the interrupt primitive and waits for
+the resumed response before continuing the graph.
+
+This framework implements the same interactive pause shape with a
+Promise-based frontend tool. The agent calls `schedule_meeting`, the client
+renders the picker, and the tool result resolves only after the user chooses a
+slot or cancels.
+
+> **Not available on this framework.** Interactive generative UI requires
+> either a native interrupt primitive or a Promise-resolving frontend tool.
+> For tool-call-based approval flows, use
+> [Human-in-the-loop](../human-in-the-loop) instead.

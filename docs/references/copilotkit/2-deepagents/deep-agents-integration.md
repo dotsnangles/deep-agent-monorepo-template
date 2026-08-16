@@ -1,0 +1,26 @@
+---
+title: "LangGraph Deep Agents in CopilotKit"
+description: "Leverage LangGraph Deep Agents to build sophisticated agentic applications with CopilotKit."
+hideTOC: true
+---
+
+## What are Deep Agents?
+
+They go beyond basic agents. They can plan multi-step workflows, manage their own file systems for context, spawn subagents for specialized tasks, and maintain long-term memory across sessions.
+
+## Deep Agents in Your App Through CopilotKit
+
+<div className="flex flex-col md:flex-row gap-6 items-start">
+<div className="flex-1">
+
+</div>
+<div className="flex-1">
+
+CopilotKit brings your Deep Agents to the frontend. Users can see the agent's thought process, interact with subagents as they spawn, and collaborate with the agent in real-time. It bridges the gap between powerful backend agents and actual user experience.
+
+### Get Started
+
+- [Deep Agents Guide](/deepagents)
+
+</div>
+</div>

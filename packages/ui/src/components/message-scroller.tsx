@@ -19,17 +19,22 @@ function MessageScrollerProvider(
 
 function MessageScroller({
   className,
+  children,
   ...props
 }: React.ComponentProps<typeof MessageScrollerPrimitive.Root>) {
   return (
-    <MessageScrollerPrimitive.Root
-      data-slot="message-scroller"
-      className={cn(
-        "cn-message-scroller group/message-scroller relative flex size-full min-h-0 flex-col overflow-hidden",
-        className,
-      )}
-      {...props}
-    />
+    <MessageScrollerPrimitive.Provider>
+      <MessageScrollerPrimitive.Root
+        data-slot="message-scroller"
+        className={cn(
+          "cn-message-scroller group/message-scroller relative flex size-full min-h-0 flex-col overflow-hidden",
+          className,
+        )}
+        {...props}
+      >
+        {children}
+      </MessageScrollerPrimitive.Root>
+    </MessageScrollerPrimitive.Provider>
   );
 }
 

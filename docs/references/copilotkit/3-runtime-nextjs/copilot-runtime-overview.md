@@ -1,0 +1,283 @@
+---
+title: "Copilot Runtime"
+description: "The Copilot Runtime is the backend that connects your frontend to your AI agents, providing authentication, middleware, routing, and more."
+---
+
+The Copilot Runtime is the backend layer that connects your frontend application to your AI agents. It's set up during the [quickstart](/quickstart) and is the recommended way to use CopilotKit.
+
+## Setting up the runtime
+
+The runtime is a lightweight server endpoint that you add to your backend. Here's a minimal example using Next.js:
+
+```ts title="app/api/copilotkit/route.ts"
+import {
+  CopilotRuntime,
+  ExperimentalEmptyAdapter,
+  copilotRuntimeNextJSAppRouterEndpoint,
+} from "@copilotkit/runtime";
+
+const serviceAdapter = new ExperimentalEmptyAdapter();
+
+const runtime = new CopilotRuntime({
+  agents: {
+    // your agents go here
+  },
+});
+
+const POST = async (req: NextRequest) => {
+  const { handleRequest } = copilotRuntimeNextJSAppRouterEndpoint({
+    runtime,
+    serviceAdapter,
+    endpoint: "/api/copilotkit",
+  });
+
+  return handleRequest(req);
+};
+```
+
+Then point your frontend at the endpoint:
+
+```tsx
+
+  
+
+```
+
+For Express, NestJS, or plain Node.js HTTP variants, see the [quickstart](/quickstart).
+For the exact HTTP routes the runtime exposes (and how to probe them with `curl`),
+see [Runtime HTTP endpoints](/backend/runtime-endpoints).
+
+> [!NOTE]
+> The `copilotRuntimeNextJSAppRouterEndpoint` / `copilotRuntimeNodeHttpEndpoint` / `copilotRuntimeNodeExpressEndpoint` / `copilotRuntimeNestEndpoint` helpers above are the **legacy** (v1) endpoint factories, imported from `@copilotkit/runtime`. The v2 runtime exposes a smaller, framework-agnostic API under `@copilotkit/runtime/v2`:
+> 
+>   | Legacy (`@copilotkit/runtime`) | v2 (`@copilotkit/runtime/v2`) |
+>   | --- | --- |
+>   | `copilotRuntimeNextJSAppRouterEndpoint`, `copilotRuntimeNodeHttpEndpoint` (Fetch / Next.js App Router, Bun, Deno, Cloudflare Workers) | `createCopilotRuntimeHandler` |
+>   | `copilotRuntimeNodeExpressEndpoint` (Express) | `createCopilotExpressHandler` (from `@copilotkit/runtime/v2/express`) |
+> 
+>   Both styles work in v1.50. For new projects, use the v2 handlers. See [Deploy to any runtime](/runtime-server-adapter).
+
+## Agents
+
+The runtime supports multiple agent types. `BuiltInAgent` is the primary agent class:
+
+- **Simple mode:** pass a model string and let CopilotKit handle the rest. Best for quick setup. See [Quickstart](/quickstart).
+- **Factory mode:** bring your own AI SDK, TanStack AI, or custom LLM backend. Best when you need full control. See [Factory Mode](/backend/custom-agent).
+
+## The default agent
+
+If you register an agent under the name `"default"`, CopilotKit's prebuilt UI components will use it automatically without any additional configuration on the frontend. This is useful when you have one primary agent and don't want to specify an `agentId` everywhere.
+
+```ts title="app/api/copilotkit/route.ts"
+
+const runtime = new CopilotRuntime({
+  agents: {
+    // Frontend components use this agent unless given another agentId.
+    default: new BuiltInAgent({ model: "openai:gpt-4.1" }),
+  },
+});
+```
+
+When you register multiple agents, the `"default"` agent is what powers the chat unless a specific agent is selected. Other agents can still be addressed by passing their `agentId` to a chat component or frontend agent API.
+
+## What the runtime provides
+
+### Authentication & security
+
+The runtime runs on your server, which means agent communication stays server-side. This gives you a trusted environment to enforce authentication, validate requests, and keep API keys secure. When you use the runtime, safe defaults prevent your agent endpoints from being exposed to unauthenticated access.
+
+### AG-UI middleware
+
+The [AG-UI protocol](/backend/ag-ui) supports a middleware layer (`agent.use`) for logging, guardrails, request transformation, and more. Because the runtime runs server-side, this middleware executes in a trusted environment where it cannot be tampered with by the client.
+
+### Agent routing
+
+When you register multiple agents, the runtime handles discovery and routing automatically. Your frontend doesn't need to know where each agent lives or how to reach it.
+
+### Enterprise Intelligence Platform
+
+[Threads](/threads), the [inspector](/inspector), and other Enterprise Intelligence Platform capabilities are provided through the runtime. These give you conversation persistence and debugging without extra setup.
+
+#### Assign Threads to Learning Containers
+
+Create a Learning Container in your Intelligence Project, then pass its stable
+ID to the Runtime:
+
+```ts title="runtime.ts"
+const runtime = new CopilotRuntime({
+  agents: { default: myAgent },
+  intelligence,
+  identifyUser,
+  ɵlearning: {
+    containerId: "support-quality",
+  },
+});
+```
+
+Use a callback when the Container depends on the run. The same callback handles
+web and Channel runs:
+
+```ts title="runtime.ts"
+const runtime = new CopilotRuntime({
+  agents: { default: myAgent },
+  intelligence,
+  identifyUser,
+  channels: [supportChannel],
+  ɵlearning: {
+    containerId: async ({ surface, agentId, userId, threadId }) => {
+      return chooseLearningContainer({ surface, agentId, userId, threadId });
+    },
+  },
+});
+```
+
+The callback runs once per agent run. Return a 1–64 character stable ID made
+from lowercase letters, numbers, and single hyphens. Return `null` to leave the
+Thread unassigned. A Thread can receive its first assignment when it is created
+or locked, but it cannot move to another Learning Container later.
+
+The Runtime sends only the Container ID with the normal Thread create and lock
+calls. It does not upload transcripts. The Intelligence AgentRunner's persisted
+AG-UI events remain the source for Learning.
+
+## Built-in middleware
+
+The runtime exposes two first-class middleware options you can enable directly on `CopilotRuntime` without calling `.use()` on each agent manually.
+
+### A2UI
+
+Pass `a2ui: {}` to automatically apply `A2UIMiddleware` to all registered agents:
+
+```ts title="app/api/copilotkit/route.ts"
+const runtime = new CopilotRuntime({
+  agents: { default: myAgent },
+  a2ui: {}, // enables A2UI rendering for all agents
+});
+```
+
+To scope it to specific agents only, pass an `agents` list:
+
+```ts
+a2ui: { agents: ["my-agent"] }
+```
+
+On the frontend, the A2UI renderer activates automatically. No extra
+configuration is needed. Configure `a2ui` only when you want to override the
+default theme:
+
+```tsx
+
+  {children}
+
+```
+
+### mcpApps
+
+Pass `mcpApps` to configure MCP servers for all agents from a single place:
+
+```ts title="app/api/copilotkit/route.ts"
+const runtime = new CopilotRuntime({
+  agents: { default: myAgent },
+  mcpApps: {
+    servers: [
+      { type: "http", url: "http://localhost:3108/mcp" },
+    ],
+  },
+});
+```
+
+Each server entry optionally accepts an `agentId` field to scope that server to a single agent. Without it, the server is available to all agents.
+
+Per-tool filtering belongs to `@ag-ui/mcp-apps-middleware`. The runtime currently pins version `0.0.3`, which does not support `includeTools` or `excludeTools`. Supplying either key raises a configuration error instead of silently ignoring it; use a compatible middleware release when that upstream policy contract is available.
+
+## Forwarding request headers to your agent
+
+When a request reaches the runtime, some inbound headers are forwarded onto the outgoing call to your agent (the `/run` path that actually dispatches the agent). This is how a token configured by the frontend provider reaches a self-hosted agent — see [Authentication](/auth).
+
+By default the runtime forwards `authorization` and any `x-*` header, **minus** a built-in denylist of infrastructure, proxy, and platform headers that no legitimate agent integration needs forwarded from the edge. The denylist strips, among others:
+
+- **Proxy / topology:** `x-forwarded-*`, `x-real-ip`
+- **Cloud / CDN tracing:** `x-amzn-trace-id`, `x-amz-*` (AWS), `x-azure-*`, `x-fastly-*`, `x-cloud-trace-context`, `x-cache`, `x-served-by`
+- **Platform-injected:** `x-vercel-*`, `x-middleware-*` (Next.js)
+- **CopilotKit platform:** `x-copilotcloud-*`, including `x-copilotcloud-public-api-key`
+
+Everything else still forwards: `authorization`, and any custom application header like `x-tenant-id`, `x-api-key`, or `x-user-id`.
+
+> [!WARNING]
+> Earlier runtime versions forwarded `x-request-id`. It is now stripped by default because it is predominantly a proxy-assigned trace id. If your agent relies on receiving your own `x-request-id`, re-enable it with `forwardHeaders: { allow: [...] }` or `useDefaultDenylist: false` (below).
+
+### Server-configured headers win
+
+Headers you set on an agent (e.g. `new HttpAgent({ headers: { Authorization: "Bearer <service-token>" } })`) take precedence over a forwarded inbound header of the same name, matched case-insensitively. A service-to-service token you configured on the server is never silently overridden by a browser- or edge-injected inbound header ([#5782](https://github.com/CopilotKit/CopilotKit/pull/5782)).
+
+### Configuring the policy
+
+Pass `forwardHeaders` to `CopilotRuntime` to tune what forwards:
+
+```ts title="app/api/copilotkit/route.ts"
+const runtime = new CopilotRuntime({
+  agents: { default: myAgent },
+  forwardHeaders: {
+    // Strip additional headers on top of the default denylist:
+    deny: ["x-internal-debug"],
+    denyPrefixes: ["x-acme-"],
+  },
+});
+```
+
+The options:
+
+- **`deny`** / **`denyPrefixes`** — extra exact names / name-prefixes to strip. These **always** strip (deny wins), even in allowlist mode, so a security-motivated `deny` can never be defeated by an overlapping `allow`.
+- **`allow`** — switches to **allowlist mode**: only the listed headers forward, and the usual `authorization` / `x-*` eligibility no longer applies. Your `deny` / `denyPrefixes` still subtract from this set.
+- **`useDefaultDenylist`** — defaults to `true`. Set `false` to opt out of the built-in denylist and restore the previous wide-open behavior.
+
+Empty or whitespace-only entries are ignored in every list.
+
+```ts
+// Allowlist mode: forward ONLY these two, nothing else.
+forwardHeaders: { allow: ["authorization", "x-tenant-id"] }
+```
+
+> [!WARNING]
+> In allowlist mode the built-in denylist does **not** apply — only your `allow` set (minus your own `deny`) forwards. Don't allow-list protected headers such as `x-copilotcloud-public-api-key` or `x-forwarded-*` unless you truly intend to forward them, since the default protection isn't there to catch them.
+
+## Connecting to an AG-UI agent directly
+
+CopilotKit is built on the [AG-UI protocol](/backend/ag-ui), which is an open
+standard. If you want to connect your frontend directly to an AG-UI-compatible
+agent without the runtime, you can do so by registering agent instances with the
+frontend SDK:
+
+```tsx
+
+const myAgent = new HttpAgent({
+  url: "https://my-agent.example.com",
+});
+
+  
+;
+```
+
+> [!WARNING]
+> Direct agent connections are intended for development and prototyping. They are **not recommended for production** and are not officially supported by CopilotKit.
+
+If you intend to manage the agent connection yourself in production and have
+secured it, use the supported
+[`selfManagedAgents`](/backend/self-managed-agents) configuration instead of
+the local-development agent option.
+
+Key trade-offs:
+
+1. **Authentication is your responsibility.** The runtime's safe defaults do not apply.
+2. **Many ecosystem features won't work.** Runtime-backed middleware and other capabilities depend on the server-side path.
+
+### Comparison
+
+| | With Runtime | Direct Connection |
+|---|---|---|
+| **Authentication** | Safe defaults provided | You manage it |
+| **AG-UI Middleware** | Runs server-side | Not available |
+| **Agent Routing** | Automatic | Manual |
+| **Ecosystem Features** | Full support | Limited |
+| **CopilotKit Support** | Supported | Not supported |
+| **Setup** | Requires a backend endpoint | Frontend-only |

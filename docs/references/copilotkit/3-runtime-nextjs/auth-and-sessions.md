@@ -1,0 +1,383 @@
+---
+title: Authentication
+description: Pass user auth context from your frontend to the agent so it can scope tools, data, and decisions to the signed-in user.
+snippet_cell: auth
+---
+
+You have a chat surface or a hook driving an agent and you want every agent run to know *who* the request came from. By the end of this guide, your frontend will forward a token, the runtime will pass it through, and your agent code will read the resulting user info on every turn.
+
+## When to use this
+
+- **Multi-tenant apps** where the agent reads or writes per-user data.
+- **Tool gating** where some tools should only run for authorised users.
+- **Audit and billing** where every run needs an identity to attribute it to.
+- **Session-aware UX** where the agent's behaviour depends on the user's role or permissions.
+
+If you don't need any of those, skip auth entirely. The agent runs anonymously and the frontend never has to care about tokens.
+
+## Frontend
+
+Pass your token via the `headers` prop on ``. CopilotKit forwards every request with that header attached.
+
+```tsx title="frontend/src/app/page.tsx"
+
+  
+
+```
+
+## Backend
+
+Wire authentication into the V2 runtime via the `onRequest` hook. The hook runs before any agent code and operates on the raw `Request`, so it's the right place to read the `Authorization` header, run your verifier, and either let the request through or short-circuit with a 401:
+
+```ts title="app/api/copilotkit/[[...slug]]/route.ts"
+import {
+  CopilotRuntime,
+  createCopilotRuntimeHandler,
+} from "@copilotkit/runtime/v2";
+
+const runtime = new CopilotRuntime({ agents: { default: myAgent } });
+
+const handler = createCopilotRuntimeHandler({
+  runtime,
+  basePath: "/api/copilotkit",
+  hooks: {
+    onRequest: ({ request }) => {
+      const authHeader = request.headers.get("authorization");
+      if (!authHeader?.startsWith("Bearer ")) {
+        throw new Response(
+          JSON.stringify({ error: "unauthorized" }),
+          { status: 401, headers: { "content-type": "application/json" } },
+        );
+      }
+      const token = authHeader.slice("Bearer ".length);
+      const user = verifyJwt(token); // your validation
+      // attach user to request-scoped context here
+    },
+  },
+});
+
+const POST = (req: NextRequest) => handler(req);
+const GET = (req: NextRequest) => handler(req);
+```
+
+> The V1 Next.js adapter (`copilotRuntimeNextJSAppRouterEndpoint`) does not forward the `hooks` option. Use `createCopilotRuntimeHandler` from `@copilotkit/runtime/v2` directly when you need the `onRequest` gate.
+
+## Frontend
+
+Pass your token via the `headers` prop. CopilotKit attaches it to every runtime request, and the runtime forwards the `Authorization` header on to your agent — whether that's a LangGraph deployment or a self-hosted AG-UI endpoint.
+
+```tsx title="frontend/src/app/page.tsx"
+
+  
+
+```
+
+> [!WARNING]
+> Older versions of this guide passed the token as `properties={{ authorization: userToken }}`. The runtime delivers `properties` to the agent as AG-UI `forwardedProps` — run payload data, not a request header — so nothing turns them into a Bearer credential. Use `headers` for auth. Headers the server configured on the agent itself still win on collision, so a service-to-service token can't be overridden from the browser.
+
+## Backend
+
+LangGraph supports two deployment modes. The frontend code above is the same in both, but the backend wiring differs in where the resolved user identity lands. Pick the tab that matches where your agent runs.
+
+On LangGraph Platform (and on `langgraph dev`), authentication is a managed service. You declare an `@auth.authenticate` handler, and the server runs it on every request before the graph starts. The forwarded `Authorization` header arrives as the handler's `authorization` argument, and the handler's return value becomes available to every node in the run.
+
+```python title="backend/auth.py"
+from langgraph_sdk import Auth
+
+auth = Auth()
+
+@auth.authenticate
+async def authenticate(authorization: str | None):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise Auth.exceptions.HTTPException(status_code=401, detail="Unauthorized")
+
+    token = authorization.replace("Bearer ", "")
+    user_info = validate_your_token(token)  # your validation logic
+
+    return {
+        "identity": user_info["user_id"],
+        "role": user_info.get("role"),
+        "permissions": user_info.get("permissions", []),
+    }
+```
+
+The return value of the handler shows up in every node's `config["configurable"]["langgraph_auth_user"]`. From there, scoping tool access or filtering data is straightforward:
+
+```python title="backend/agent.py"
+from langchain_core.runnables import RunnableConfig
+
+async def my_agent_node(state: AgentState, config: RunnableConfig):
+    user_info = config["configurable"]["langgraph_auth_user"]
+    user_id = user_info["identity"]
+    user_role = user_info.get("role")
+    # agent logic with user context
+    return state
+```
+
+For full handler details, see the [LangGraph Platform Authentication documentation](https://docs.langchain.com/langsmith/auth#authentication).
+
+When you self-host the agent behind FastAPI, there's no managed auth handler to plug into — validation is your job, and the natural place for it is the endpoint that serves the AG-UI stream. `add_langgraph_fastapi_endpoint` mounts that endpoint for you, but it takes one pre-built agent and gives you no per-request hook, so replace it with the equivalent route of your own: a FastAPI dependency verifies the `Authorization` header the runtime forwarded, and the resolved user is baked into a per-request agent's `config`.
+
+```python title="backend/main.py"
+from typing import Optional
+
+from ag_ui.core.types import RunAgentInput
+from ag_ui.encoder import EventEncoder
+from copilotkit import LangGraphAGUIAgent
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi.responses import StreamingResponse
+
+from src.agent import graph
+
+app = FastAPI()
+
+def current_user(authorization: Optional[str] = Header(default=None)) -> dict:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing bearer token")
+    return validate_your_token(authorization.removeprefix("Bearer ").strip())  # your validation
+
+@app.post("/")
+async def run_agent(
+    input_data: RunAgentInput,
+    request: Request,
+    user: dict = Depends(current_user),
+):
+    encoder = EventEncoder(accept=request.headers.get("accept"))
+
+    # One agent per request: the verified identity rides on this run only, and
+    # each request gets its own isolated streaming state.
+    agent = LangGraphAGUIAgent(
+        name="sample_agent",
+        graph=graph,
+        config={"configurable": {"auth_user": user}},
+    )
+
+    async def event_generator():
+        async for event in agent.run(input_data):
+            yield encoder.encode(event)
+
+    return StreamingResponse(event_generator(), media_type=encoder.get_content_type())
+```
+
+Unauthenticated requests never reach the graph — they get a 401 from the dependency. Authenticated ones arrive with an already-verified user on the config, so nodes read identity instead of re-validating a raw token:
+
+```python title="backend/src/agent.py"
+from langchain_core.runnables import RunnableConfig
+
+async def my_agent_node(state: AgentState, config: RunnableConfig):
+    user = config["configurable"]["auth_user"]
+    user_id = user["user_id"]
+    user_role = user.get("role")
+    # agent logic with user context
+    return state
+```
+
+> [!NOTE]
+> When nodes don't need the identity — you just want unauthenticated traffic rejected — keep `add_langgraph_fastapi_endpoint` and hang the dependency off the app: `FastAPI(dependencies=[Depends(current_user)])`. The gate applies, but nothing lands on the run config, so `config["configurable"]` stays empty of user context.
+
+> [!WARNING]
+> Guides written for CopilotKit v1 wrapped the graph in `CopilotKitRemoteEndpoint(agents=lambda context: [...])`. That path is retired: `copilotkit` no longer exports `LangGraphAgent` (`ImportError`), and the current `LangGraphAGUIAgent` exposes `run()` rather than the `execute()` that `CopilotKitRemoteEndpoint` calls — giving `AgentExecutionException: 'LangGraphAGUIAgent' object has no attribute 'execute'`. Use the endpoint above instead.
+
+## Frontend
+
+Pass your token via the `properties` prop. CopilotKit forwards it to AG2's `/chat` endpoint as a request header.
+
+```tsx title="frontend/src/app/page.tsx"
+
+  
+
+```
+
+## Backend
+
+The backend has two responsibilities: validate the token before the agent dispatches, and thread the resolved user identity into AG2's `ContextVariables` so tools can read it later.
+
+Start by validating the token on AG2's `/chat` endpoint. The `Authorization` header arrives as a normal FastAPI `Header(...)` parameter:
+
+```python title="backend/server.py"
+from fastapi import FastAPI, Header, HTTPException
+from fastapi.responses import StreamingResponse
+from autogen import ConversableAgent, LLMConfig
+from autogen.ag_ui import AGUIStream, RunAgentInput
+
+agent = ConversableAgent(
+    name="assistant",
+    system_message="You are a helpful assistant.",
+    llm_config=LLMConfig({"model": "gpt-5.4-mini"}),
+)
+
+stream = AGUIStream(agent)
+app = FastAPI()
+
+def validate_your_token(token: str) -> dict:
+    if token != "valid-token":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return {"user_id": "user_123", "role": "member"}
+
+@app.post("/chat")
+async def run_agent(
+    message: RunAgentInput,
+    accept: str | None = Header(None),
+    authorization: str | None = Header(None),
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing authorization header")
+
+    token = authorization.replace("Bearer ", "")
+    user_info = validate_your_token(token)
+    # use user_info to scope tools, state, and data access before dispatch
+
+    return StreamingResponse(
+        stream.dispatch(message, accept=accept),
+        media_type=accept or "text/event-stream",
+    )
+```
+
+Once the token is validated, AG2's tools can read the user identity straight out of `ContextVariables`. This is how you make individual tool calls aware of who's asking, without having to thread the user object manually through every helper:
+
+```python title="backend/tools.py"
+from typing import Annotated
+from autogen import ContextVariables
+
+@agent.register_for_llm(description="Return account data for the authenticated user.")
+def get_account_data(
+    context: ContextVariables,
+    account_id: Annotated[str, "The target account id"],
+) -> dict:
+    user = context.get("auth_user")
+    if not user:
+        return {"error": "unauthorized"}
+    if account_id not in user.get("allowed_accounts", []):
+        return {"error": "forbidden"}
+    return {"account_id": account_id, "owner": user["user_id"]}
+```
+
+## Frontend
+
+Microsoft Agent Framework's AG-UI host expects authentication on a request header rather than the runtime properties channel. Pass the token via ``:
+
+```tsx title="frontend/src/app/page.tsx"
+
+  
+
+```
+
+## Backend
+
+Validation lives at the host process level: ASP.NET Core's JwtBearer middleware on the .NET host, FastAPI middleware on the Python host. Either way, the AG-UI endpoint refuses to dispatch the agent until the token is verified — so by the time your tools run, the user identity is already trustworthy.
+
+```csharp title="Program.cs"
+using Microsoft.Agents.AI;
+using Microsoft.Agents.AI.Hosting.AGUI.AspNetCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using OpenAI;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.Authority = builder.Configuration["JwtAuthority"];
+        options.Audience = builder.Configuration["JwtAudience"];
+        options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+        };
+    });
+
+builder.Services.AddAuthorization();
+
+var app = builder.Build();
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+string githubToken = builder.Configuration["GitHubToken"]!;
+var openAI = new OpenAIClient(
+    new System.ClientModel.ApiKeyCredential(githubToken),
+    new OpenAIClientOptions { Endpoint = new Uri("https://models.inference.ai.azure.com") }
+);
+var agent = openAI.GetChatClient("gpt-5.4-mini")
+    .CreateAIAgent(name: "AGUIAssistant", instructions: "You are a helpful assistant.");
+
+app.MapAGUI("/", agent).RequireAuthorization();
+
+await app.RunAsync();
+```
+
+Settings live in `appsettings.json`:
+
+```json title="appsettings.json"
+{
+  "JwtAuthority": "https://login.microsoftonline.com/{your-tenant-id}/v2.0",
+  "JwtAudience": "api://{your-client-id}",
+  "GitHubToken": "your-github-token-here"
+}
+```
+
+```python title="agent/src/main.py"
+from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.middleware.cors import CORSMiddleware
+from agent_framework.ag_ui import add_agent_framework_fastapi_endpoint
+from agent import create_agent
+import os
+
+app = FastAPI(title="CopilotKit + Microsoft Agent Framework")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+REQUIRED_BEARER_TOKEN = os.getenv("AUTH_BEARER_TOKEN")
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    if REQUIRED_BEARER_TOKEN and request.url.path == "/":
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing bearer token")
+        token = auth_header.split(" ", 1)[1].strip()
+        if token != REQUIRED_BEARER_TOKEN:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    return await call_next(request)
+
+chat_client = build_chat_client()  # Azure OpenAI or OpenAI
+my_agent = create_agent(chat_client)
+add_agent_framework_fastapi_endpoint(app=app, agent=my_agent, path="/")
+```
+
+Settings live in `agent/.env`:
+
+```bash title="agent/.env"
+AUTH_BEARER_TOKEN=super-secret-demo-token
+```
+
+> [!WARNING]
+> Examples that validate against a single shared secret are for local demos only. For production, use proper authentication: validate JWTs with `Microsoft.AspNetCore.Authentication.JwtBearer` (.NET), or OAuth 2.0 / OpenID Connect JWT validation (Python).
+
+## Tool gating
+
+The most common reason to wire auth is so individual tools can decline to run. Read the resolved user inside the tool's handler and bail if the role doesn't match:
+
+```python
+def delete_record(record_id: str, *, user: User):
+    if "admin" not in user.permissions:
+        raise PermissionError("admin role required")
+    # do the delete
+```
+
+This composes with [Human in the loop](/human-in-the-loop): gate on auth first, surface a confirmation card next, execute last.
+
+## Security checklist
+
+- **Always validate** the token on the backend. Never trust the frontend's claim.
+- **Scope every read and write** to the resolved user. Auth context only matters if you actually use it to filter data.
+- **Don't log raw tokens.** Log the resolved user id (or `anonymous`) instead.
+- **Use HTTPS in production.** The Bearer token is sensitive.
+- **Refresh strategy.** Your frontend is responsible for rotating expired tokens before they reach the agent. CopilotKit doesn't refresh on your behalf.

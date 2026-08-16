@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, Bot, Paperclip, Sparkles, Square, Terminal } from "lucide-react";
 import { Button } from "@repo/ui/components/button";
 import { Textarea } from "@repo/ui/components/textarea";
+import {
+  MessageScroller,
+  MessageScrollerViewport,
+  MessageScrollerContent,
+  MessageScrollerItem,
+} from "@repo/ui/components/message-scroller";
 import { useChatEngine } from "../hooks/use-chat-engine";
 import { useSmartScroll } from "../hooks/use-smart-scroll";
 import { useDirectUpload } from "../hooks/use-direct-upload";
@@ -147,97 +153,100 @@ export function MessageFeed({ sessionId }: MessageFeedProps) {
 
   return (
     <div className="flex flex-col h-full w-full max-w-4xl mx-auto min-h-0 relative">
-      {/* Scrollable Message Feed Area with Smart Scroll Tracking */}
-      <div
-        ref={scrollRef}
-        onScroll={handleScroll}
-        className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-6 py-4 space-y-4"
-      >
-        {isLoading && activePath.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-muted-foreground gap-2">
-            <span className="size-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-            <p className="text-xs">대화 기록을 불러오는 중입니다...</p>
-          </div>
-        ) : activePath.length === 0 ? (
-          /* Empty Starter State */
-          <div className="flex flex-col items-center justify-center min-h-[400px] h-full text-center px-4">
-            <div className="flex items-center justify-center size-12 rounded-2xl bg-primary/10 text-primary mb-3 shadow-xs">
-              <Bot className="size-6" />
+      {/* Scrollable Message Feed Area with shadcn MessageScroller */}
+      <MessageScroller className="flex-1 min-h-0">
+        <MessageScrollerViewport
+          ref={scrollRef as any}
+          onScroll={handleScroll}
+          className="px-3 sm:px-6 py-4"
+        >
+          {isLoading && activePath.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-muted-foreground gap-2">
+              <span className="size-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+              <p className="text-xs">대화 기록을 불러오는 중입니다...</p>
             </div>
-            <h3 className="text-base font-semibold text-foreground">Hollow Echo AI 어시스턴트</h3>
-            <p className="text-xs text-muted-foreground mt-1 max-w-md leading-relaxed">
-              마크다운, LaTeX 수식, 코드 블록, 이미지 및 문서 첨부를 완벽히 지원합니다. 자유롭게 대화를 시작해 보세요.
-            </p>
+          ) : activePath.length === 0 ? (
+            /* Empty Starter State */
+            <div className="flex flex-col items-center justify-center min-h-[400px] h-full text-center px-4">
+              <div className="flex items-center justify-center size-12 rounded-2xl bg-primary/10 text-primary mb-3 shadow-xs">
+                <Bot className="size-6" />
+              </div>
+              <h3 className="text-base font-semibold text-foreground">Hollow Echo AI 어시스턴트</h3>
+              <p className="text-xs text-muted-foreground mt-1 max-w-md leading-relaxed">
+                마크다운, LaTeX 수식, 코드 블록, 이미지 및 문서 첨부를 완벽히 지원합니다. 자유롭게 대화를 시작해 보세요.
+              </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-8 w-full max-w-3xl">
-              {STARTER_PROMPTS.map((item, idx) => {
-                const Icon = item.icon;
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-8 w-full max-w-3xl">
+                {STARTER_PROMPTS.map((item, idx) => {
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        isPinnedToBottomRef.current = true;
+                        send(item.prompt);
+                      }}
+                      className="flex flex-col items-start p-3.5 rounded-2xl bg-card border border-border/70 hover:border-primary/50 hover:bg-muted/30 transition-all text-left group shadow-xs cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2 text-xs font-semibold text-foreground group-hover:text-primary transition-colors">
+                        <Icon className="size-4 text-primary shrink-0" />
+                        <span>{item.title}</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-1.5 line-clamp-2 leading-relaxed">
+                        {item.prompt}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            /* Message List */
+            <MessageScrollerContent className="gap-4">
+              {activePath.map((msg, index) => {
+                const isLast = index === activePath.length - 1;
+                const isStreamingThisMessage =
+                  isGenerating &&
+                  ((generatingAssistantId && msg.id === generatingAssistantId) ||
+                    (!generatingAssistantId && isLast && msg.role === "assistant"));
+
                 return (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => {
-                      isPinnedToBottomRef.current = true;
-                      send(item.prompt);
-                    }}
-                    className="flex flex-col items-start p-3.5 rounded-2xl bg-card border border-border/70 hover:border-primary/50 hover:bg-muted/30 transition-all text-left group shadow-xs cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2 text-xs font-semibold text-foreground group-hover:text-primary transition-colors">
-                      <Icon className="size-4 text-primary shrink-0" />
-                      <span>{item.title}</span>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground mt-1.5 line-clamp-2 leading-relaxed">
-                      {item.prompt}
-                    </p>
-                  </button>
+                  <MessageScrollerItem key={msg.id}>
+                    <MessageItem
+                      message={msg}
+                      isGenerating={isStreamingThisMessage}
+                      onRegenerate={() => {
+                        isPinnedToBottomRef.current = true;
+                        regenerate(msg.id);
+                      }}
+                      onDelete={() => deleteNode(msg.id)}
+                      onRetry={() => {
+                        isPinnedToBottomRef.current = true;
+                        retry(msg.id);
+                      }}
+                      onFork={async () => {
+                        const result = await forkSession(msg.id);
+                        if (result?.newSessionId) {
+                          router.push(`/chat/${result.newSessionId}` as any);
+                        }
+                      }}
+                      onApprove={(toolCallId) => {
+                        isPinnedToBottomRef.current = true;
+                        respondToApproval(toolCallId, true);
+                      }}
+                      onReject={(toolCallId, reason) => {
+                        isPinnedToBottomRef.current = true;
+                        respondToApproval(toolCallId, false, reason);
+                      }}
+                    />
+                  </MessageScrollerItem>
                 );
               })}
-            </div>
-          </div>
-        ) : (
-          /* Message List */
-          <div className="space-y-4">
-            {activePath.map((msg, index) => {
-              const isLast = index === activePath.length - 1;
-              const isStreamingThisMessage =
-                isGenerating &&
-                ((generatingAssistantId && msg.id === generatingAssistantId) ||
-                  (!generatingAssistantId && isLast && msg.role === "assistant"));
-
-              return (
-                <MessageItem
-                  key={msg.id}
-                  message={msg}
-                  isGenerating={isStreamingThisMessage}
-                  onRegenerate={() => {
-                    isPinnedToBottomRef.current = true;
-                    regenerate(msg.id);
-                  }}
-                  onDelete={() => deleteNode(msg.id)}
-                  onRetry={() => {
-                    isPinnedToBottomRef.current = true;
-                    retry(msg.id);
-                  }}
-                  onFork={async () => {
-                    const result = await forkSession(msg.id);
-                    if (result?.newSessionId) {
-                      router.push(`/chat/${result.newSessionId}` as any);
-                    }
-                  }}
-                  onApprove={(toolCallId) => {
-                    isPinnedToBottomRef.current = true;
-                    respondToApproval(toolCallId, true);
-                  }}
-                  onReject={(toolCallId, reason) => {
-                    isPinnedToBottomRef.current = true;
-                    respondToApproval(toolCallId, false, reason);
-                  }}
-                />
-              );
-            })}
-          </div>
-        )}
-      </div>
+            </MessageScrollerContent>
+          )}
+        </MessageScrollerViewport>
+      </MessageScroller>
 
       {/* Floating 'Scroll to Bottom' Button when user scrolled up */}
       {showScrollBottomButton && (
