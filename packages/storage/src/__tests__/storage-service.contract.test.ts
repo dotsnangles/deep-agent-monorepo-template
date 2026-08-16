@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { FakeStorageService } from "../fake-storage-service";
 import { MinioStorageService } from "../minio-storage-service";
 import { normalizeStorageKey } from "../storage-service";
+import { buildArtifactStorageKey } from "../index";
 import * as presigner from "@aws-sdk/s3-request-presigner";
 
 vi.mock("@aws-sdk/s3-request-presigner", () => ({
@@ -16,6 +17,12 @@ describe("StorageService Port Contract Tests", () => {
     expect(normalizeStorageKey("path/to/file.txt")).toBe("path/to/file.txt");
     expect(normalizeStorageKey("/path/to/file.txt")).toBe("path/to/file.txt");
     expect(normalizeStorageKey("///path/to/file.txt")).toBe("path/to/file.txt");
+  });
+
+  it("builds artifact storage keys correctly", () => {
+    expect(buildArtifactStorageKey("sess-1", "chart.png")).toBe("artifacts/sessions/sess-1/chart.png");
+    expect(buildArtifactStorageKey("sess-1", "chart.png", "msg-123")).toBe("artifacts/sessions/sess-1/msg-123/chart.png");
+    expect(buildArtifactStorageKey("sess-1", "/nested/report.pdf", "msg-456")).toBe("artifacts/sessions/sess-1/msg-456/nested/report.pdf");
   });
 
   describe("FakeStorageService (@repo/storage in-memory double)", () => {

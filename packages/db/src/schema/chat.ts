@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { index, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { index, integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import type { AttachmentEntity } from "@repo/validators";
 
 import { user } from "./auth";
@@ -48,12 +48,38 @@ export const chatMessage = pgTable(
   ]
 );
 
+export const chatArtifact = pgTable(
+  "chat_artifact",
+  {
+    id: text("id").primaryKey(), // UUID string
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => chatSession.id, { onDelete: "cascade" }),
+    messageId: text("message_id")
+      .references(() => chatMessage.id, { onDelete: "set null" }),
+    name: text("name").notNull(),
+    storageKey: text("storage_key").notNull(),
+    mimeType: text("mime_type").notNull(),
+    sizeBytes: integer("size_bytes"),
+    metadata: jsonb("metadata")
+      .$type<Record<string, unknown>>()
+      .default({})
+      .notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("chat_artifact_sessionId_idx").on(table.sessionId),
+    index("chat_artifact_messageId_idx").on(table.messageId),
+  ]
+);
+
 export const chatSessionRelations = relations(chatSession, ({ one, many }) => ({
   user: one(user, {
     fields: [chatSession.userId],
     references: [user.id],
   }),
   messages: many(chatMessage),
+  artifacts: many(chatArtifact),
 }));
 
 export const chatMessageRelations = relations(chatMessage, ({ one, many }) => ({
@@ -68,5 +94,17 @@ export const chatMessageRelations = relations(chatMessage, ({ one, many }) => ({
   }),
   children: many(chatMessage, {
     relationName: "message_tree",
+  }),
+  artifacts: many(chatArtifact),
+}));
+
+export const chatArtifactRelations = relations(chatArtifact, ({ one }) => ({
+  session: one(chatSession, {
+    fields: [chatArtifact.sessionId],
+    references: [chatSession.id],
+  }),
+  message: one(chatMessage, {
+    fields: [chatArtifact.messageId],
+    references: [chatMessage.id],
   }),
 }));

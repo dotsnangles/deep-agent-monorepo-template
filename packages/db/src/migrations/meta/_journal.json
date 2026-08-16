@@ -15,6 +15,13 @@
       "when": 1786852321950,
       "tag": "0001_tough_the_professor",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786905595936,
+      "tag": "0002_panoramic_dagger",
+      "breakpoints": true
     }
   ]
 }

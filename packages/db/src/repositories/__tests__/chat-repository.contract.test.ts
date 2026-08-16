@@ -361,4 +361,60 @@ describe("ChatRepository Contract Tests (FakeChatRepository)", () => {
       expect(forkNonExistent).toBeNull();
     });
   });
+
+  describe("Chat Artifact Management", () => {
+    it("creates and retrieves artifacts by session and message", async () => {
+      await repo.createSession({ id: "sess-art", userId: USER_A, title: "Artifacts Test" });
+      await repo.saveMessage({ id: "msg-1", sessionId: "sess-art", role: "assistant", content: "Here is chart" }, USER_A);
+
+      const artifact1 = await repo.saveArtifact({
+        id: "art-1",
+        sessionId: "sess-art",
+        messageId: "msg-1",
+        name: "chart.png",
+        storageKey: "artifacts/sessions/sess-art/msg-1/chart.png",
+        mimeType: "image/png",
+        sizeBytes: 1024,
+        metadata: { format: "png", dpi: 300 },
+      });
+
+      expect(artifact1.id).toBe("art-1");
+      expect(artifact1.sessionId).toBe("sess-art");
+      expect(artifact1.messageId).toBe("msg-1");
+      expect(artifact1.name).toBe("chart.png");
+      expect(artifact1.storageKey).toBe("artifacts/sessions/sess-art/msg-1/chart.png");
+      expect(artifact1.mimeType).toBe("image/png");
+      expect(artifact1.sizeBytes).toBe(1024);
+      expect(artifact1.metadata).toEqual({ format: "png", dpi: 300 });
+
+      // Save a second session-level artifact
+      const artifact2 = await repo.saveArtifact({
+        sessionId: "sess-art",
+        name: "data.csv",
+        storageKey: "artifacts/sessions/sess-art/data.csv",
+        mimeType: "text/csv",
+        sizeBytes: 2048,
+      });
+
+      expect(artifact2.id).toBeDefined();
+      expect(artifact2.messageId).toBeNull();
+
+      // Retrieve by session
+      const sessionArtifacts = await repo.getArtifactsBySession("sess-art");
+      expect(sessionArtifacts).toHaveLength(2);
+      expect(sessionArtifacts.map((a) => a.name)).toEqual(["chart.png", "data.csv"]);
+
+      // Retrieve by message
+      const messageArtifacts = await repo.getArtifactsByMessage("msg-1");
+      expect(messageArtifacts).toHaveLength(1);
+      expect(messageArtifacts[0].id).toBe("art-1");
+
+      // Retrieve single by ID
+      const single = await repo.getArtifact("art-1");
+      expect(single).toEqual(artifact1);
+
+      const nonExistent = await repo.getArtifact("art-missing");
+      expect(nonExistent).toBeNull();
+    });
+  });
 });

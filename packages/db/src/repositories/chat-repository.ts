@@ -58,6 +58,29 @@ export interface ForkSessionResult {
   messages: MessageNode[];
 }
 
+export interface ChatArtifactEntity {
+  id: string;
+  sessionId: string;
+  messageId: string | null;
+  name: string;
+  storageKey: string;
+  mimeType: string;
+  sizeBytes: number | null;
+  metadata: Record<string, unknown>;
+  createdAt: Date;
+}
+
+export interface CreateArtifactParams {
+  id?: string;
+  sessionId: string;
+  messageId?: string | null;
+  name: string;
+  storageKey: string;
+  mimeType: string;
+  sizeBytes?: number | null;
+  metadata?: Record<string, unknown>;
+}
+
 export interface ChatRepository {
   getSessions(userId: string): Promise<ChatSessionEntity[]>;
   getSession(sessionId: string, userId: string): Promise<ChatSessionEntity | null>;
@@ -76,4 +99,8 @@ export interface ChatRepository {
     userId: string,
     newTitle?: string
   ): Promise<ForkSessionResult | null>;
+  saveArtifact(params: CreateArtifactParams): Promise<ChatArtifactEntity>;
+  getArtifactsBySession(sessionId: string): Promise<ChatArtifactEntity[]>;
+  getArtifactsByMessage(messageId: string): Promise<ChatArtifactEntity[]>;
+  getArtifact(artifactId: string): Promise<ChatArtifactEntity | null>;
 }

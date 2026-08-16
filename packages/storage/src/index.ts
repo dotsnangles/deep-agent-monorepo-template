@@ -40,3 +40,15 @@ export async function getPresignedDownloadUrl(
     expiresInSeconds,
   });
 }
+
+export function buildArtifactStorageKey(
+  sessionId: string,
+  filename: string,
+  messageId?: string | null
+): string {
+  const cleanName = filename.replace(/^\/+/, "");
+  if (messageId) {
+    return `artifacts/sessions/${sessionId}/${messageId}/${cleanName}`;
+  }
+  return `artifacts/sessions/${sessionId}/${cleanName}`;
+}

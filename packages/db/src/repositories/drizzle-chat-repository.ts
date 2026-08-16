@@ -1,10 +1,12 @@
 import { and, asc, desc, eq, inArray, type SQL } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "../schema";
-import { chatMessage, chatSession } from "../schema/chat";
+import { chatArtifact, chatMessage, chatSession } from "../schema/chat";
 import type {
+  ChatArtifactEntity,
   ChatRepository,
   ChatSessionEntity,
+  CreateArtifactParams,
   CreateMessageParams,
   CreateSessionParams,
   DeleteSubtreeResult,
@@ -21,6 +23,20 @@ import {
 } from "./tree-utils";
 
 export type DrizzleDb = NodePgDatabase<typeof schema>;
+
+function toArtifactEntity(record: typeof chatArtifact.$inferSelect): ChatArtifactEntity {
+  return {
+    id: record.id,
+    sessionId: record.sessionId,
+    messageId: record.messageId,
+    name: record.name,
+    storageKey: record.storageKey,
+    mimeType: record.mimeType,
+    sizeBytes: record.sizeBytes,
+    metadata: (record.metadata as Record<string, unknown>) ?? {},
+    createdAt: record.createdAt,
+  };
+}
 
 function toSessionEntity(record: typeof chatSession.$inferSelect): ChatSessionEntity {
   return {
@@ -392,5 +408,53 @@ export class DrizzleChatRepository implements ChatRepository {
         activeLeafId: newActiveLeafId,
       };
     });
+  }
+
+  public async saveArtifact(params: CreateArtifactParams): Promise<ChatArtifactEntity> {
+    const id = params.id || `art_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const [record] = await this.db
+      .insert(chatArtifact)
+      .values({
+        id,
+        sessionId: params.sessionId,
+        messageId: params.messageId || null,
+        name: params.name,
+        storageKey: params.storageKey,
+        mimeType: params.mimeType,
+        sizeBytes: params.sizeBytes ?? null,
+        metadata: params.metadata ?? {},
+      })
+      .returning();
+
+    return toArtifactEntity(record);
+  }
+
+  public async getArtifactsBySession(sessionId: string): Promise<ChatArtifactEntity[]> {
+    const records = await this.db
+      .select()
+      .from(chatArtifact)
+      .where(eq(chatArtifact.sessionId, sessionId))
+      .orderBy(asc(chatArtifact.createdAt));
+
+    return records.map(toArtifactEntity);
+  }
+
+  public async getArtifactsByMessage(messageId: string): Promise<ChatArtifactEntity[]> {
+    const records = await this.db
+      .select()
+      .from(chatArtifact)
+      .where(eq(chatArtifact.messageId, messageId))
+      .orderBy(asc(chatArtifact.createdAt));
+
+    return records.map(toArtifactEntity);
+  }
+
+  public async getArtifact(artifactId: string): Promise<ChatArtifactEntity | null> {
+    const [record] = await this.db
+      .select()
+      .from(chatArtifact)
+      .where(eq(chatArtifact.id, artifactId));
+
+    return record ? toArtifactEntity(record) : null;
   }
 }

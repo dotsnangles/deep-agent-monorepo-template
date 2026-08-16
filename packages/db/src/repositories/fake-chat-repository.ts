@@ -8,6 +8,8 @@ import type {
   SaveMessageResult,
   CreateSessionParams,
   ForkSessionResult,
+  ChatArtifactEntity,
+  CreateArtifactParams,
 } from "./chat-repository";
 import {
   traverseActivePath,
@@ -19,6 +21,7 @@ import {
 export class FakeChatRepository implements ChatRepository {
   private sessions: Map<string, ChatSessionEntity> = new Map();
   private messages: Map<string, MessageNode[]> = new Map();
+  private artifacts: Map<string, ChatArtifactEntity> = new Map();
 
   public async getSessions(userId: string): Promise<ChatSessionEntity[]> {
     const userSessions: ChatSessionEntity[] = [];
@@ -253,8 +256,51 @@ export class FakeChatRepository implements ChatRepository {
     };
   }
 
+  public async saveArtifact(params: CreateArtifactParams): Promise<ChatArtifactEntity> {
+    const id = params.id || `art_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const artifact: ChatArtifactEntity = {
+      id,
+      sessionId: params.sessionId,
+      messageId: params.messageId || null,
+      name: params.name,
+      storageKey: params.storageKey,
+      mimeType: params.mimeType,
+      sizeBytes: params.sizeBytes ?? null,
+      metadata: params.metadata ? { ...params.metadata } : {},
+      createdAt: new Date(),
+    };
+    this.artifacts.set(id, artifact);
+    return { ...artifact };
+  }
+
+  public async getArtifactsBySession(sessionId: string): Promise<ChatArtifactEntity[]> {
+    const list: ChatArtifactEntity[] = [];
+    for (const art of this.artifacts.values()) {
+      if (art.sessionId === sessionId) {
+        list.push({ ...art });
+      }
+    }
+    return list.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  }
+
+  public async getArtifactsByMessage(messageId: string): Promise<ChatArtifactEntity[]> {
+    const list: ChatArtifactEntity[] = [];
+    for (const art of this.artifacts.values()) {
+      if (art.messageId === messageId) {
+        list.push({ ...art });
+      }
+    }
+    return list.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  }
+
+  public async getArtifact(artifactId: string): Promise<ChatArtifactEntity | null> {
+    const art = this.artifacts.get(artifactId);
+    return art ? { ...art } : null;
+  }
+
   public clear(): void {
     this.sessions.clear();
     this.messages.clear();
+    this.artifacts.clear();
   }
 }
