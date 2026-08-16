@@ -3,6 +3,7 @@
 from src.schemas.events import (
     AgentEventType,
     AgentStreamEvent,
+    ApprovalRequestEventData,
     DoneEventData,
     ErrorEventData,
     NodeTransitionEventData,
@@ -14,6 +15,7 @@ from src.schemas.events import (
 __all__ = [
     "AgentEventType",
     "AgentStreamEvent",
+    "ApprovalRequestEventData",
     "DoneEventData",
     "ErrorEventData",
     "NodeTransitionEventData",

@@ -1,7 +1,7 @@
 import json
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class TokenEventData(BaseModel):
@@ -18,6 +18,16 @@ class ToolEndEventData(BaseModel):
     tool: str
     output: Any
     run_id: str | None = None
+
+
+class ApprovalRequestEventData(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    tool: str
+    input: Any
+    tool_call_id: str = Field(..., serialization_alias="toolCallId")
+    description: str | None = None
+    requires_approval: bool = Field(default=True, serialization_alias="requiresApproval")
 
 
 class NodeTransitionEventData(BaseModel):
@@ -39,6 +49,7 @@ AgentEventType = Literal[
     "token",
     "tool_start",
     "tool_end",
+    "approval_request",
     "node_transition",
     "error",
     "done",
@@ -50,8 +61,12 @@ class AgentStreamEvent(BaseModel):
     data: dict[str, Any] | BaseModel = Field(default_factory=dict)
 
     def to_sse(self) -> str:
-        """Serializes the event into Server-Sent Events (SSE) format."""
-        payload = self.data.model_dump() if isinstance(self.data, BaseModel) else self.data
+        """Serializes the event into Server-Sent Events (SSE) format with camelCase aliases."""
+        payload = (
+            self.data.model_dump(by_alias=True)
+            if isinstance(self.data, BaseModel)
+            else self.data
+        )
         json_data = json.dumps(payload, ensure_ascii=False)
         return f"event: {self.event}\ndata: {json_data}\n\n"
 
@@ -81,6 +96,24 @@ class AgentStreamEvent(BaseModel):
         return cls(
             event="tool_end",
             data=ToolEndEventData(tool=tool, output=output, run_id=run_id),
+        )
+
+    @classmethod
+    def approval_request(
+        cls,
+        tool: str,
+        tool_input: Any,
+        tool_call_id: str,
+        description: str | None = None,
+    ) -> "AgentStreamEvent":
+        return cls(
+            event="approval_request",
+            data=ApprovalRequestEventData(
+                tool=tool,
+                input=tool_input,
+                tool_call_id=tool_call_id,
+                description=description,
+            ),
         )
 
     @classmethod
