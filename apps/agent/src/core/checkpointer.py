@@ -29,20 +29,30 @@ class CheckpointerFactory:
         )
         return current_env.lower() in ("test", "testing")
 
+    _pool: Any = None
+
+    @classmethod
+    def get_pool(cls, db_url: str | None = None) -> Any:
+        url = cls._get_effective_db_url(None, db_url)
+        if not url:
+            return None
+        if cls._pool is None:
+            from psycopg_pool import AsyncConnectionPool
+
+            cls._pool = AsyncConnectionPool(
+                conninfo=url,
+                max_size=20,
+                kwargs={"autocommit": True},
+                open=True,
+            )
+        return cls._pool
+
     @classmethod
     async def create_pool(cls, db_url: str | None = None, max_size: int = 20) -> Any:
-        url = db_url or os.getenv("DATABASE_URL")
-        if not url or url.startswith("sqlite") or url == "memory":
-            return None
-        from psycopg_pool import AsyncConnectionPool
-
-        pool = AsyncConnectionPool(
-            conninfo=url,
-            max_size=max_size,
-            kwargs={"autocommit": True},
-            open=False,
-        )
-        await pool.open()
+        pool = cls.get_pool(db_url)
+        if pool is not None:
+            if not getattr(pool, "_opened", False):
+                await pool.open()
         return pool
 
     @classmethod
@@ -68,9 +78,10 @@ class CheckpointerFactory:
         try:
             from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
-            if pool is not None:
-                return AsyncPostgresSaver(pool)
-            return AsyncPostgresSaver.from_conn_string(db_url)
+            effective_pool = pool if pool is not None else cls.get_pool(db_url)
+            if effective_pool is not None:
+                return AsyncPostgresSaver(effective_pool)
+            return MemorySaver()
         except Exception as e:
             logger.warning("Failed to initialize PostgreSQL checkpointer: %s. Using MemorySaver.", e)
             return MemorySaver()
@@ -89,9 +100,10 @@ class CheckpointerFactory:
         try:
             from langgraph.store.postgres.aio import AsyncPostgresStore
 
-            if pool is not None:
-                return AsyncPostgresStore(pool)
-            return AsyncPostgresStore.from_conn_string(db_url)
+            effective_pool = pool if pool is not None else cls.get_pool(db_url)
+            if effective_pool is not None:
+                return AsyncPostgresStore(effective_pool)
+            return InMemoryStore()
         except Exception as e:
             logger.warning("Failed to initialize PostgreSQL store: %s. Using InMemoryStore.", e)
             return InMemoryStore()
