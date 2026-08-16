@@ -9,6 +9,7 @@ export { MessageItem } from "./components/message-item";
 export { MessageBranchSwitcher } from "./components/message-branch-switcher";
 export { MarkdownRenderer } from "./components/markdown-renderer";
 export { ToolActionCard } from "./components/tool-action-card";
+export { AttachmentStagingBar } from "./components/attachment-staging-bar";
 export {
   useChatEngine,
   useChatRegistry,
@@ -16,6 +17,14 @@ export {
 } from "./hooks/use-chat-engine";
 export { useSmartScroll } from "./hooks/use-smart-scroll";
 export { useCopyToClipboard } from "./hooks/use-copy-to-clipboard";
+export {
+  useDirectUpload,
+  formatFileSize,
+  isImageMime,
+  getAttachmentFileIcon,
+  type StagedAttachment,
+  type UseDirectUploadOptions,
+} from "./hooks/use-direct-upload";
 
 export {
   traverseActivePath,

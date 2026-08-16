@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, Bot, Sparkles, Square, Terminal } from "lucide-react";
+import { ArrowDown, ArrowUp, Bot, Paperclip, Sparkles, Square, Terminal } from "lucide-react";
 import { Button } from "@repo/ui/components/button";
 import { Textarea } from "@repo/ui/components/textarea";
 import { useChatEngine } from "../hooks/use-chat-engine";
 import { useSmartScroll } from "../hooks/use-smart-scroll";
+import { useDirectUpload } from "../hooks/use-direct-upload";
 import { MessageItem } from "./message-item";
+import { AttachmentStagingBar } from "./attachment-staging-bar";
 
 interface MessageTreeFeedProps {
   sessionId: string;
@@ -47,8 +49,18 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
     getBranchInfo,
   } = useChatEngine(sessionId);
 
+  const {
+    stagedFiles,
+    isUploading,
+    completedAttachments,
+    addFiles,
+    removeFile,
+    clearStaged,
+  } = useDirectUpload({ sessionId });
+
   const [inputPrompt, setInputPrompt] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const prevActiveLengthRef = useRef(activePath.length);
   const prevGeneratingRef = useRef(isGenerating);
 
@@ -100,14 +112,20 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
   }, [inputPrompt]);
 
   const handleSend = () => {
-    if (!inputPrompt.trim() || isGenerating) return;
+    if ((!inputPrompt.trim() && completedAttachments.length === 0) || isGenerating || isUploading) {
+      return;
+    }
     const content = inputPrompt.trim();
+    const attachments = completedAttachments.length > 0 ? [...completedAttachments] : undefined;
+
     setInputPrompt("");
+    clearStaged();
+
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
     isPinnedToBottomRef.current = true;
-    send(content);
+    send(content, attachments);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -117,6 +135,17 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
       handleSend();
     }
   };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (isGenerating || isUploading) return;
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      addFiles(e.dataTransfer.files);
+    }
+  };
+
+  const isSendDisabled =
+    (!inputPrompt.trim() && completedAttachments.length === 0) || isUploading;
 
   return (
     <div className="flex flex-col h-full w-full max-w-4xl mx-auto min-h-0 relative">
@@ -139,7 +168,7 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
             </div>
             <h3 className="text-base font-semibold text-foreground">Hollow Echo AI 어시스턴트</h3>
             <p className="text-xs text-muted-foreground mt-1 max-w-md leading-relaxed">
-              마크다운, LaTeX 수식, 코드 블록을 완벽히 지원합니다. 자유롭게 질문하거나 이전 메시지를 수정하여 대화 분기를 탐색해 보세요.
+              마크다운, LaTeX 수식, 코드 블록, 이미지 및 문서 첨부를 완벽히 지원합니다. 자유롭게 질문하거나 이전 메시지를 수정하여 대화 분기를 탐색해 보세요.
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-8 w-full max-w-3xl">
@@ -227,9 +256,20 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
         </div>
       )}
 
-      {/* Bottom Floating Prompt Box with Dynamic Send/Stop Toggle Button */}
+      {/* Bottom Floating Prompt Box with File Upload Staging & Dynamic Send/Stop Toggle Button */}
       <div className="shrink-0 px-3 sm:px-6 pb-4 pt-1 bg-gradient-to-t from-background via-background/95 to-transparent">
-        <div className="relative flex flex-col rounded-2xl bg-card border border-border/80 shadow-md focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/15 transition-all">
+        <div
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={handleDrop}
+          className="relative flex flex-col rounded-2xl bg-card border border-border/80 shadow-md focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/15 transition-all"
+        >
+          {/* File Attachment Staging Bar */}
+          <AttachmentStagingBar
+            stagedFiles={stagedFiles}
+            onRemove={removeFile}
+            disabled={isGenerating}
+          />
+
           <Textarea
             ref={textareaRef}
             value={inputPrompt}
@@ -239,16 +279,51 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
             placeholder={
               isGenerating
                 ? "AI가 답변을 작성하고 있습니다... (필요시 중지 가능)"
-                : "무엇이든 물어보세요... (Enter: 전송, Shift+Enter: 줄바꿈)"
+                : isUploading
+                ? "파일을 업로드하는 중입니다..."
+                : "무엇이든 물어보세요... (Enter: 전송, Shift+Enter: 줄바꿈, 파일 드래그앤드롭)"
             }
             className="min-h-[52px] max-h-[180px] resize-none border-none shadow-none focus-visible:ring-0 text-sm px-4 py-3 bg-transparent leading-relaxed disabled:opacity-60 disabled:cursor-not-allowed"
             rows={1}
           />
 
+          {/* Hidden File Input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,text/markdown,text/csv,application/json"
+            className="hidden"
+            onChange={(e) => {
+              if (e.target.files && e.target.files.length > 0) {
+                addFiles(e.target.files);
+              }
+              e.target.value = "";
+            }}
+          />
+
           <div className="flex items-center justify-between px-3.5 pb-2.5 pt-0.5">
-            <span className="text-[11px] text-muted-foreground/80 select-none">
-              {isGenerating ? "답변 생성 진행 중" : "대화 분기 지원 (수정 시 새 브랜치 생성)"}
-            </span>
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-8 rounded-xl text-muted-foreground hover:text-foreground cursor-pointer"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isGenerating || isUploading}
+                title="파일 첨부 (이미지, PDF, TXT, CSV, JSON, MD)"
+              >
+                <Paperclip className="size-4" />
+              </Button>
+              <span className="text-[11px] text-muted-foreground/80 select-none">
+                {isGenerating
+                  ? "답변 생성 진행 중"
+                  : isUploading
+                  ? "파일 업로드 중..."
+                  : "대화 분기 및 멀티모달 첨부 지원"}
+              </span>
+            </div>
+
             {isGenerating ? (
               <Button
                 type="button"
@@ -265,7 +340,7 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
                 size="icon"
                 className="size-8 rounded-xl shadow-xs"
                 onClick={handleSend}
-                disabled={!inputPrompt.trim()}
+                disabled={isSendDisabled}
                 title="메시지 전송 (Enter)"
               >
                 <ArrowUp className="size-4" />

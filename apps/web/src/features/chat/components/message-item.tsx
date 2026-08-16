@@ -1,15 +1,31 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { AlertCircle, Bot, Check, Copy, Edit2, RotateCw, Trash2, User, X } from "lucide-react";
-import { toast } from "sonner";
+import { useState } from "react";
+import {
+  AlertCircle,
+  Bot,
+  Check,
+  Copy,
+  Download,
+  Edit2,
+  RotateCw,
+  Trash2,
+  User,
+  X,
+} from "lucide-react";
 import { Button } from "@repo/ui/components/button";
 import { Textarea } from "@repo/ui/components/textarea";
+import type { AttachmentEntity } from "@repo/validators";
 import type { MessageNode, BranchInfo } from "../lib/tree";
 import { MessageBranchSwitcher } from "./message-branch-switcher";
 import { MarkdownRenderer } from "./markdown-renderer";
 import { ToolActionCard } from "./tool-action-card";
 import { useCopyToClipboard } from "../hooks/use-copy-to-clipboard";
+import {
+  formatFileSize,
+  isImageMime,
+  getAttachmentFileIcon,
+} from "../hooks/use-direct-upload";
 
 interface MessageItemProps {
   message: MessageNode;
@@ -23,6 +39,115 @@ interface MessageItemProps {
   onRetry?: () => void;
   onApprove?: (toolCallId: string) => void;
   onReject?: (toolCallId: string, reason?: string) => void;
+}
+
+function MessageAttachmentsView({
+  attachments,
+  isUser,
+}: {
+  attachments: AttachmentEntity[];
+  isUser: boolean;
+}) {
+  const [lightboxImage, setLightboxImage] = useState<AttachmentEntity | null>(null);
+
+  const images = attachments.filter((a) => isImageMime(a.mimeType));
+  const docs = attachments.filter((a) => !isImageMime(a.mimeType));
+
+  return (
+    <div className={`flex flex-col gap-2 w-full mt-1 ${isUser ? "items-end" : "items-start"}`}>
+      {/* Images Grid */}
+      {images.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {images.map((img) => (
+            <button
+              key={img.id}
+              type="button"
+              onClick={() => setLightboxImage(img)}
+              className="group relative size-20 sm:size-24 rounded-xl overflow-hidden border border-border/70 bg-muted/40 cursor-pointer shadow-xs hover:border-primary/60 transition-all"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={img.url}
+                alt={img.name}
+                className="size-full object-cover transition-transform group-hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Documents List */}
+      {docs.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 max-w-full">
+          {docs.map((doc) => {
+            const Icon = getAttachmentFileIcon(doc.mimeType);
+            return (
+              <a
+                key={doc.id}
+                href={doc.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                download={doc.name}
+                className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-xs transition-all shadow-2xs hover:border-primary/50 group bg-card border-border/80 text-foreground hover:bg-muted"
+                title={`${doc.name} (${formatFileSize(doc.size)}) 다운로드`}
+              >
+                <Icon className="size-3.5 shrink-0 text-primary" />
+                <span className="truncate max-w-[140px] sm:max-w-[200px] text-[11px] font-medium">
+                  {doc.name}
+                </span>
+                <span className="text-[10px] text-muted-foreground">
+                  ({formatFileSize(doc.size)})
+                </span>
+                <Download className="size-3 opacity-60 group-hover:opacity-100 transition-opacity" />
+              </a>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Image Lightbox Modal */}
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+          onClick={() => setLightboxImage(null)}
+        >
+          <div
+            className="relative max-w-4xl max-h-[90vh] flex flex-col items-center justify-center p-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
+              <a
+                href={lightboxImage.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                download={lightboxImage.name}
+                className="flex items-center justify-center size-8 rounded-full bg-black/60 text-white hover:bg-black/90 transition-colors"
+                title="원본 다운로드"
+              >
+                <Download className="size-4" />
+              </a>
+              <button
+                type="button"
+                onClick={() => setLightboxImage(null)}
+                className="flex items-center justify-center size-8 rounded-full bg-black/60 text-white hover:bg-black/90 transition-colors cursor-pointer"
+                title="닫기"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={lightboxImage.url}
+              alt={lightboxImage.name}
+              className="max-h-[85vh] max-w-full rounded-xl object-contain shadow-2xl"
+            />
+            <span className="text-xs text-white/80 mt-2 font-medium">{lightboxImage.name}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function MessageItem({
@@ -44,6 +169,7 @@ export function MessageItem({
   const { copied, copy } = useCopyToClipboard("메시지가 클립보드에 복사되었습니다.");
 
   const isUser = message.role === "user";
+  const hasAttachments = Boolean(message.attachments && message.attachments.length > 0);
 
   const handleCopy = () => {
     copy(message.content);
@@ -128,13 +254,24 @@ export function MessageItem({
             </div>
           </div>
         ) : isUser ? (
-          /* User Message: Clean rounded bubble */
-          <div className="rounded-2xl rounded-tr-xs bg-primary px-4 py-2.5 text-sm leading-relaxed text-primary-foreground shadow-xs break-words whitespace-pre-wrap">
-            {message.content}
+          /* User Message: Clean rounded bubble with attachments */
+          <div className="flex flex-col items-end gap-1.5">
+            {hasAttachments && (
+              <MessageAttachmentsView attachments={message.attachments!} isUser={true} />
+            )}
+            {message.content && (
+              <div className="rounded-2xl rounded-tr-xs bg-primary px-4 py-2.5 text-sm leading-relaxed text-primary-foreground shadow-xs break-words whitespace-pre-wrap">
+                {message.content}
+              </div>
+            )}
           </div>
         ) : (
-          /* Assistant Message: Clean stream layout with Markdown & Tool Action Card */
+          /* Assistant Message: Clean stream layout with Markdown, Tool Action Card & Attachments */
           <div className="w-full text-sm leading-relaxed text-foreground py-0.5 space-y-2">
+            {hasAttachments && (
+              <MessageAttachmentsView attachments={message.attachments!} isUser={false} />
+            )}
+
             {message.content ? (
               <MarkdownRenderer content={message.content} isGenerating={isGenerating} />
             ) : isGenerating && !message.toolApproval ? (
@@ -161,7 +298,9 @@ export function MessageItem({
               <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-destructive/10 border border-destructive/30 text-xs text-destructive w-full max-w-md animate-in fade-in-50 duration-150">
                 <div className="flex items-center gap-2 min-w-0">
                   <AlertCircle className="size-4 shrink-0" />
-                  <span className="truncate">{message.error || "답변 생성 중 오류가 발생했습니다."}</span>
+                  <span className="truncate">
+                    {message.error || "답변 생성 중 오류가 발생했습니다."}
+                  </span>
                 </div>
                 {onRetry && (
                   <Button
@@ -204,7 +343,11 @@ export function MessageItem({
                 onClick={handleCopy}
                 title="메시지 복사"
               >
-                {copied ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
+                {copied ? (
+                  <Check className="size-3 text-emerald-500" />
+                ) : (
+                  <Copy className="size-3" />
+                )}
               </Button>
 
               {/* Edit (User Only) */}
