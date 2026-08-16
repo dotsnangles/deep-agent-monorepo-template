@@ -36,7 +36,8 @@ from src.core.config import (
     get_deep_agent_mode,
     get_llm,
 )
-from src.graphs.chat.prompts import MAIN_SYSTEM_PROMPT
+from src.core.settings import get_agent_config
+from src.graphs.chat.prompts import get_prompt_catalog
 
 logger = logging.getLogger(__name__)
 
@@ -73,20 +74,23 @@ class DeepAgentEnvironmentFactory:
         mode: EnvironmentMode | None = None,
         rubric: str | None = None,
         grader_model: Any = None,
-        max_rubric_iterations: int = 3,
+        max_rubric_iterations: int | None = None,
         on_rubric_evaluation: Any = None,
         rubric_tools: list[Any] | None = None,
         fallback_model: Any = None,
         model_call_limit: int | None = None,
         tool_call_limit: int | None = None,
         tool_retry_config: dict[str, Any] | None = None,
-        enable_summarization_tool: bool = True,
+        enable_summarization_tool: bool | None = None,
         **kwargs: Any,
     ) -> Any:
-        effective_mode = mode or get_deep_agent_mode()
+        cfg = get_agent_config()
+        catalog = get_prompt_catalog(debug=cfg.agent.debug)
+
+        effective_mode = mode or cfg.agent.mode or get_deep_agent_mode()
         llm = model if model is not None else get_llm()
         effective_tools = list(tools) if tools is not None else []
-        effective_prompt = system_prompt or MAIN_SYSTEM_PROMPT
+        effective_prompt = system_prompt or catalog.get_system_prompt()
 
         effective_checkpointer = (
             checkpointer
@@ -103,17 +107,19 @@ class DeepAgentEnvironmentFactory:
         # Model ID resolution for profile registration
         model_id = getattr(llm, "model", getattr(llm, "model_name", "deep_agent_model"))
 
+        is_subagents_allowed = (
+            enable_subagents
+            if enable_subagents is not None
+            else (cfg.features.enable_subagents if cfg is not None else ENABLE_SUBAGENTS)
+        )
+        effective_subagents = (
+            list(subagents) if (subagents is not None and is_subagents_allowed) else []
+        )
+
         # -----------------------------------------------------------------
         # 1. Environment-Specific Defaults & Profile Registration
         # -----------------------------------------------------------------
         if effective_mode == EnvironmentMode.LOCAL_SLM:
-            is_subagents_allowed = (
-                enable_subagents if enable_subagents is not None else ENABLE_SUBAGENTS
-            )
-            effective_subagents = (
-                list(subagents) if (subagents is not None and is_subagents_allowed) else []
-            )
-
             try:
                 register_harness_profile(
                     str(model_id),
@@ -127,8 +133,16 @@ class DeepAgentEnvironmentFactory:
             except Exception as e:
                 logger.debug("Harness profile registration skipped: %s", e)
 
-            effective_model_limit = model_call_limit if model_call_limit is not None else 30
-            effective_tool_limit = tool_call_limit if tool_call_limit is not None else 100
+            effective_model_limit = (
+                model_call_limit
+                if model_call_limit is not None
+                else (cfg.limits.model_calls if cfg is not None else 30)
+            )
+            effective_tool_limit = (
+                tool_call_limit
+                if tool_call_limit is not None
+                else (cfg.limits.tool_calls if cfg is not None else 100)
+            )
 
             effective_middleware = list(
                 middleware
@@ -145,11 +159,6 @@ class DeepAgentEnvironmentFactory:
         # 2. CLOUD PROVIDER MULTI-LLM MODE (OpenAI, Anthropic, Gemini, etc.)
         # -----------------------------------------------------------------
         else:
-            is_subagents_allowed = enable_subagents if enable_subagents is not None else True
-            effective_subagents = (
-                list(subagents) if (subagents is not None and is_subagents_allowed) else []
-            )
-
             try:
                 register_harness_profile(
                     str(model_id),
@@ -162,8 +171,16 @@ class DeepAgentEnvironmentFactory:
             except Exception as e:
                 logger.debug("Harness profile registration skipped: %s", e)
 
-            effective_model_limit = model_call_limit if model_call_limit is not None else 50
-            effective_tool_limit = tool_call_limit if tool_call_limit is not None else 200
+            effective_model_limit = (
+                model_call_limit
+                if model_call_limit is not None
+                else (cfg.limits.model_calls if cfg is not None else 50)
+            )
+            effective_tool_limit = (
+                tool_call_limit
+                if tool_call_limit is not None
+                else (cfg.limits.tool_calls if cfg is not None else 200)
+            )
 
             effective_middleware = list(
                 middleware
@@ -191,12 +208,19 @@ class DeepAgentEnvironmentFactory:
         # -----------------------------------------------------------------
         # 3. Dynamic Feature Middlewares (Fault Tolerance, Summarization, Rubric)
         # -----------------------------------------------------------------
-        if fallback_model is not None:
-            effective_middleware.append(ModelFallbackMiddleware(fallback_model))
+        effective_fallback = fallback_model or cfg.models.fallback
+        if effective_fallback is not None:
+            effective_middleware.append(ModelFallbackMiddleware(effective_fallback))
+
         if tool_retry_config is not None:
             effective_middleware.append(ToolRetryMiddleware(**tool_retry_config))
 
-        if enable_summarization_tool:
+        is_summarization_allowed = (
+            enable_summarization_tool
+            if enable_summarization_tool is not None
+            else cfg.features.enable_summarization_tool
+        )
+        if is_summarization_allowed:
             compaction_backend = (
                 effective_backend if effective_backend is not None else StateBackend()
             )
@@ -207,11 +231,27 @@ class DeepAgentEnvironmentFactory:
             except Exception as sum_err:
                 logger.warning("Summarization tool attachment skipped: %s", sum_err)
 
-        if rubric is not None or grader_model is not None:
-            target_grader = grader_model if grader_model is not None else llm
+        effective_rubric = (
+            rubric
+            if rubric is not None
+            else (catalog.get_rubric_prompt() if cfg.features.rubric_enabled else None)
+        )
+        effective_grader = grader_model or cfg.models.grader
+        effective_rubric_iters = (
+            max_rubric_iterations
+            if max_rubric_iterations is not None
+            else cfg.features.max_rubric_iterations
+        )
+
+        if (
+            effective_rubric is not None
+            or effective_grader is not None
+            or cfg.features.rubric_enabled
+        ):
+            target_grader = effective_grader if effective_grader is not None else llm
             rubric_kwargs: dict[str, Any] = {
                 "model": target_grader,
-                "max_iterations": max_rubric_iterations,
+                "max_iterations": effective_rubric_iters,
             }
             if on_rubric_evaluation is not None:
                 rubric_kwargs["on_evaluation"] = on_rubric_evaluation
