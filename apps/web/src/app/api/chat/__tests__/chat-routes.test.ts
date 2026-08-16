@@ -261,5 +261,35 @@ describe("Zero-DB Chat API Route Handlers Integration", () => {
       const deleteData = await deleteRes.json();
       expect(deleteData.deletedIds).toContain("m-asst-1");
     });
+
+    it("triggers smart title generation when first user message is saved in a pre-created session", async () => {
+      const { generateSmartTitleInBackground } = await import("@/features/chat/server");
+
+      // 1. Session was pre-created by client heuristic on initial send
+      await hoisted.fakeRepo.createSession({
+        id: "sess-precreated",
+        userId: TEST_USER.user.id,
+        title: "파이썬으로 최적화된 피보나치",
+      });
+
+      // 2. First user message arrives with parentId: null (or undefined)
+      const postReq = new NextRequest("http://localhost:3000/api/chat/messages", {
+        method: "POST",
+        body: JSON.stringify({
+          id: "m-user-root",
+          sessionId: "sess-precreated",
+          role: "user",
+          content: "파이썬으로 최적화된 피보나치 수열 생성 함수를 작성하고 시간 복잡도를 설명해줘.",
+        }),
+      });
+
+      const postRes = await messagesRoute.POST(postReq);
+      expect(postRes.status).toBe(201);
+
+      expect(generateSmartTitleInBackground).toHaveBeenCalledWith(
+        "sess-precreated",
+        "파이썬으로 최적화된 피보나치 수열 생성 함수를 작성하고 시간 복잡도를 설명해줘."
+      );
+    });
   });
 });

@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Trigger smart title generation in background if first user message
-    if (result.isNewSession && role === "user") {
+    if ((result.isNewSession || !parentId) && role === "user") {
       generateSmartTitleInBackground(sessionId, content);
     }
 
