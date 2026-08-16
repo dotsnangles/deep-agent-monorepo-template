@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, Bot, Paperclip, Sparkles, Square, Terminal } from "lucide-react";
 import { Button } from "@repo/ui/components/button";
 import { Textarea } from "@repo/ui/components/textarea";
@@ -33,6 +34,7 @@ const STARTER_PROMPTS = [
 ];
 
 export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
+  const router = useRouter();
   const {
     activePath,
     isLoading,
@@ -45,6 +47,7 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
     deleteNode,
     selectBranch,
     retry,
+    forkSession,
     stop,
     getBranchInfo,
   } = useChatEngine(sessionId);
@@ -225,6 +228,12 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
                   onRetry={() => {
                     isPinnedToBottomRef.current = true;
                     retry(msg.id);
+                  }}
+                  onFork={async () => {
+                    const result = await forkSession(msg.id);
+                    if (result?.newSessionId) {
+                      router.push(`/chat/${result.newSessionId}` as any);
+                    }
                   }}
                   onApprove={(toolCallId) => {
                     isPinnedToBottomRef.current = true;

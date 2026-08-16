@@ -3,6 +3,10 @@ import React from "react";
 import { renderToString } from "react-dom/server";
 import { MessageTreeFeed } from "../message-tree-feed";
 
+vi.mock("next/navigation", () => ({
+  useRouter: vi.fn().mockReturnValue({ push: vi.fn(), replace: vi.fn() }),
+}));
+
 // Mock hooks
 vi.mock("../../hooks/use-chat-engine", () => ({
   useChatEngine: vi.fn().mockReturnValue({

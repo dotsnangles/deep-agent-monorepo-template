@@ -33,6 +33,11 @@ export interface DeleteSubtreeResult {
   activeLeafId: string | null;
 }
 
+export interface ForkSessionResult {
+  session: { id: string; title: string };
+  messages: MessageNode[];
+}
+
 export interface StreamCallbacks {
   onToken?: (token: string) => void;
   onApprovalRequest?: (approval: ToolApprovalRequest) => void;
@@ -50,6 +55,11 @@ export interface ChatTransport {
   persistNode(dto: CreateChatMessageDTO): Promise<boolean>;
   updateActiveLeaf(sessionId: string, activeLeafId: string): Promise<boolean>;
   deleteSubtree(sessionId: string, messageId: string): Promise<DeleteSubtreeResult | null>;
+  forkSession(
+    sessionId: string,
+    fromMessageId: string,
+    title?: string
+  ): Promise<ForkSessionResult | null>;
 }
 
 export class HttpChatTransport implements ChatTransport {
@@ -235,6 +245,30 @@ export class HttpChatTransport implements ChatTransport {
       return null;
     }
   }
+
+  async forkSession(
+    sessionId: string,
+    fromMessageId: string,
+    title?: string
+  ): Promise<ForkSessionResult | null> {
+    try {
+      const res = await this.fetchFn(
+        `/api/chat/sessions/${encodeURIComponent(sessionId)}/fork`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fromMessageId, title }),
+        }
+      );
+      if (res.ok) {
+        return await res.json();
+      }
+      return null;
+    } catch (err) {
+      console.error("[HttpChatTransport] Failed to fork session:", err);
+      return null;
+    }
+  }
 }
 
 export class FakeChatTransport implements ChatTransport {
@@ -346,6 +380,34 @@ export class FakeChatTransport implements ChatTransport {
     return {
       deletedIds: [messageId],
       activeLeafId: null,
+    };
+  }
+
+  async forkSession(
+    sessionId: string,
+    fromMessageId: string,
+    title?: string
+  ): Promise<ForkSessionResult | null> {
+    const tree = this.trees.get(sessionId);
+    if (!tree) return null;
+    const targetIdx = tree.messages.findIndex((m) => m.id === fromMessageId);
+    if (targetIdx === -1) return null;
+
+    const sliced = tree.messages.slice(0, targetIdx + 1);
+    const newSessionId = `sess_fork_${Date.now()}`;
+    const newTitle = title || `${tree.title || "새로운 대화"} (분기)`;
+    const lastId = sliced[sliced.length - 1]?.id || null;
+
+    const forkedTree: TreeFetchResult = {
+      messages: sliced.map((m) => ({ ...m, sessionId: newSessionId })),
+      activeLeafId: lastId,
+      title: newTitle,
+    };
+    this.trees.set(newSessionId, forkedTree);
+
+    return {
+      session: { id: newSessionId, title: newTitle },
+      messages: forkedTree.messages,
     };
   }
 }

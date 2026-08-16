@@ -503,6 +503,27 @@ export class ChatEngine {
     return getBranchInfo(nodeId, this.state.allNodes);
   }
 
+  public async forkSession(
+    fromMessageId: string,
+    title?: string
+  ): Promise<{ newSessionId: string; title: string } | null> {
+    if (this.state.isGenerating) {
+      return null;
+    }
+
+    const res = await this.transport.forkSession(this.sessionId, fromMessageId, title);
+    if (!res) {
+      return null;
+    }
+
+    this.onSessionCreated?.(res.session.id, res.session.title);
+
+    return {
+      newSessionId: res.session.id,
+      title: res.session.title,
+    };
+  }
+
   private async executeStream(params: {
     assistantMessageId: string;
     userMessageId: string | null;

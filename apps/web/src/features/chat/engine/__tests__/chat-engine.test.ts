@@ -541,4 +541,32 @@ describe("ChatEngine (In-Process State Machine)", () => {
     expect(state.activePath).toHaveLength(1);
     expect(state.activeLeafId).toBe("u-1");
   });
+
+  it("forks session up to a specific message and invokes onSessionCreated callback", async () => {
+    const mockNodes: MessageNode[] = [
+      { id: "u-1", sessionId: "session-1", parentId: null, role: "user", content: "Prompt 1", createdAt: new Date() },
+      { id: "a-1", sessionId: "session-1", parentId: "u-1", role: "assistant", content: "Answer 1", createdAt: new Date() },
+      { id: "u-2", sessionId: "session-1", parentId: "a-1", role: "user", content: "Prompt 2", createdAt: new Date() },
+    ];
+
+    transport.setMockTree("session-1", {
+      messages: mockNodes,
+      activeLeafId: "u-2",
+      title: "Research Topic",
+    });
+
+    const onSessionCreated = vi.fn();
+    const engine = new ChatEngine({
+      sessionId: "session-1",
+      transport,
+      onSessionCreated,
+    });
+    await engine.loadTree();
+
+    const result = await engine.forkSession("a-1", "Forked Branch");
+    expect(result).not.toBeNull();
+    expect(result?.newSessionId).toBeDefined();
+    expect(result?.title).toBe("Forked Branch");
+    expect(onSessionCreated).toHaveBeenCalledWith(result?.newSessionId, "Forked Branch");
+  });
 });

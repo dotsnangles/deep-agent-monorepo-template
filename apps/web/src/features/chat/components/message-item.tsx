@@ -8,6 +8,7 @@ import {
   Copy,
   Download,
   Edit2,
+  GitFork,
   RotateCw,
   Trash2,
   User,
@@ -37,6 +38,7 @@ interface MessageItemProps {
   onRegenerate: () => void;
   onDelete: () => void;
   onRetry?: () => void;
+  onFork?: () => void;
   onApprove?: (toolCallId: string) => void;
   onReject?: (toolCallId: string, reason?: string) => void;
 }
@@ -160,6 +162,7 @@ export function MessageItem({
   onRegenerate,
   onDelete,
   onRetry,
+  onFork,
   onApprove,
   onReject,
 }: MessageItemProps) {
@@ -372,9 +375,24 @@ export function MessageItem({
                   className="size-6 text-muted-foreground hover:text-foreground"
                   onClick={onRegenerate}
                   disabled={isGenerating}
-                  title="답변 다시 생성 (새 대화 분기 생성)"
+                  title="답변 다시 생성"
                 >
                   <RotateCw className={`size-3 ${isGenerating ? "animate-spin" : ""}`} />
+                </Button>
+              )}
+
+              {/* Fork to New Session */}
+              {onFork && (
+                <Button
+                  data-testid="fork-session-button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-6 text-muted-foreground hover:text-primary transition-colors cursor-pointer"
+                  onClick={onFork}
+                  disabled={isGenerating}
+                  title="이 메시지 시점부터 새 대화로 분기 (Fork)"
+                >
+                  <GitFork className="size-3" />
                 </Button>
               )}
 
