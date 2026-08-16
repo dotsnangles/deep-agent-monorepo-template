@@ -284,7 +284,3 @@ export class DrizzleChatRepository implements ChatRepository {
     });
   }
 }
-
-export const drizzleChatRepository = new DrizzleChatRepository(
-  schema as any
-);

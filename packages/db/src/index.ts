@@ -21,10 +21,15 @@ export function getDb() {
 }
 
 export const db = new Proxy({} as ReturnType<typeof createDb>, {
-  get(_target, prop) {
+  get(_target, prop, receiver) {
     const realDb = getDb();
-    return (realDb as any)[prop];
+    const value = Reflect.get(realDb, prop, receiver);
+    if (typeof value === "function") {
+      return value.bind(realDb);
+    }
+    return value;
   },
 });
 
 export const chatRepository = new DrizzleChatRepository(db);
+export const drizzleChatRepository = chatRepository;
