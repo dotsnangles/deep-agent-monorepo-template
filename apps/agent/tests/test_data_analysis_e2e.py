@@ -151,7 +151,12 @@ class TestDataAnalysisFlowAndSubagents:
         registry = GraphRegistry()
         registry.register(
             "data_analysis",
-            lambda **kw: build_agent(interrupt_on={}, subagents=custom_subagents, **kw),
+            lambda **kw: build_agent(
+                interrupt_on={},
+                subagents=custom_subagents,
+                enable_subagents=True,
+                **kw,
+            ),
         )
         checkpointer = MemorySaver()
         gateway = AgentExecutionGateway(

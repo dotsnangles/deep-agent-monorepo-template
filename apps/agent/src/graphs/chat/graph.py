@@ -7,7 +7,7 @@ from langchain.agents.middleware import TodoListMiddleware
 from langchain_core.output_parsers import StrOutputParser
 
 from src.core.checkpointer import CheckpointerFactory
-from src.core.config import get_llm
+from src.core.config import ENABLE_SUBAGENTS, get_llm
 from src.graphs.chat.prompts import MAIN_SYSTEM_PROMPT, TITLE_PROMPT
 
 # Default interrupt policy: empty by default so sandboxed tools run autonomously.
@@ -19,6 +19,7 @@ def build_agent(
     checkpointer: Any = None,
     store: Any = None,
     subagents: list[dict[str, Any]] | None = None,
+    enable_subagents: bool | None = None,
     model: Any = None,
     tools: list[Any] | None = None,
     interrupt_on: dict[str, Any] | None = None,
@@ -36,6 +37,7 @@ def build_agent(
         checkpointer: Persistent checkpointer (e.g. AsyncPostgresSaver) or MemorySaver.
         store: Long-term store (e.g. AsyncPostgresStore) or None.
         subagents: Optional list of custom subagent configuration dicts. Defaults to [].
+        enable_subagents: Boolean flag overriding ENABLE_SUBAGENTS config. If None, defaults to ENABLE_SUBAGENTS.
         model: Custom LLM instance, or None to use default get_llm().
         tools: Optional list of custom tools. Defaults to [] (framework built-ins only).
         interrupt_on: Tool gating map for HITL approval. Defaults to {} (autonomous sandbox execution).
@@ -45,7 +47,15 @@ def build_agent(
     """
     llm = model if model is not None else get_llm()
     effective_tools = list(tools) if tools is not None else []
-    effective_subagents = list(subagents) if subagents is not None else []
+
+    # Check whether subagents should be active (respects ENABLE_SUBAGENTS env toggle for local LLMs)
+    is_subagents_allowed = (
+        enable_subagents if enable_subagents is not None else ENABLE_SUBAGENTS
+    )
+    effective_subagents = (
+        list(subagents) if (subagents is not None and is_subagents_allowed) else []
+    )
+
     effective_checkpointer = (
         checkpointer if checkpointer is not None else CheckpointerFactory.get_default_checkpointer()
     )

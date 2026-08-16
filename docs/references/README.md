@@ -13,10 +13,10 @@
 - **Steering & HITL**: [Human-In-The-Loop](deepagents/human-in-the-loop.md), [Streaming](deepagents/streaming.md), [Event Streaming](deepagents/event-streaming.md)
 - **Frontend Streaming**: [Todo List](deepagents/frontend/todo-list.md), [Subagent Streaming](deepagents/frontend/subagent-streaming.md), [Sandbox UI](deepagents/frontend/sandbox.md)
 
-### 2. [Deep Agents Code (CLI & Coding Harness)](deepagents-code/overview.md) (`docs/references/deepagents-code/`)
-- [CLI Overview](deepagents-code/overview.md), [Quickstart](deepagents-code/quickstart.md), [Configuration](deepagents-code/configuration.md), [Config File](deepagents-code/config-file.md)
-- [CLI Reference](deepagents-code/cli-reference.md), [Approval Modes](deepagents-code/approval-modes.md), [Hooks](deepagents-code/hooks.md), [Memory & Skills](deepagents-code/memory-and-skills.md)
-- [Remote Sandboxes](deepagents-code/remote-sandboxes.md), [Subagents](deepagents-code/subagents.md), [Plugins](deepagents-code/plugins.md)
+### 2. [Deep Agents Code (CLI & Coding Harness)](deepagents/code/overview.md) (`docs/references/deepagents/code/`)
+- [CLI Overview](deepagents/code/overview.md), [Quickstart](deepagents/code/quickstart.md), [Configuration](deepagents/code/configuration.md), [Config File](deepagents/code/config-file.md)
+- [CLI Reference](deepagents/code/cli-reference.md), [Approval Modes](deepagents/code/approval-modes.md), [Hooks](deepagents/code/hooks.md), [Memory & Skills](deepagents/code/memory-and-skills.md)
+- [Remote Sandboxes](deepagents/code/remote-sandboxes.md), [Subagents](deepagents/code/subagents.md), [Plugins](deepagents/code/plugins.md)
 
 ### 3. [Foundational Concepts](concepts/products.md) (`docs/references/concepts/`)
 - [Runtimes, Frameworks, and Harnesses](concepts/products.md) - Deep Agents vs. LangGraph vs. LangChain architectural relationship
