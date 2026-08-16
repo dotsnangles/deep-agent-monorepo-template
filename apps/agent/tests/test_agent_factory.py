@@ -1,9 +1,10 @@
 import os
 from unittest.mock import patch
 
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph.state import CompiledStateGraph
+from langgraph.store.memory import InMemoryStore
 
-from src.core.checkpointer import CheckpointerFactory
 from src.core.config import EnvironmentMode, get_deep_agent_mode
 from src.core.testing import FakeChatModel
 from src.graphs.chat.factory import DeepAgentEnvironmentFactory
@@ -14,8 +15,8 @@ def test_factory_creates_local_slm_agent():
     """Verify that DeepAgentEnvironmentFactory produces a valid graph in local_slm mode."""
     with patch.dict(os.environ, {"DEEP_AGENT_MODE": "local_slm", "LLM_PROVIDER": "ollama"}):
         model = FakeChatModel()
-        checkpointer = CheckpointerFactory.get_default_checkpointer()
-        store = CheckpointerFactory.get_default_store()
+        checkpointer = MemorySaver()
+        store = InMemoryStore()
 
         agent_graph = DeepAgentEnvironmentFactory.create_agent(
             model=model,
@@ -31,8 +32,8 @@ def test_factory_creates_cloud_provider_agent():
     """Verify that DeepAgentEnvironmentFactory produces a valid graph in cloud_provider mode."""
     with patch.dict(os.environ, {"DEEP_AGENT_MODE": "cloud_provider", "LLM_PROVIDER": "openai"}):
         model = FakeChatModel()
-        checkpointer = CheckpointerFactory.get_default_checkpointer()
-        store = CheckpointerFactory.get_default_store()
+        checkpointer = MemorySaver()
+        store = InMemoryStore()
 
         agent_graph = DeepAgentEnvironmentFactory.create_agent(
             model=model,
