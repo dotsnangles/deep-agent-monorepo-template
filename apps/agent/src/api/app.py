@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 import redis.asyncio as aioredis
@@ -12,26 +13,28 @@ from src.api.routes.copilotkit import register_copilotkit_agent
 from src.api.routes.events import events_router
 from src.api.routes.health import health_router
 from src.api.routes.title import title_router
+from src.core.checkpointer import CheckpointerFactory
 from src.core.config import DATABASE_URL, REDIS_URL
+from src.core.gateway import AgentExecutionGateway
 from src.core.redis import RedisEventBroker, StandardRedisCache
 from src.graphs.chat.graph import build_agent
-from src.workers.title_worker import TitleGenerationWorker
+from src.workers import TitleGenerationWorker
+
+logger = logging.getLogger(__name__)
 
 
 def create_app() -> FastAPI:
     """FastAPI application factory with lifecycle management."""
 
-    # Temporary placeholder reference for the agent to update during lifespan
-    agent_holder: dict = {}
-
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.pg_pool = None
-        app.state.checkpointer = None
+        app.state.checkpointer = CheckpointerFactory.create_checkpointer()
         app.state.store = None
         app.state.redis = None
         app.state.broker = None
         app.state.title_worker = None
+        app.state.gateway = None
 
         # 1. Initialize Redis Cache, Client & Event Broker
         if REDIS_URL:
@@ -41,17 +44,17 @@ def create_app() -> FastAPI:
                 app.state.redis = r
                 broker = RedisEventBroker(r)
                 app.state.broker = broker
-                if "agent" in agent_holder:
-                    agent_holder["agent"].broker = broker
+                if hasattr(app.state, "copilotkit_agent") and app.state.copilotkit_agent:
+                    app.state.copilotkit_agent.broker = broker
 
                 # Global LLM cache
                 set_llm_cache(StandardRedisCache(redis_url=REDIS_URL, ttl=86400))
-                print(f"[INIT] Redis connected, Pub/Sub broker & LLM cache active ({REDIS_URL}).")
+                logger.info("Redis connected, Pub/Sub broker active (%s).", REDIS_URL)
             except Exception as e:
-                print(f"[WARN] Redis connection failed: {e}. Running without Redis cache/broker.")
+                logger.warning("Redis connection failed: %s. Using memory fallback.", e)
 
         # 2. Initialize PostgreSQL Checkpointer & Store
-        if DATABASE_URL:
+        if DATABASE_URL and not DATABASE_URL.startswith("sqlite"):
             try:
                 pool = AsyncConnectionPool(
                     conninfo=DATABASE_URL,
@@ -72,19 +75,25 @@ def create_app() -> FastAPI:
                 app.state.store = store
 
                 # Recompile agent graph with persistent checkpointer & store
-                if "agent" in agent_holder:
-                    agent_holder["agent"].graph = build_agent(
+                if hasattr(app.state, "copilotkit_agent") and app.state.copilotkit_agent:
+                    app.state.copilotkit_agent.graph = build_agent(
                         checkpointer=checkpointer, store=store
                     )
-                print(f"[INIT] PostgreSQL checkpointer & store ready ({DATABASE_URL}).")
+                logger.info("PostgreSQL checkpointer & store ready (%s).", DATABASE_URL)
             except Exception as e:
-                print(f"[WARN] PostgreSQL connection failed: {e}. Using in-memory fallback.")
+                logger.warning("PostgreSQL connection failed: %s. Using in-memory fallback.", e)
 
-        # 3. Initialize & Start Title Generation Queue Worker
-        if app.state.redis and app.state.pg_pool:
+        # 3. Initialize AgentExecutionGateway
+        app.state.gateway = AgentExecutionGateway(
+            checkpointer=app.state.checkpointer,
+            store=app.state.store,
+            event_broker=app.state.broker,
+        )
+
+        # 4. Initialize & Start Title Generation Queue Worker
+        if app.state.redis:
             title_worker = TitleGenerationWorker(
                 redis_client=app.state.redis,
-                pg_pool=app.state.pg_pool,
                 event_broker=app.state.broker,
             )
             title_worker.start()
@@ -97,10 +106,10 @@ def create_app() -> FastAPI:
             await app.state.title_worker.stop()
         if app.state.pg_pool:
             await app.state.pg_pool.close()
-            print("[SHUTDOWN] PostgreSQL connection pool closed.")
+            logger.info("PostgreSQL connection pool closed.")
         if app.state.redis:
             await app.state.redis.aclose()
-            print("[SHUTDOWN] Redis client closed.")
+            logger.info("Redis client closed.")
 
     app = FastAPI(
         title="Hollow Echo Deep Agent Server",
@@ -111,8 +120,8 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Register AG-UI agent endpoint
-    agent_holder["agent"] = register_copilotkit_agent(app)
+    # Register AG-UI agent endpoint and store on app.state
+    app.state.copilotkit_agent = register_copilotkit_agent(app)
 
     # Register HTTP Routers
     app.include_router(health_router)

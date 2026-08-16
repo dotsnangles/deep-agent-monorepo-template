@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.core.config import LLM_PROVIDER
 from src.graphs.chat.graph import generate_title
@@ -8,7 +8,7 @@ title_router = APIRouter(tags=["Title Summarization"])
 
 
 class TitleRequest(BaseModel):
-    prompt: str
+    prompt: str = Field(..., description="First user prompt to summarize into a concise title")
 
 
 class TitleResponse(BaseModel):

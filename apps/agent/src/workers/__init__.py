@@ -1,3 +1,15 @@
-from src.workers.title_worker import TitleGenerationWorker
+"""Background queue workers for the agent service."""
 
-__all__ = ["TitleGenerationWorker"]
+from src.workers.title_worker import (
+    QUEUE_KEY,
+    TITLE_UPDATED_CHANNEL,
+    TitleGenerationWorker,
+    TitleTaskPayload,
+)
+
+__all__ = [
+    "QUEUE_KEY",
+    "TITLE_UPDATED_CHANNEL",
+    "TitleGenerationWorker",
+    "TitleTaskPayload",
+]

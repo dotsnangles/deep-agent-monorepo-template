@@ -1,61 +1,73 @@
+from collections.abc import AsyncIterator
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from src.core.config import get_llm
-from src.core.observability import get_langfuse_callback
-from src.graphs.chat.prompts import MAIN_SYSTEM_PROMPT
+from src.core import AgentExecutionGateway
 
 chat_router = APIRouter(prefix="/chat", tags=["chat"])
 
-ROLE_MESSAGE_MAP = {
-    "user": HumanMessage,
-    "assistant": AIMessage,
-    "system": SystemMessage,
-}
-
 
 class ChatMessageInput(BaseModel):
-    role: str
-    content: str
+    role: str = Field(
+        default="user",
+        description="Message author role: user, assistant, system",
+    )
+    content: str = Field(
+        default="",
+        description="Text content of the message",
+    )
 
 
 class ChatStreamRequest(BaseModel):
-    thread_id: str | None = None
-    messages: list[ChatMessageInput]
+    thread_id: str | None = Field(
+        default=None,
+        description="Unique conversation session or thread ID",
+    )
+    messages: list[ChatMessageInput] = Field(
+        default_factory=list,
+        description="List of messages in active path",
+    )
+    agent_type: str = Field(
+        default="default",
+        description="Agent graph workflow type",
+    )
+    system_prompt: str | None = Field(
+        default=None,
+        description="Optional custom system prompt override",
+    )
+
+
+def get_gateway(request: Request) -> AgentExecutionGateway:
+    """Dependency provider for AgentExecutionGateway."""
+    if hasattr(request.app.state, "gateway") and request.app.state.gateway:
+        return request.app.state.gateway
+    return AgentExecutionGateway()
 
 
 @chat_router.post("/stream")
-async def stream_chat(req: ChatStreamRequest):
-    """Streams LLM chat response for active path conversation context."""
-    llm = get_llm()
-    lf_callback = get_langfuse_callback()
-    callbacks = [lf_callback] if lf_callback else []
+async def stream_chat(
+    req: ChatStreamRequest,
+    gateway: AgentExecutionGateway = Depends(get_gateway),
+) -> StreamingResponse:
+    """Streams structured SSE events (text/event-stream) via AgentExecutionGateway."""
 
-    lc_messages: list[BaseMessage] = [SystemMessage(content=MAIN_SYSTEM_PROMPT)]
-    for msg in req.messages:
-        msg_cls = ROLE_MESSAGE_MAP.get(msg.role.lower(), HumanMessage)
-        lc_messages.append(msg_cls(content=msg.content))
+    async def sse_event_generator() -> AsyncIterator[str]:
+        async for event in gateway.stream_execution(
+            messages=[msg.model_dump() for msg in req.messages],
+            thread_id=req.thread_id,
+            agent_type=req.agent_type,
+            system_prompt=req.system_prompt,
+        ):
+            yield event.to_sse()
 
-    async def token_generator():
-        try:
-            async for chunk in llm.astream(
-                lc_messages,
-                config={
-                    "callbacks": callbacks,
-                    "metadata": {
-                        "langfuse_session_id": req.thread_id or "default",
-                        "langfuse_trace_name": "Hollow Echo Message Tree Stream",
-                    },
-                },
-            ):
-                content = chunk.content if hasattr(chunk, "content") else str(chunk)
-                if content:
-                    yield content
-        except Exception as e:
-            print(f"[ERROR] Chat stream error: {e}")
-            yield f"\n[답변 생성 중 오류: {str(e)}]"
-
-    return StreamingResponse(token_generator(), media_type="text/plain; charset=utf-8")
+    return StreamingResponse(
+        sse_event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
