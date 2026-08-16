@@ -19,6 +19,7 @@ RUN pip install --no-cache-dir \
     seaborn \
     scipy \
     openpyxl \
+    tabulate \
     requests
 
 CMD ["tail", "-f", "/dev/null"]

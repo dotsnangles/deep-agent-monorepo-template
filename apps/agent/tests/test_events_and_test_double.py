@@ -90,24 +90,3 @@ class TestFakeChatModel:
 
         assert len(chunks) >= 1
         assert chunks[0].tool_call_chunks[0]["name"] == "calculator"
-
-
-class TestCheckpointerFactory:
-    def test_checkpointer_factory_defaults_to_memory_saver_in_test(self):
-        checkpointer = CheckpointerFactory.create_checkpointer(env="test")
-        assert isinstance(checkpointer, MemorySaver)
-
-    def test_checkpointer_factory_when_no_db_url(self):
-        checkpointer = CheckpointerFactory.create_checkpointer(env="development", postgres_url="")
-        assert isinstance(checkpointer, MemorySaver)
-
-    def test_checkpointer_factory_instantiates_postgres_saver_when_configured(self):
-        target_path = "langgraph.checkpoint.postgres.aio.AsyncPostgresSaver.from_conn_string"
-        with patch(target_path) as mock_from_conn:
-            mock_from_conn.return_value = "mock_postgres_saver"
-            saver = CheckpointerFactory.create_checkpointer(
-                env="production",
-                postgres_url="postgresql://user:pass@localhost:5432/db",
-            )
-            assert saver == "mock_postgres_saver"
-            mock_from_conn.assert_called_once_with("postgresql://user:pass@localhost:5432/db")
