@@ -14,6 +14,7 @@ from copilotkit import CopilotKitMiddleware
 from deepagents import (
     GeneralPurposeSubagentProfile,
     HarnessProfile,
+    RubricMiddleware,
     create_deep_agent,
     register_harness_profile,
 )
@@ -62,6 +63,11 @@ class DeepAgentEnvironmentFactory:
         backend: Any = None,
         system_prompt: str | None = None,
         mode: EnvironmentMode | None = None,
+        rubric: str | None = None,
+        grader_model: Any = None,
+        max_rubric_iterations: int = 3,
+        on_rubric_evaluation: Any = None,
+        rubric_tools: list[Any] | None = None,
         **kwargs: Any,
     ) -> Any:
         effective_mode = mode or get_deep_agent_mode()
@@ -113,6 +119,17 @@ class DeepAgentEnvironmentFactory:
                 if middleware is not None
                 else [TodoListMiddleware(), CopilotKitMiddleware()]
             )
+            if rubric is not None or grader_model is not None:
+                target_grader = grader_model if grader_model is not None else llm
+                rubric_kwargs: dict[str, Any] = {
+                    "model": target_grader,
+                    "max_iterations": max_rubric_iterations,
+                }
+                if on_rubric_evaluation is not None:
+                    rubric_kwargs["on_evaluation"] = on_rubric_evaluation
+                if rubric_tools is not None:
+                    rubric_kwargs["tools"] = rubric_tools
+                effective_middleware.append(RubricMiddleware(**rubric_kwargs))
 
             agent_kwargs: dict[str, Any] = {
                 "model": llm,
@@ -158,6 +175,17 @@ class DeepAgentEnvironmentFactory:
                     ModelRetryMiddleware(max_retries=3),
                 ]
             )
+            if rubric is not None or grader_model is not None:
+                target_grader = grader_model if grader_model is not None else llm
+                rubric_kwargs = {
+                    "model": target_grader,
+                    "max_iterations": max_rubric_iterations,
+                }
+                if on_rubric_evaluation is not None:
+                    rubric_kwargs["on_evaluation"] = on_rubric_evaluation
+                if rubric_tools is not None:
+                    rubric_kwargs["tools"] = rubric_tools
+                effective_middleware.append(RubricMiddleware(**rubric_kwargs))
 
             if effective_backend is None and effective_store is not None:
                 from src.graphs.chat.backends import get_session_backend
