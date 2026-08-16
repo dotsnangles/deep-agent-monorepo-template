@@ -28,7 +28,6 @@ from src.core.config import (
     get_llm,
 )
 from src.graphs.chat.prompts import MAIN_SYSTEM_PROMPT
-from src.graphs.chat.subagents import get_default_subagents
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +81,9 @@ class DeepAgentEnvironmentFactory:
 
         effective_backend = backend
 
+        # Model ID resolution for profile registration
+        model_id = getattr(llm, "model", getattr(llm, "model_name", "deep_agent_model"))
+
         # -----------------------------------------------------------------
         # 1. LOCAL SLM MODE (Ollama / Small Local Models)
         # -----------------------------------------------------------------
@@ -93,16 +95,11 @@ class DeepAgentEnvironmentFactory:
                 list(subagents) if (subagents is not None and is_subagents_allowed) else []
             )
 
-            # Defensive harness profile for SLM (concurrency & context protection)
-            model_id = getattr(llm, "model", getattr(llm, "model_name", "ollama_slm"))
             try:
                 register_harness_profile(
                     str(model_id),
                     HarnessProfile(
                         system_prompt_suffix="Keep answers concise and direct.",
-                        excluded_tools=(
-                            {"execute", "delete"} if effective_backend is None else set()
-                        ),
                         general_purpose_subagent=GeneralPurposeSubagentProfile(
                             enabled=is_subagents_allowed
                         ),
@@ -136,10 +133,21 @@ class DeepAgentEnvironmentFactory:
         # -----------------------------------------------------------------
         else:
             is_subagents_allowed = enable_subagents if enable_subagents is not None else True
-            if subagents is not None:
-                effective_subagents = list(subagents) if is_subagents_allowed else []
-            else:
-                effective_subagents = get_default_subagents() if is_subagents_allowed else []
+            effective_subagents = (
+                list(subagents) if (subagents is not None and is_subagents_allowed) else []
+            )
+
+            try:
+                register_harness_profile(
+                    str(model_id),
+                    HarnessProfile(
+                        general_purpose_subagent=GeneralPurposeSubagentProfile(
+                            enabled=is_subagents_allowed
+                        ),
+                    ),
+                )
+            except Exception as e:
+                logger.debug("Harness profile registration skipped: %s", e)
 
             effective_middleware = list(
                 middleware
