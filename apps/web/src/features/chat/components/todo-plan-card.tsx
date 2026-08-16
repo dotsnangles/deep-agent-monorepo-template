@@ -35,13 +35,21 @@ export function TodoPlanCard({
 }: TodoPlanCardProps) {
   const [isOpen, setIsOpen] = useState(true);
 
-  if (!todos || todos.length === 0) {
+  const effectiveTodos = useMemo(() => {
+    if (!todos || todos.length === 0) return [];
+    if (!isGenerating) {
+      return todos.map((t) => ({ ...t, status: "completed" as const }));
+    }
+    return todos;
+  }, [todos, isGenerating]);
+
+  if (!effectiveTodos || effectiveTodos.length === 0) {
     return null;
   }
 
-  const completedCount = todos.filter((t) => t.status === "completed").length;
-  const inProgressItem = todos.find((t) => t.status === "in_progress");
-  const totalCount = todos.length;
+  const completedCount = effectiveTodos.filter((t) => t.status === "completed").length;
+  const inProgressItem = effectiveTodos.find((t) => t.status === "in_progress");
+  const totalCount = effectiveTodos.length;
   const percentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
   return (
@@ -105,7 +113,7 @@ export function TodoPlanCard({
           </div>
           <Separator />
           <CardContent className="flex flex-col gap-2 pt-2.5">
-            {todos.map((todo, idx) => {
+            {effectiveTodos.map((todo, idx) => {
               const isCompleted = todo.status === "completed";
               const isInProgress = todo.status === "in_progress";
 
