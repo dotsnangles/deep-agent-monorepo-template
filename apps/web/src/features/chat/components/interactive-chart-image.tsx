@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { Download, Maximize2, X, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@repo/ui/components/button";
+import { Card, CardContent, CardFooter } from "@repo/ui/components/card";
+import { cn } from "@repo/ui/lib/utils";
 
 interface InteractiveChartImageProps {
   src: string;
@@ -13,7 +15,7 @@ interface InteractiveChartImageProps {
 export function InteractiveChartImage({
   src,
   alt = "생성된 차트/시각화 이미지",
-  className = "",
+  className,
 }: InteractiveChartImageProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
@@ -44,36 +46,42 @@ export function InteractiveChartImage({
   return (
     <>
       {/* Thumbnail Card with Hover Overlay */}
-      <div
+      <Card
         data-testid="interactive-chart-card"
-        className={`group relative my-3 max-w-lg rounded-2xl border border-border/80 bg-card/60 p-2 overflow-hidden shadow-xs hover:border-primary/50 transition-all duration-200 cursor-pointer ${className}`}
+        size="sm"
+        className={cn(
+          "group/chart relative my-3 max-w-lg overflow-hidden shadow-xs cursor-pointer",
+          className
+        )}
         onClick={() => {
           setZoom(1);
           setIsOpen(true);
         }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={src}
-          alt={alt}
-          className="w-full h-auto rounded-xl object-contain bg-background/80 transition-transform duration-200 group-hover:scale-[1.01]"
-          loading="lazy"
-        />
+        <CardContent className="p-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={src}
+            alt={alt}
+            className="w-full h-auto rounded-xl object-contain bg-background/80 transition-transform duration-200 group-hover/chart:scale-[1.01]"
+            loading="lazy"
+          />
 
-        {/* Hover Action Overlay */}
-        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-150 rounded-2xl flex items-center justify-center gap-2">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-background/90 text-foreground text-xs font-semibold shadow-lg backdrop-blur-xs">
-            <Maximize2 className="size-3.5 text-primary" />
-            <span>크게 보기</span>
+          {/* Hover Action Overlay */}
+          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/chart:opacity-100 transition-opacity duration-150 rounded-none flex items-center justify-center gap-2">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-background/90 text-foreground text-xs font-semibold shadow-lg backdrop-blur-xs">
+              <Maximize2 data-icon="inline-start" className="text-primary" />
+              <span>크게 보기</span>
+            </div>
           </div>
-        </div>
+        </CardContent>
 
         {alt && (
-          <div className="px-2 pt-2 pb-0.5 text-xs text-muted-foreground font-medium truncate">
+          <CardFooter className="px-3 py-2 text-xs text-muted-foreground font-medium truncate">
             {alt}
-          </div>
+          </CardFooter>
         )}
-      </div>
+      </Card>
 
       {/* Lightbox Modal */}
       {isOpen && (
@@ -91,7 +99,7 @@ export function InteractiveChartImage({
               onClick={handleZoomIn}
               title="확대"
             >
-              <ZoomIn className="size-4" />
+              <ZoomIn data-icon="inline-start" />
             </Button>
             <Button
               variant="secondary"
@@ -100,19 +108,25 @@ export function InteractiveChartImage({
               onClick={handleZoomOut}
               title="축소"
             >
-              <ZoomOut className="size-4" />
+              <ZoomOut data-icon="inline-start" />
             </Button>
-            <a
-              href={src}
-              download={alt || "chart.png"}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="flex items-center justify-center size-9 rounded-full bg-black/60 text-white hover:bg-black/90 hover:text-white transition-colors shadow-lg"
-              title="원본 다운로드"
-            >
-              <Download className="size-4" />
-            </a>
+            <Button
+              variant="secondary"
+              size="icon"
+              className="size-9 rounded-full bg-black/60 text-white hover:bg-black/90 hover:text-white border-0 shadow-lg"
+              render={
+                <a
+                  href={src}
+                  download={alt || "chart.png"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  title="원본 다운로드"
+                >
+                  <Download data-icon="inline-start" />
+                </a>
+              }
+            />
             <Button
               variant="secondary"
               size="icon"
@@ -120,7 +134,7 @@ export function InteractiveChartImage({
               onClick={() => setIsOpen(false)}
               title="닫기 (ESC)"
             >
-              <X className="size-4" />
+              <X data-icon="inline-start" />
             </Button>
           </div>
 
