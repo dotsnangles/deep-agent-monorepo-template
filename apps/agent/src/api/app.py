@@ -3,7 +3,6 @@ from contextlib import asynccontextmanager
 
 import redis.asyncio as aioredis
 from fastapi import FastAPI
-from langchain_core.globals import set_llm_cache
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.store.postgres.aio import AsyncPostgresStore
 from psycopg_pool import AsyncConnectionPool
@@ -16,7 +15,7 @@ from src.api.routes.title import title_router
 from src.core.checkpointer import CheckpointerFactory
 from src.core.config import DATABASE_URL, REDIS_URL
 from src.core.gateway import AgentExecutionGateway
-from src.core.redis import RedisEventBroker, StandardRedisCache
+from src.core.redis import RedisEventBroker
 from src.graphs.chat.graph import build_agent
 from src.workers import TitleGenerationWorker
 
@@ -36,7 +35,7 @@ def create_app() -> FastAPI:
         app.state.title_worker = None
         app.state.gateway = None
 
-        # 1. Initialize Redis Cache, Client & Event Broker
+        # 1. Initialize Redis Client & Event Broker
         if REDIS_URL:
             try:
                 r = aioredis.from_url(REDIS_URL, decode_responses=True)
@@ -47,8 +46,6 @@ def create_app() -> FastAPI:
                 if hasattr(app.state, "copilotkit_agent") and app.state.copilotkit_agent:
                     app.state.copilotkit_agent.broker = broker
 
-                # Global LLM cache
-                set_llm_cache(StandardRedisCache(redis_url=REDIS_URL, ttl=86400))
                 logger.info("Redis connected, Pub/Sub broker active (%s).", REDIS_URL)
             except Exception as e:
                 logger.warning("Redis connection failed: %s. Using memory fallback.", e)

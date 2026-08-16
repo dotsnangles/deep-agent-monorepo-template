@@ -1,5 +1,4 @@
-import operator
-from typing import Annotated, Any, TypedDict
+from typing import Any, TypedDict
 
 from langchain_core.messages import (
     AIMessage,
@@ -23,7 +22,7 @@ from src.tools.system import get_default_tools
 
 
 class AgentState(TypedDict):
-    messages: Annotated[list[BaseMessage], operator.add]
+    messages: list[BaseMessage]
 
 
 async def _invoke_tool(
@@ -70,14 +69,15 @@ def build_hitl_agent_graph(
     workflow = StateGraph(AgentState)
 
     async def call_model(state: AgentState) -> dict[str, Any]:
-        msgs = list(state["messages"])
+        msgs = list(state.get("messages", []))
         if not msgs or not isinstance(msgs[0], SystemMessage):
             msgs = [SystemMessage(content=sys_prompt)] + msgs
         response = await llm_with_tools.ainvoke(msgs)
-        return {"messages": [response]}
+        return {"messages": msgs + [response]}
 
     async def call_tools(state: AgentState) -> dict[str, Any]:
-        last_message = state["messages"][-1]
+        msgs = list(state.get("messages", []))
+        last_message = msgs[-1] if msgs else None
         tool_messages: list[BaseMessage] = []
 
         if isinstance(last_message, AIMessage) and last_message.tool_calls:
@@ -124,10 +124,13 @@ def build_hitl_agent_graph(
                     tool_msg = await _invoke_tool(tool_map, tool_name, tool_args, tool_call_id)
                     tool_messages.append(tool_msg)
 
-        return {"messages": tool_messages}
+        return {"messages": msgs + tool_messages}
 
     def should_continue(state: AgentState) -> str:
-        last_message = state["messages"][-1]
+        msgs = state.get("messages", [])
+        if not msgs:
+            return END
+        last_message = msgs[-1]
         if isinstance(last_message, AIMessage) and last_message.tool_calls:
             return "tools"
         return END

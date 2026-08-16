@@ -36,3 +36,7 @@ Key terms and definitions used across `hollow-echo-distant-signal`:
 | Message Attachment | Embedded metadata record (`id`, `url`, `name`, `mimeType`, `size`, `s3Key`) bound directly to a `MessageNode` | Database & Web (`@repo/db`, `apps/web`) |
 | Multimodal Context Injection | Transforming attached images into vision blocks and document attachments into contextual prompt sections | Agent (`apps/agent`) |
 | Attachment Staging Bar | Input area component displaying staged file upload chips, progress bars, and image thumbnail previews | Web Client (`apps/web`) |
+| Tree SSOT | PostgreSQL `chat_message` database table as the sole persistent authority and single source of truth for conversational DAG trees | Database & Web (`@repo/db`, `apps/web`) |
+| Active Path Synchronization | Replacing LangGraph checkpointer state with the client-provided active path on every turn to prevent $O(N^2)$ history accumulation | Agent (`apps/agent`) |
+| Live LLM Inference | Mandatory live token generation without global exact-match response caching (`set_llm_cache`) for interactive chat endpoints | Agent (`apps/agent`) |
+| Bounded Checkpointer | Confining LangGraph checkpointer scope to in-turn HITL approval interrupts and resumption rather than multi-turn tree history | Agent (`apps/agent`) |

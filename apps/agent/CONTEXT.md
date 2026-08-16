@@ -16,3 +16,5 @@ Domain glossary and architectural concepts for the Python Deep Agent service:
 | Store | Long-term cross-thread memory store (`AsyncPostgresStore`) | `src/api/app.py` |
 | Title Worker | Background task consumer listening on `queue:title_generation` to summarize chat titles asynchronously | `src/workers/title_worker.py` |
 | Tool Registry | Custom tool definitions exposed to the LLM agent | `src/tools/system.py` |
+| Active Path Synchronization | State replacement strategy synchronizing LangGraph state directly with client active path, avoiding $O(N^2)$ message inflation | `src/graphs/chat/hitl_graph.py` |
+| Live LLM Inference | Prohibition of global response caches (`set_llm_cache`) in interactive chat pipelines to ensure real-time token streaming | `src/api/app.py` |

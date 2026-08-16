@@ -8,16 +8,17 @@ from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage
 from langchain_core.messages.tool import ToolCallChunk
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 from langchain_core.tools import BaseTool
+from pydantic import Field
 
 
 class FakeChatModel(BaseChatModel):
     """Deterministic in-memory Fake Chat Model for offline, zero-cost testing."""
 
-    responses: list[str] = ["안녕하세요! 무엇을 도와드릴까요?"]
+    responses: list[str] = Field(default_factory=lambda: ["안녕하세요! 무엇을 도와드릴까요?"])
     tokens: list[str] | None = None
     tool_calls: list[dict[str, Any]] | None = None
-    bound_tools: list[Any] = []
-    received_messages: list[list[BaseMessage]] = []
+    bound_tools: list[Any] = Field(default_factory=list)
+    received_messages: list[list[BaseMessage]] = Field(default_factory=list)
     _idx: int = 0
 
     @property
@@ -30,13 +31,14 @@ class FakeChatModel(BaseChatModel):
         **kwargs: Any,
     ) -> "FakeChatModel":
         """Simulates binding tools to the model."""
-        return FakeChatModel(
+        bound = FakeChatModel(
             responses=self.responses,
             tokens=self.tokens,
             tool_calls=self.tool_calls,
             bound_tools=list(tools),
-            received_messages=self.received_messages,
         )
+        bound.received_messages = self.received_messages
+        return bound
 
     def _get_tokens(self) -> list[str]:
         if self.tokens:
