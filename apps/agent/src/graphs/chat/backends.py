@@ -126,9 +126,10 @@ class DockerSandboxBackend(FilesystemBackend, SandboxBackendProtocol):
                 return res
             return ExecuteResponse(output=str(res), exit_code=0, truncated=False)
 
-        # Check if Docker runner container is available and running
+        # Check if Docker runner container is available, running, and root_dir is mounted
         use_docker = False
-        if shutil.which("docker") and self.container_name:
+        is_mounted_volume = "workspace/sessions" in str(self.root_dir.resolve())
+        if is_mounted_volume and shutil.which("docker") and self.container_name:
             try:
                 check_cmd = ["docker", "inspect", "-f", "{{.State.Running}}", self.container_name]
                 proc = await asyncio.create_subprocess_exec(

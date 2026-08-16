@@ -7,6 +7,9 @@
   ],
   "type": "module",
   "scripts": {
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "infra:logs": "docker compose logs -f",
     "dev": "nx run-many -t dev --output-style=stream",
     "build": "nx run-many -t build",
     "check-types": "nx run-many -t check-types",
@@ -22,10 +25,10 @@
     "db:watch": "docker compose up postgres",
     "db:stop": "docker compose stop postgres",
     "db:down": "docker compose down postgres",
-    "docker:build": "docker compose build",
-    "docker:up": "docker compose up -d --build",
-    "docker:down": "docker compose down",
-    "docker:logs": "docker compose logs -f"
+    "docker:build": "docker compose --profile app build",
+    "docker:up": "docker compose --profile app up -d --build",
+    "docker:down": "docker compose --profile app down",
+    "docker:logs": "docker compose --profile app logs -f"
   },
   "dependencies": {
     "@repo/env": "workspace:*",
