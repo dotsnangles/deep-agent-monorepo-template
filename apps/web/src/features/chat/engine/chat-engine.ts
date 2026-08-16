@@ -578,17 +578,27 @@ export class ChatEngine {
     } catch (err: any) {
       const isAborted = this.abortController.signal.aborted || err?.name === "AbortError";
       if (isAborted) {
-        // User aborted: mark complete with partial content
-        this.state = {
-          ...this.state,
-          allNodes: this.state.allNodes.map((n) =>
-            n.id === params.assistantMessageId
-              ? { ...n, content: accumulatedContent, status: "complete" }
-              : n
-          ),
-          isGenerating: false,
-          generatingAssistantId: null,
-        };
+        // User aborted: if no tokens received yet, remove empty ghost node and restore activeLeaf
+        if (accumulatedContent.length === 0) {
+          this.state = {
+            ...this.state,
+            allNodes: this.state.allNodes.filter((n) => n.id !== params.assistantMessageId),
+            activeLeafId: params.userMessageId || this.state.activeLeafId,
+            isGenerating: false,
+            generatingAssistantId: null,
+          };
+        } else {
+          this.state = {
+            ...this.state,
+            allNodes: this.state.allNodes.map((n) =>
+              n.id === params.assistantMessageId
+                ? { ...n, content: accumulatedContent, status: "complete" }
+                : n
+            ),
+            isGenerating: false,
+            generatingAssistantId: null,
+          };
+        }
         this.notify();
       } else {
         // Real stream error: preserve node as error
