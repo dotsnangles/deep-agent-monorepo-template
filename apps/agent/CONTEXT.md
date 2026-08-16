@@ -36,3 +36,5 @@ Domain glossary and architectural concepts for the Python Deep Agent service:
 | Context Compaction Engine | Dual-action context management combining automatic 85% window summarization and on-demand `compact_conversation` tool | `src/graphs/chat/factory.py` |
 | Agent Config Loader | Multi-source configuration resolver (`agent.config.yaml` + `.env`) providing type-safe Pydantic settings with fail-fast validation | `src/core/settings.py` |
 | Prompt Catalog | File-based prompt management layer loading externalized Markdown templates (`prompts/*.md`) with safe variable interpolation | `src/graphs/chat/prompts.py` |
+| Deterministic Storage Seam | URL-driven checkpointer/store resolver eliminating environment sniffing in favor of explicit `DATABASE_URL` resolution and test DI | `src/core/checkpointer.py` |
+| Lifespan-Managed Connection Pool | Singleton `AsyncConnectionPool` managed exclusively within the FastAPI lifecycle, shared across checkpointer, store, and worker | `src/core/checkpointer.py` |
