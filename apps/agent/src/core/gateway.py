@@ -1,16 +1,19 @@
 import logging
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.types import Command
 
 from src.core.config import get_llm
 from src.core.observability import get_langfuse_callback
 from src.core.redis import RedisEventBroker, RedisStreamingCallbackHandler
-from src.graphs.chat.prompts import MAIN_SYSTEM_PROMPT
-from src.graphs.registry import GraphRegistry, global_graph_registry
-from src.schemas.events import AgentStreamEvent
+from src.graphs.chat import MAIN_SYSTEM_PROMPT
+from src.schemas import AgentStreamEvent
+
+if TYPE_CHECKING:
+    from src.graphs.registry import GraphRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -24,10 +27,13 @@ ROLE_MAP = {
 
 
 def _normalize_messages(
-    messages: list[BaseMessage | dict[str, Any]],
+    messages: list[BaseMessage | dict[str, Any]] | None,
     system_prompt: str | None = None,
 ) -> list[BaseMessage]:
     """Converts mixed dicts/BaseMessages into BaseMessages with effective system prompt."""
+    if not messages:
+        return [SystemMessage(content=system_prompt or MAIN_SYSTEM_PROMPT)]
+
     normalized: list[BaseMessage] = []
     has_system = False
     effective_system = system_prompt or MAIN_SYSTEM_PROMPT
@@ -55,18 +61,46 @@ def _normalize_messages(
     return normalized
 
 
+def _extract_interrupt_events(graph_state: Any) -> list[AgentStreamEvent]:
+    """Encapsulates extraction of approval_request events from LangGraph state."""
+    events: list[AgentStreamEvent] = []
+    if not graph_state or not getattr(graph_state, "tasks", None):
+        return events
+
+    for task in graph_state.tasks:
+        if task.interrupts:
+            for interrupt_item in task.interrupts:
+                val = interrupt_item.value
+                if isinstance(val, dict):
+                    events.append(
+                        AgentStreamEvent.approval_request(
+                            tool=val.get("tool", "tool"),
+                            tool_input=val.get("input", {}),
+                            tool_call_id=val.get("tool_call_id", ""),
+                            description=val.get("description"),
+                        )
+                    )
+    return events
+
+
 class AgentExecutionGateway:
-    """Deep domain execution facade orchestrating graph resolution and SSE event streaming."""
+    """Deep domain execution facade orchestrating graph resolution, HITL interrupts, and SSE event streaming."""
 
     def __init__(
         self,
-        registry: GraphRegistry | None = None,
+        registry: Any = None,
         checkpointer: BaseCheckpointSaver | None = None,
         store: Any = None,
         model: Any = None,
         event_broker: RedisEventBroker | None = None,
     ):
-        self.registry = registry or global_graph_registry
+        if registry is None:
+            from src.graphs.registry import global_graph_registry
+
+            self.registry = global_graph_registry
+        else:
+            self.registry = registry
+
         self.checkpointer = checkpointer
         self.store = store
         self.default_model = model
@@ -85,14 +119,15 @@ class AgentExecutionGateway:
 
     async def stream_execution(
         self,
-        messages: list[BaseMessage | dict[str, Any]],
+        messages: list[BaseMessage | dict[str, Any]] | None = None,
         thread_id: str | None = None,
         agent_type: str = "default",
         model: Any = None,
         system_prompt: str | None = None,
         config: dict[str, Any] | None = None,
+        resume_action: dict[str, Any] | None = None,
     ) -> AsyncIterator[AgentStreamEvent]:
-        """Streams structured AgentStreamEvents for the given conversation messages."""
+        """Streams structured AgentStreamEvents with support for Human-In-The-Loop interrupt and resume."""
         lc_messages = _normalize_messages(messages, system_prompt=system_prompt)
         effective_model = model or self.default_model or get_llm()
         effective_thread_id = thread_id or "default"
@@ -121,49 +156,74 @@ class AgentExecutionGateway:
                     model=effective_model,
                 )
 
+                # Determine graph input: Command(resume=...) for HITL resume or {"messages": ...} for initial input
+                if resume_action is not None:
+                    graph_input = Command(resume=resume_action)
+                else:
+                    graph_input = {"messages": lc_messages}
+
                 # Check if graph has astream_events capability
                 if hasattr(graph, "astream_events"):
                     total_tokens = 0
-                    async for event in graph.astream_events(
-                        {"messages": lc_messages},
-                        config=stream_config,
-                        version="v2",
-                    ):
-                        kind = event.get("event")
-                        if kind == "on_chat_model_stream":
-                            chunk = event.get("data", {}).get("chunk")
-                            content = getattr(chunk, "content", "")
-                            if content and isinstance(content, str):
-                                total_tokens += len(content)
-                                yield AgentStreamEvent.token(content=content)
-                        elif kind == "on_chat_model_end":
-                            # Check for tool calls on completed model step
-                            output = event.get("data", {}).get("output")
-                            tool_calls = getattr(output, "tool_calls", None) or []
-                            for tc in tool_calls:
-                                yield AgentStreamEvent.tool_start(
-                                    tool=tc.get("name", "tool"),
-                                    tool_input=tc.get("args", {}),
-                                    run_id=tc.get("id"),
-                                )
-                        elif kind == "on_tool_start":
-                            yield AgentStreamEvent.tool_start(
-                                tool=event.get("name", "tool"),
-                                tool_input=event.get("data", {}).get("input"),
-                                run_id=event.get("run_id"),
-                            )
-                        elif kind == "on_tool_end":
-                            yield AgentStreamEvent.tool_end(
-                                tool=event.get("name", "tool"),
-                                output=event.get("data", {}).get("output"),
-                                run_id=event.get("run_id"),
-                            )
-                        elif kind == "on_chain_start" and event.get("name") in (
-                            "agent",
-                            "tools",
-                            "generate",
+                    try:
+                        async for event in graph.astream_events(
+                            graph_input,
+                            config=stream_config,
+                            version="v2",
                         ):
-                            yield AgentStreamEvent.node_transition(node=event.get("name", "node"))
+                            kind = event.get("event")
+                            if kind == "on_chat_model_stream":
+                                chunk = event.get("data", {}).get("chunk")
+                                content = getattr(chunk, "content", "")
+                                if content and isinstance(content, str):
+                                    total_tokens += len(content)
+                                    yield AgentStreamEvent.token(content=content)
+                            elif kind == "on_chat_model_end":
+                                output = event.get("data", {}).get("output")
+                                tool_calls = getattr(output, "tool_calls", None) or []
+                                for tc in tool_calls:
+                                    yield AgentStreamEvent.tool_start(
+                                        tool=tc.get("name", "tool"),
+                                        tool_input=tc.get("args", {}),
+                                        run_id=tc.get("id"),
+                                    )
+                            elif kind == "on_tool_start":
+                                yield AgentStreamEvent.tool_start(
+                                    tool=event.get("name", "tool"),
+                                    tool_input=event.get("data", {}).get("input"),
+                                    run_id=event.get("run_id"),
+                                )
+                            elif kind == "on_tool_end":
+                                yield AgentStreamEvent.tool_end(
+                                    tool=event.get("name", "tool"),
+                                    output=event.get("data", {}).get("output"),
+                                    run_id=event.get("run_id"),
+                                )
+                            elif kind == "on_chain_start" and event.get("name") in (
+                                "agent",
+                                "tools",
+                                "generate",
+                            ):
+                                yield AgentStreamEvent.node_transition(node=event.get("name", "node"))
+                    except Exception as stream_err:
+                        logger.debug("Stream completed or interrupted: %s", stream_err)
+
+                    # After stream finishes, check if graph entered an interrupted state
+                    if hasattr(graph, "aget_state"):
+                        graph_state = await graph.aget_state(stream_config)
+                        interrupt_events = _extract_interrupt_events(graph_state)
+                        if interrupt_events:
+                            for ie in interrupt_events:
+                                yield ie
+                            yield AgentStreamEvent.done(
+                                finish_reason="interrupt",
+                                metadata={
+                                    "total_chars": total_tokens,
+                                    "thread_id": effective_thread_id,
+                                    "interrupted": True,
+                                },
+                            )
+                            return
 
                     yield AgentStreamEvent.done(
                         finish_reason="stop",

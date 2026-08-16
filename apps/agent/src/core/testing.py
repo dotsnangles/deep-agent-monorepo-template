@@ -1,3 +1,4 @@
+import json
 from collections.abc import AsyncIterator, Iterator, Sequence
 from typing import Any
 
@@ -42,6 +43,26 @@ class FakeChatModel(BaseChatModel):
         self._idx += 1
         return [full_text[i : i + 4] for i in range(0, len(full_text), 4)]
 
+    def _generate_tool_chunks(self) -> list[ChatGenerationChunk]:
+        """Helper generating ToolCallChunk generation chunks from tool_calls."""
+        chunks: list[ChatGenerationChunk] = []
+        if self.tool_calls:
+            for idx, tc in enumerate(self.tool_calls):
+                args_val = tc.get("args", {})
+                args_str = json.dumps(args_val) if isinstance(args_val, dict) else str(args_val)
+                tc_chunk = ToolCallChunk(
+                    name=tc.get("name"),
+                    args=args_str,
+                    id=tc.get("id", f"call_{idx}"),
+                    index=idx,
+                )
+                chunks.append(
+                    ChatGenerationChunk(
+                        message=AIMessageChunk(content="", tool_call_chunks=[tc_chunk])
+                    )
+                )
+        return chunks
+
     def _generate(
         self,
         messages: list[BaseMessage],
@@ -74,17 +95,10 @@ class FakeChatModel(BaseChatModel):
         run_manager: CallbackManagerForLLMRun | None = None,
         **kwargs: Any,
     ) -> Iterator[ChatGenerationChunk]:
-        if self.tool_calls:
-            for idx, tc in enumerate(self.tool_calls):
-                tc_chunk = ToolCallChunk(
-                    name=tc.get("name"),
-                    args=str(tc.get("args", {})),
-                    id=tc.get("id", f"call_{idx}"),
-                    index=idx,
-                )
-                yield ChatGenerationChunk(
-                    message=AIMessageChunk(content="", tool_call_chunks=[tc_chunk])
-                )
+        tool_chunks = self._generate_tool_chunks()
+        if tool_chunks:
+            for chunk in tool_chunks:
+                yield chunk
             return
 
         for token in self._get_tokens():
@@ -100,17 +114,10 @@ class FakeChatModel(BaseChatModel):
         run_manager: AsyncCallbackManagerForLLMRun | None = None,
         **kwargs: Any,
     ) -> AsyncIterator[ChatGenerationChunk]:
-        if self.tool_calls:
-            for idx, tc in enumerate(self.tool_calls):
-                tc_chunk = ToolCallChunk(
-                    name=tc.get("name"),
-                    args=str(tc.get("args", {})),
-                    id=tc.get("id", f"call_{idx}"),
-                    index=idx,
-                )
-                yield ChatGenerationChunk(
-                    message=AIMessageChunk(content="", tool_call_chunks=[tc_chunk])
-                )
+        tool_chunks = self._generate_tool_chunks()
+        if tool_chunks:
+            for chunk in tool_chunks:
+                yield chunk
             return
 
         for token in self._get_tokens():

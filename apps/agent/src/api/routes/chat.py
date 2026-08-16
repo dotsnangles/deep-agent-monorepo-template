@@ -1,4 +1,5 @@
 from collections.abc import AsyncIterator
+from typing import Any
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
@@ -20,9 +21,26 @@ class ChatMessageInput(BaseModel):
     )
 
 
-class ChatStreamRequest(BaseModel):
+class ResumeActionInput(BaseModel):
+    tool_call_id: str | None = Field(
+        default=None,
+        alias="toolCallId",
+        description="ID of the tool call being approved/rejected",
+    )
+    approved: bool = Field(
+        default=True,
+        description="Whether the user approved tool execution",
+    )
+    reason: str | None = Field(
+        default=None,
+        description="Optional rejection reason or feedback",
+    )
+
+
+class ChatStreamRequestDTO(BaseModel):
     thread_id: str | None = Field(
         default=None,
+        alias="threadId",
         description="Unique conversation session or thread ID",
     )
     messages: list[ChatMessageInput] = Field(
@@ -31,12 +49,22 @@ class ChatStreamRequest(BaseModel):
     )
     agent_type: str = Field(
         default="default",
+        alias="agentType",
         description="Agent graph workflow type",
     )
     system_prompt: str | None = Field(
         default=None,
+        alias="systemPrompt",
         description="Optional custom system prompt override",
     )
+    resume: ResumeActionInput | None = Field(
+        default=None,
+        description="Optional resume payload for Human-In-The-Loop approval/rejection",
+    )
+
+
+# Alias for backward compatibility
+ChatStreamRequest = ChatStreamRequestDTO
 
 
 def get_gateway(request: Request) -> AgentExecutionGateway:
@@ -48,10 +76,14 @@ def get_gateway(request: Request) -> AgentExecutionGateway:
 
 @chat_router.post("/stream")
 async def stream_chat(
-    req: ChatStreamRequest,
+    req: ChatStreamRequestDTO,
     gateway: AgentExecutionGateway = Depends(get_gateway),
 ) -> StreamingResponse:
     """Streams structured SSE events (text/event-stream) via AgentExecutionGateway."""
+
+    resume_dict: dict[str, Any] | None = None
+    if req.resume:
+        resume_dict = req.resume.model_dump(by_alias=False)
 
     async def sse_event_generator() -> AsyncIterator[str]:
         async for event in gateway.stream_execution(
@@ -59,6 +91,7 @@ async def stream_chat(
             thread_id=req.thread_id,
             agent_type=req.agent_type,
             system_prompt=req.system_prompt,
+            resume_action=resume_dict,
         ):
             yield event.to_sse()
 

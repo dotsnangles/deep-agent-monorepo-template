@@ -56,14 +56,28 @@ export const deleteChatMessageSchema = z.object({
 
 export type DeleteChatMessageDTO = z.infer<typeof deleteChatMessageSchema>;
 
+export const resumeActionSchema = z.object({
+  toolCallId: z.string().optional(),
+  approved: z.boolean(),
+  reason: z.string().optional(),
+});
+
+export type ResumeActionDTO = z.infer<typeof resumeActionSchema>;
+
 export const chatStreamRequestSchema = z.object({
   threadId: z.string().optional(),
-  messages: z.array(
-    z.object({
-      role: z.enum(["user", "assistant", "system"]),
-      content: z.string(),
-    })
-  ),
+  messages: z
+    .array(
+      z.object({
+        role: z.enum(["user", "assistant", "system"]),
+        content: z.string(),
+      })
+    )
+    .optional()
+    .default([]),
+  agentType: z.string().optional(),
+  systemPrompt: z.string().optional(),
+  resume: resumeActionSchema.optional(),
 });
 
 export type ChatStreamRequestDTO = z.infer<typeof chatStreamRequestSchema>;
