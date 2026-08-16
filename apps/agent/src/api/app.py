@@ -14,7 +14,7 @@ from src.api.routes.events import events_router
 from src.api.routes.health import health_router
 from src.api.routes.title import title_router
 from src.core.checkpointer import CheckpointerFactory
-from src.core.config import DATABASE_URL, REDIS_URL
+from src.core.config import DATABASE_URL, ENABLE_TITLE_WORKER, REDIS_URL
 from src.core.gateway import AgentExecutionGateway
 from src.core.redis import RedisEventBroker
 from src.graphs.chat.graph import build_agent
@@ -89,7 +89,7 @@ def create_app() -> FastAPI:
         )
 
         # 4. Initialize & Start Title Generation Queue Worker
-        if app.state.redis:
+        if app.state.redis and ENABLE_TITLE_WORKER:
             title_worker = TitleGenerationWorker(
                 redis_client=app.state.redis,
                 event_broker=app.state.broker,
@@ -97,6 +97,8 @@ def create_app() -> FastAPI:
             )
             title_worker.start()
             app.state.title_worker = title_worker
+        elif app.state.redis:
+            logger.info("Title generation worker disabled (ENABLE_TITLE_WORKER=false).")
 
         yield
 

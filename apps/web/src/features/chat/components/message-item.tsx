@@ -297,7 +297,10 @@ export function MessageItem({
                 <span className="flex size-2 rounded-full bg-primary animate-pulse" />
                 <span className="shimmer">답변을 생성하고 있습니다...</span>
               </div>
-            ) : message.status === "error" || message.error ? null : message.toolApproval ? null : (
+            ) : message.status === "error" ||
+              message.error ||
+              message.toolApproval ||
+              (message.todos && message.todos.length > 0) ? null : (
               <span className="text-muted-foreground italic text-xs">(내용 없음)</span>
             )}
 

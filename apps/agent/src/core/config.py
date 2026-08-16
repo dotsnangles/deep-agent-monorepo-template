@@ -21,6 +21,7 @@ SERVER_HOST: str = os.getenv("SERVER_HOST", "0.0.0.0")
 SERVER_PORT: int = int(os.getenv("SERVER_PORT", "8000"))
 TITLE_WORKER_CONCURRENCY: int = int(os.getenv("TITLE_WORKER_CONCURRENCY", "3"))
 ENABLE_SUBAGENTS: bool = os.getenv("ENABLE_SUBAGENTS", "false").lower() == "true"
+ENABLE_TITLE_WORKER: bool = os.getenv("ENABLE_TITLE_WORKER", "false").lower() == "true"
 
 
 def get_llm():
