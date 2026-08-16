@@ -7,6 +7,7 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         NEXT_PUBLIC_SERVER_URL: http://localhost:3000
+    container_name: hollow-echo-distant-signal-web
     init: true
     ports:
       - "3001:3001"
@@ -40,6 +41,7 @@ services:
     build:
       context: .
       dockerfile: apps/server/Dockerfile
+    container_name: hollow-echo-distant-signal-server
     init: true
     ports:
       - "3000:3000"
