@@ -18,6 +18,7 @@
     "@repo/db": "workspace:*",
     "@repo/env": "workspace:*",
     "@repo/redis": "workspace:*",
+    "@repo/storage": "workspace:*",
     "@repo/ui": "workspace:*",
     "@repo/validators": "workspace:*",
     "@swc/helpers": "^0.5.23",
