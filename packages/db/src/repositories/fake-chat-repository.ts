@@ -63,6 +63,16 @@ export class FakeChatRepository implements ChatRepository {
     return true;
   }
 
+  public async updateSessionTitleById(sessionId: string, title: string): Promise<boolean> {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      return false;
+    }
+    session.title = title.trim();
+    session.updatedAt = new Date();
+    return true;
+  }
+
   public async updateSessionActiveLeaf(sessionId: string, userId: string, activeLeafId: string | null): Promise<boolean> {
     const session = this.sessions.get(sessionId);
     if (!session || session.userId !== userId) {

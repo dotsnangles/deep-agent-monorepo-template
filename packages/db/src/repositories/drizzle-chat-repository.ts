@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, type SQL } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "../schema";
 import { chatMessage, chatSession } from "../schema/chat";
@@ -46,6 +46,22 @@ function toMessageNode(record: typeof chatMessage.$inferSelect): MessageNode {
 export class DrizzleChatRepository implements ChatRepository {
   constructor(private db: DrizzleDb) {}
 
+  private async updateSessionRecord(
+    filter: SQL,
+    patch: Partial<typeof chatSession.$inferInsert>
+  ): Promise<boolean> {
+    const [updated] = await this.db
+      .update(chatSession)
+      .set({
+        ...patch,
+        updatedAt: new Date(),
+      })
+      .where(filter)
+      .returning();
+
+    return !!updated;
+  }
+
   public async getSessions(userId: string): Promise<ChatSessionEntity[]> {
     const records = await this.db
       .select()
@@ -85,16 +101,14 @@ export class DrizzleChatRepository implements ChatRepository {
   }
 
   public async updateSessionTitle(sessionId: string, userId: string, title: string): Promise<boolean> {
-    const [updated] = await this.db
-      .update(chatSession)
-      .set({
-        title,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(chatSession.id, sessionId), eq(chatSession.userId, userId)))
-      .returning();
+    return this.updateSessionRecord(
+      and(eq(chatSession.id, sessionId), eq(chatSession.userId, userId)) as SQL,
+      { title }
+    );
+  }
 
-    return !!updated;
+  public async updateSessionTitleById(sessionId: string, title: string): Promise<boolean> {
+    return this.updateSessionRecord(eq(chatSession.id, sessionId), { title });
   }
 
   public async updateSessionActiveLeaf(
@@ -102,16 +116,10 @@ export class DrizzleChatRepository implements ChatRepository {
     userId: string,
     activeLeafId: string | null
   ): Promise<boolean> {
-    const [updated] = await this.db
-      .update(chatSession)
-      .set({
-        activeLeafId,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(chatSession.id, sessionId), eq(chatSession.userId, userId)))
-      .returning();
-
-    return !!updated;
+    return this.updateSessionRecord(
+      and(eq(chatSession.id, sessionId), eq(chatSession.userId, userId)) as SQL,
+      { activeLeafId }
+    );
   }
 
   public async deleteSession(sessionId: string, userId: string): Promise<boolean> {
@@ -124,36 +132,35 @@ export class DrizzleChatRepository implements ChatRepository {
   }
 
   public async getTree(sessionId: string, userId: string): Promise<TreeResult | null> {
-    const [sessionRecord] = await this.db
-      .select()
-      .from(chatSession)
-      .where(and(eq(chatSession.id, sessionId), eq(chatSession.userId, userId)))
-      .limit(1);
-
-    if (!sessionRecord) {
+    const session = await this.getSession(sessionId, userId);
+    if (!session) {
       return null;
     }
 
-    const messages = await this.db
+    const records = await this.db
       .select()
       .from(chatMessage)
       .where(eq(chatMessage.sessionId, sessionId))
       .orderBy(asc(chatMessage.createdAt));
 
-    const nodes = messages.map(toMessageNode);
-    const activePath = traverseActivePath(nodes, sessionRecord.activeLeafId);
+    const messages = records.map(toMessageNode);
+    const activePath = traverseActivePath(messages, session.activeLeafId);
 
     return {
-      sessionId: sessionRecord.id,
-      activeLeafId: sessionRecord.activeLeafId,
-      messages: nodes,
+      sessionId,
+      activeLeafId: session.activeLeafId,
+      messages,
       activePath,
     };
   }
 
-  public async saveMessage(params: CreateMessageParams, userId: string): Promise<SaveMessageResult | null> {
+  public async saveMessage(
+    params: CreateMessageParams,
+    userId: string
+  ): Promise<SaveMessageResult | null> {
     return await this.db.transaction(async (tx) => {
-      const [existingSession] = await (tx as unknown as DrizzleDb)
+      // 1. Check existing session for tenant boundary verification
+      const [existingSession] = await tx
         .select()
         .from(chatSession)
         .where(eq(chatSession.id, params.sessionId))
@@ -165,15 +172,15 @@ export class DrizzleChatRepository implements ChatRepository {
 
       const isNewSession = !existingSession;
       const messageId = params.id || crypto.randomUUID();
-      const snippet = createSessionSnippet(params.content);
+      const initialTitle = createSessionSnippet(params.content);
 
-      // Atomic session upsert with tenant boundary guard
-      const [sessionRecord] = await (tx as unknown as DrizzleDb)
+      // 2. Upsert session with activeLeafId
+      const [sessionRecord] = await tx
         .insert(chatSession)
         .values({
           id: params.sessionId,
           userId,
-          title: snippet,
+          title: initialTitle,
           activeLeafId: messageId,
         })
         .onConflictDoUpdate({
@@ -182,16 +189,15 @@ export class DrizzleChatRepository implements ChatRepository {
             activeLeafId: messageId,
             updatedAt: new Date(),
           },
-          where: eq(chatSession.userId, userId),
         })
         .returning();
 
       if (!sessionRecord) {
-        throw new Error("Failed to upsert chat session record");
+        return null;
       }
 
-      // Message insert
-      const [messageRecord] = await (tx as unknown as DrizzleDb)
+      // 3. Insert message node
+      const [insertedMessage] = await tx
         .insert(chatMessage)
         .values({
           id: messageId,
@@ -202,12 +208,12 @@ export class DrizzleChatRepository implements ChatRepository {
         })
         .returning();
 
-      if (!messageRecord) {
-        throw new Error("Failed to insert chat message record");
+      if (!insertedMessage) {
+        return null;
       }
 
       return {
-        message: toMessageNode(messageRecord),
+        message: toMessageNode(insertedMessage),
         session: toSessionEntity(sessionRecord),
         isNewSession,
       };
@@ -220,7 +226,8 @@ export class DrizzleChatRepository implements ChatRepository {
     userId: string
   ): Promise<DeleteSubtreeResult | null> {
     return await this.db.transaction(async (tx) => {
-      const [sessionRecord] = await (tx as unknown as DrizzleDb)
+      // 1. Verify session ownership
+      const [sessionRecord] = await tx
         .select()
         .from(chatSession)
         .where(and(eq(chatSession.id, sessionId), eq(chatSession.userId, userId)))
@@ -230,24 +237,28 @@ export class DrizzleChatRepository implements ChatRepository {
         return null;
       }
 
-      const allMessages = await (tx as unknown as DrizzleDb)
+      // 2. Fetch all messages in the session
+      const allRecords = await tx
         .select()
         .from(chatMessage)
         .where(eq(chatMessage.sessionId, sessionId))
         .orderBy(asc(chatMessage.createdAt));
 
-      const nodes = allMessages.map(toMessageNode);
-      const targetNode = nodes.find((n) => n.id === messageId);
+      const allNodes = allRecords.map(toMessageNode);
+      const targetNode = allNodes.find((n) => n.id === messageId);
       if (!targetNode) {
         return null;
       }
 
-      const { remainingNodes, deletedIds } = pruneSubtree(nodes, messageId);
+      // 3. Calculate recursive prune
+      const { remainingNodes, deletedIds } = pruneSubtree(allNodes, messageId);
 
+      // 4. Delete nodes from DB
       if (deletedIds.length > 0) {
-        await (tx as unknown as DrizzleDb).delete(chatMessage).where(inArray(chatMessage.id, deletedIds));
+        await tx.delete(chatMessage).where(inArray(chatMessage.id, deletedIds));
       }
 
+      // 5. Compute new active leaf
       const newActiveLeafId = resolveActiveLeafAfterPrune(
         remainingNodes,
         sessionRecord.activeLeafId,
@@ -255,13 +266,14 @@ export class DrizzleChatRepository implements ChatRepository {
         targetNode.parentId
       );
 
-      await (tx as unknown as DrizzleDb)
+      // 6. Update session active leaf pointer
+      await tx
         .update(chatSession)
         .set({
           activeLeafId: newActiveLeafId,
           updatedAt: new Date(),
         })
-        .where(and(eq(chatSession.id, sessionId), eq(chatSession.userId, userId)));
+        .where(eq(chatSession.id, sessionId));
 
       return {
         deletedIds,
@@ -270,3 +282,7 @@ export class DrizzleChatRepository implements ChatRepository {
     });
   }
 }
+
+export const drizzleChatRepository = new DrizzleChatRepository(
+  schema as any
+);

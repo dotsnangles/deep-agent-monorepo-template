@@ -14,3 +14,5 @@ export async function checkRedisHealth(): Promise<boolean> {
     return false;
   }
 }
+
+export * from "./subscribers/title-subscriber";

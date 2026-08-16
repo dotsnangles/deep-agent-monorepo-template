@@ -54,6 +54,7 @@ export interface ChatRepository {
   getSession(sessionId: string, userId: string): Promise<ChatSessionEntity | null>;
   createSession(params: CreateSessionParams): Promise<ChatSessionEntity>;
   updateSessionTitle(sessionId: string, userId: string, title: string): Promise<boolean>;
+  updateSessionTitleById(sessionId: string, title: string): Promise<boolean>;
   updateSessionActiveLeaf(sessionId: string, userId: string, activeLeafId: string | null): Promise<boolean>;
   deleteSession(sessionId: string, userId: string): Promise<boolean>;
   getTree(sessionId: string, userId: string): Promise<TreeResult | null>;

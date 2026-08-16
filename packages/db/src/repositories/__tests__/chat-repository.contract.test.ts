@@ -86,11 +86,14 @@ describe("ChatRepository Contract Tests (FakeChatRepository)", () => {
       const updatedTitle = await repo.updateSessionTitle("sess-update", USER_A, "Renamed Title");
       expect(updatedTitle).toBe(true);
 
+      const updatedById = await repo.updateSessionTitleById("sess-update", "System AI Title");
+      expect(updatedById).toBe(true);
+
       const updatedLeaf = await repo.updateSessionActiveLeaf("sess-update", USER_A, "node-123");
       expect(updatedLeaf).toBe(true);
 
       let session = await repo.getSession("sess-update", USER_A);
-      expect(session?.title).toBe("Renamed Title");
+      expect(session?.title).toBe("System AI Title");
       expect(session?.activeLeafId).toBe("node-123");
 
       // Nullable active leaf support
