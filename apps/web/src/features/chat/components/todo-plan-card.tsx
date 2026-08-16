@@ -8,6 +8,7 @@ import {
   Circle,
   ListChecks,
   Loader2,
+  PlayCircle,
 } from "lucide-react";
 import { Badge } from "@repo/ui/components/badge";
 import { Separator } from "@repo/ui/components/separator";
@@ -41,12 +42,13 @@ export function TodoPlanCard({
   const completedCount = todos.filter((t) => t.status === "completed").length;
   const inProgressItem = todos.find((t) => t.status === "in_progress");
   const totalCount = todos.length;
+  const percentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
   return (
     <Card
       data-testid="todo-plan-card"
       size="sm"
-      className={cn("mb-3 shadow-2xs", className)}
+      className={cn("mb-3 shadow-2xs border-border/70", className)}
     >
       {/* Card Header as Toggle */}
       <button
@@ -63,14 +65,19 @@ export function TodoPlanCard({
               작업 계획
             </CardTitle>
             <Badge variant="secondary" className="text-[11px] font-medium">
-              {`${completedCount}/${totalCount} 완료`}
+              {`${completedCount}/${totalCount} 완료 (${percentage}%)`}
             </Badge>
-            {isGenerating && inProgressItem && (
+            {isGenerating && inProgressItem ? (
               <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-primary">
                 <Loader2 className="size-3 animate-spin" />
                 <span className="truncate max-w-[200px]">{inProgressItem.content}</span>
               </span>
-            )}
+            ) : inProgressItem ? (
+              <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                <PlayCircle className="size-3 text-primary" />
+                <span className="truncate max-w-[200px]">{inProgressItem.content}</span>
+              </span>
+            ) : null}
           </div>
 
           <CardAction>
@@ -85,9 +92,17 @@ export function TodoPlanCard({
         </CardHeader>
       </button>
 
-      {/* Checklist Body with Separator */}
+      {/* Checklist Body with Progress Bar & Separator */}
       {isOpen && (
         <>
+          <div className="px-4 pb-2">
+            <div className="w-full bg-muted/60 h-1.5 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-primary transition-all duration-500 ease-out rounded-full"
+                style={{ width: `${percentage}%` }}
+              />
+            </div>
+          </div>
           <Separator />
           <CardContent className="flex flex-col gap-2 pt-2.5">
             {todos.map((todo, idx) => {
@@ -109,7 +124,11 @@ export function TodoPlanCard({
                     {isCompleted ? (
                       <CheckCircle2 className="size-3.5 text-primary" />
                     ) : isInProgress ? (
-                      <Loader2 className="size-3.5 text-primary animate-spin" />
+                      isGenerating ? (
+                        <Loader2 className="size-3.5 text-primary animate-spin" />
+                      ) : (
+                        <PlayCircle className="size-3.5 text-primary" />
+                      )
                     ) : (
                       <Circle className="size-3.5 text-muted-foreground/40" />
                     )}
