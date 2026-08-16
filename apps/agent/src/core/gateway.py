@@ -9,7 +9,7 @@ from langgraph.types import Command
 from src.core.config import get_llm
 from src.core.observability import get_langfuse_callback
 from src.core.redis import RedisEventBroker, RedisStreamingCallbackHandler
-from src.graphs.chat import MAIN_SYSTEM_PROMPT
+from src.graphs.chat.prompts import MAIN_SYSTEM_PROMPT
 from src.schemas import AgentStreamEvent, AttachmentInput
 
 logger = logging.getLogger(__name__)

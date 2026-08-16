@@ -35,11 +35,13 @@ class TitleGenerationWorker:
         event_broker: RedisEventBroker | None = None,
         max_concurrency: int = MAX_CONCURRENCY,
         title_generator: Any = None,
+        pg_pool: Any = None,
     ):
         self.redis = redis_client
         self.event_broker = event_broker
         self.semaphore = asyncio.Semaphore(max_concurrency)
         self.title_generator = title_generator or generate_title
+        self.pg_pool = pg_pool
         self._task: asyncio.Task | None = None
         self._stop_event = asyncio.Event()
 
@@ -100,7 +102,23 @@ class TitleGenerationWorker:
                 if not smart_title or len(smart_title.strip()) < 2:
                     return
 
-                # 2. Publish title update event over Redis Pub/Sub
+                # 2. Persist directly to PostgreSQL if pool is available
+                if self.pg_pool:
+                    try:
+                        async with self.pg_pool.connection() as conn:
+                            await conn.execute(
+                                "UPDATE chat_session SET title = %s, updated_at = NOW() WHERE id = %s",
+                                (smart_title, task.sessionId),
+                            )
+                            logger.info(
+                                "Session %s title persisted in PostgreSQL: '%s'",
+                                task.sessionId,
+                                smart_title,
+                            )
+                    except Exception as pg_err:
+                        logger.warning("Direct PostgreSQL title update failed: %s", pg_err)
+
+                # 3. Publish title update event over Redis Pub/Sub
                 event_payload = {
                     "sessionId": task.sessionId,
                     "title": smart_title,

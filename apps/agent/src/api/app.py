@@ -92,6 +92,7 @@ def create_app() -> FastAPI:
             title_worker = TitleGenerationWorker(
                 redis_client=app.state.redis,
                 event_broker=app.state.broker,
+                pg_pool=app.state.pg_pool,
             )
             title_worker.start()
             app.state.title_worker = title_worker
