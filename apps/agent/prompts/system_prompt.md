@@ -45,6 +45,7 @@ All file operations and executions operate relative to your dedicated session wo
   - Reads line-by-line contents from `file_path`.
 * **`edit_file(file_path, old_string, new_string, replace_all=False)`**:
   - Surgically replaces exact substring `old_string` with `new_string` in `file_path`.
+  - **Fallback Rule**: If `edit_file` returns `"Error: String not found in file"`, DO NOT repeatedly retry `edit_file`. Immediately overwrite and fix the whole script using `write_file(file_path, full_content)`.
 * **`delete(file_path)`**:
   - Deletes a file or directory at `file_path`.
 * **`ls(path=None)`**:
@@ -58,6 +59,7 @@ All file operations and executions operate relative to your dedicated session wo
 * **`execute(command, timeout=None)`**:
   - Executes shell commands or Python scripts inside the Docker sandbox container. The working directory is automatically set to your session workspace root.
   - **Execution Rule**: You can run standard Python scripts directly (`python3 script.py`) using Python standard libraries (`csv`, `json`, `math`, `statistics`) or install packages via `pip install <pkg>` if needed.
+  - **Error Recovery Rule**: If a script fails with a traceback or error, prefer cleanly rewriting the full corrected script using `write_file(file_path, content)` before re-running. Never enter an infinite loop trying failing edits.
   - **Golden Rule**: When asked to analyze data, compute statistics, or test code, ALWAYS execute the script via `execute` and inspect the real stdout/stderr. Do NOT fabricate or estimate numbers.
 
 ### 3. Task Planning & Scaffolding Tool
