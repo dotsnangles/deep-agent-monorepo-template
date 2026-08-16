@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import React from "react";
 import { renderToString } from "react-dom/server";
-import { MessageTreeFeed } from "../message-tree-feed";
+import { MessageFeed } from "../message-feed";
 
 vi.mock("next/navigation", () => ({
   useRouter: vi.fn().mockReturnValue({ push: vi.fn(), replace: vi.fn() }),
@@ -16,13 +16,10 @@ vi.mock("../../hooks/use-chat-engine", () => ({
     generatingAssistantId: null,
     send: vi.fn(),
     respondToApproval: vi.fn(),
-    forkAndEdit: vi.fn(),
     regenerate: vi.fn(),
     deleteNode: vi.fn(),
-    selectBranch: vi.fn(),
     retry: vi.fn(),
     stop: vi.fn(),
-    getBranchInfo: vi.fn().mockReturnValue({ currentIndex: 1, totalBranches: 1 }),
   }),
 }));
 
@@ -78,9 +75,9 @@ vi.mock("../../hooks/use-direct-upload", async (importOriginal) => {
   };
 });
 
-describe("MessageTreeFeed Attachments Integration", () => {
+describe("MessageFeed Attachments Integration", () => {
   it("renders paperclip attachment button and staged file chips in prompt box", () => {
-    const html = renderToString(<MessageTreeFeed sessionId="session-upload-test" />);
+    const html = renderToString(<MessageFeed sessionId="session-upload-test" />);
 
     // File input & paperclip button
     expect(html).toContain("type=\"file\"");

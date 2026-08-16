@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Bot, GitFork } from "lucide-react";
 import { Badge } from "@repo/ui/components/badge";
-import { MessageTreeFeed, useChatSessions } from "@/features/chat";
+import { MessageFeed, useChatSessions } from "@/features/chat";
 
 export default function Home() {
   const { activeSessionId } = useChatSessions();
@@ -49,7 +49,7 @@ export default function Home() {
               <span>Hollow Echo Deep Agent</span>
               <Badge variant="outline" className="h-4 px-1.5 text-[9px] font-mono leading-none gap-1">
                 <GitFork className="size-2.5 text-primary" />
-                Message Tree
+                Linear Session
               </Badge>
             </h2>
           </div>
@@ -69,9 +69,9 @@ export default function Home() {
         </Badge>
       </div>
 
-      {/* Main Fullscreen Message Tree Feed */}
+      {/* Main Fullscreen Message Feed */}
       <div className="flex-1 min-h-0 relative flex flex-col overflow-hidden">
-        <MessageTreeFeed key={activeSessionId} sessionId={activeSessionId} />
+        <MessageFeed key={activeSessionId} sessionId={activeSessionId} />
       </div>
     </div>
   );

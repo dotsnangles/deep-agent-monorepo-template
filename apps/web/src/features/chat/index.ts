@@ -4,11 +4,13 @@ export {
   type ChatSession,
 } from "./context/chat-session-context";
 export { ChatSearchDialog } from "./components/chat-search-dialog";
-export { MessageTreeFeed } from "./components/message-tree-feed";
+export { MessageFeed, MessageTreeFeed } from "./components/message-feed";
 export { MessageItem } from "./components/message-item";
-export { MessageBranchSwitcher } from "./components/message-branch-switcher";
 export { MarkdownRenderer } from "./components/markdown-renderer";
 export { ToolActionCard } from "./components/tool-action-card";
+export { TodoPlanCard } from "./components/todo-plan-card";
+export { SpecialistDelegationCard } from "./components/specialist-delegation-card";
+export { InteractiveChartImage } from "./components/interactive-chart-image";
 export { AttachmentStagingBar } from "./components/attachment-staging-bar";
 export {
   useChatEngine,
@@ -26,14 +28,7 @@ export {
   type UseDirectUploadOptions,
 } from "./hooks/use-direct-upload";
 
-export {
-  traverseActivePath,
-  getBranchInfo,
-  pruneSubtree,
-  type MessageNode,
-  type BranchInfo,
-  type ToolApprovalRequest,
-} from "./lib/tree";
+export * from "./lib/types";
 export {
   fuzzyMatch,
   type FuzzySegment,

@@ -22,6 +22,8 @@ export interface UseChatEngineReturn extends ChatEngineState {
   regenerate: (nodeId: string) => Promise<void>;
   selectBranch: (nodeId: string, direction: "prev" | "next") => Promise<void>;
   deleteNode: (nodeId: string) => Promise<void>;
+  deleteMessage: (messageId: string) => Promise<void>;
+  loadMessages: () => Promise<void>;
   retry: (nodeId?: string) => Promise<void>;
   forkSession: (fromMessageId: string, title?: string) => Promise<{ newSessionId: string; title: string } | null>;
   stop: () => void;
@@ -84,6 +86,16 @@ export function useChatEngine(
     [engine]
   );
 
+  const deleteMessage = useCallback(
+    (messageId: string) => engine.deleteMessage(messageId),
+    [engine]
+  );
+
+  const loadMessages = useCallback(
+    () => engine.loadMessages(),
+    [engine]
+  );
+
   const retry = useCallback(
     (nodeId?: string) => engine.retry(nodeId),
     [engine]
@@ -110,6 +122,8 @@ export function useChatEngine(
     regenerate,
     selectBranch,
     deleteNode,
+    deleteMessage,
+    loadMessages,
     retry,
     forkSession,
     stop,

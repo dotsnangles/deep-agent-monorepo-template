@@ -11,7 +11,7 @@ import { useDirectUpload } from "../hooks/use-direct-upload";
 import { MessageItem } from "./message-item";
 import { AttachmentStagingBar } from "./attachment-staging-bar";
 
-interface MessageTreeFeedProps {
+interface MessageFeedProps {
   sessionId: string;
 }
 
@@ -33,7 +33,7 @@ const STARTER_PROMPTS = [
   },
 ];
 
-export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
+export function MessageFeed({ sessionId }: MessageFeedProps) {
   const router = useRouter();
   const {
     activePath,
@@ -42,14 +42,11 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
     generatingAssistantId,
     send,
     respondToApproval,
-    forkAndEdit,
     regenerate,
     deleteNode,
-    selectBranch,
     retry,
     forkSession,
     stop,
-    getBranchInfo,
   } = useChatEngine(sessionId);
 
   const {
@@ -84,7 +81,6 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
     prevGeneratingRef.current = isGenerating;
 
     if (isNewMessageAdded || isGenerationStarted) {
-      // Action-driven scroll: New message sent or generation started -> force pin and smooth scroll to bottom
       isPinnedToBottomRef.current = true;
       requestAnimationFrame(() => {
         scrollToBottom("smooth");
@@ -94,7 +90,6 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
       }, 60);
       return () => clearTimeout(timer);
     } else if (isGenerating && isPinnedToBottomRef.current) {
-      // Normal streaming token arrival -> instant scroll without fighting user gestures
       scrollToBottom("instant");
     }
   }, [activePath, isGenerating, scrollToBottom, isPinnedToBottomRef]);
@@ -171,7 +166,7 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
             </div>
             <h3 className="text-base font-semibold text-foreground">Hollow Echo AI 어시스턴트</h3>
             <p className="text-xs text-muted-foreground mt-1 max-w-md leading-relaxed">
-              마크다운, LaTeX 수식, 코드 블록, 이미지 및 문서 첨부를 완벽히 지원합니다. 자유롭게 질문하거나 이전 메시지를 수정하여 대화 분기를 탐색해 보세요.
+              마크다운, LaTeX 수식, 코드 블록, 이미지 및 문서 첨부를 완벽히 지원합니다. 자유롭게 대화를 시작해 보세요.
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-8 w-full max-w-3xl">
@@ -213,13 +208,7 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
                 <MessageItem
                   key={msg.id}
                   message={msg}
-                  branchInfo={getBranchInfo(msg.id)}
                   isGenerating={isStreamingThisMessage}
-                  onNavigateSibling={(direction) => selectBranch(msg.id, direction)}
-                  onEdit={(newContent) => {
-                    isPinnedToBottomRef.current = true;
-                    forkAndEdit(msg.id, newContent);
-                  }}
                   onRegenerate={() => {
                     isPinnedToBottomRef.current = true;
                     regenerate(msg.id);
@@ -329,7 +318,7 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
                   ? "답변 생성 진행 중"
                   : isUploading
                   ? "파일 업로드 중..."
-                  : "대화 분기 및 멀티모달 첨부 지원"}
+                  : "선형 대화 세션 및 멀티모달 첨부 지원"}
               </span>
             </div>
 
@@ -361,3 +350,6 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
     </div>
   );
 }
+
+// Alias for backward compatibility
+export const MessageTreeFeed = MessageFeed;

@@ -17,8 +17,7 @@ import {
 import { Button } from "@repo/ui/components/button";
 import { Textarea } from "@repo/ui/components/textarea";
 import type { AttachmentEntity } from "@repo/validators";
-import type { MessageNode, BranchInfo } from "../lib/tree";
-import { MessageBranchSwitcher } from "./message-branch-switcher";
+import type { MessageNode } from "../lib/types";
 import { MarkdownRenderer } from "./markdown-renderer";
 import { ToolActionCard } from "./tool-action-card";
 import { TodoPlanCard } from "./todo-plan-card";
@@ -32,17 +31,18 @@ import {
 
 interface MessageItemProps {
   message: MessageNode;
-  branchInfo: BranchInfo;
-  affectedSubtreeCount?: number;
   isGenerating: boolean;
-  onNavigateSibling: (direction: "prev" | "next") => void;
-  onEdit: (newContent: string) => void;
+  onEdit?: (newContent: string) => void;
   onRegenerate: () => void;
   onDelete: () => void;
   onRetry?: () => void;
   onFork?: () => void;
   onApprove?: (toolCallId: string) => void;
   onReject?: (toolCallId: string, reason?: string) => void;
+  // Deprecated props kept optional for backward compatibility
+  branchInfo?: any;
+  affectedSubtreeCount?: number;
+  onNavigateSibling?: (direction: "prev" | "next") => void;
 }
 
 function MessageAttachmentsView({
@@ -185,7 +185,7 @@ export function MessageItem({
       setIsEditing(false);
       return;
     }
-    onEdit(editDraft.trim());
+    onEdit?.(editDraft.trim());
     setIsEditing(false);
   };
 
@@ -334,20 +334,13 @@ export function MessageItem({
           </div>
         )}
 
-        {/* Action Bar (Branch Switcher + Quick Actions) */}
+        {/* Action Bar (Quick Actions) */}
         {!isEditing && (
           <div
             className={`flex items-center gap-2 mt-1 px-1 ${
               isUser ? "flex-row-reverse" : "flex-row"
             }`}
           >
-            {/* Branch Switcher (< 1/3 >) */}
-            <MessageBranchSwitcher
-              branchInfo={branchInfo}
-              onNavigate={onNavigateSibling}
-              disabled={isGenerating}
-            />
-
             {/* Smart Action Buttons */}
             <div className="flex items-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity duration-150">
               {/* Copy */}
@@ -366,14 +359,14 @@ export function MessageItem({
               </Button>
 
               {/* Edit (User Only) */}
-              {isUser && (
+              {isUser && onEdit && (
                 <Button
                   variant="ghost"
                   size="icon"
                   className="size-6 text-muted-foreground hover:text-foreground"
                   onClick={() => setIsEditing(true)}
                   disabled={isGenerating}
-                  title="질문 수정 (새 대화 분기 생성)"
+                  title="질문 수정"
                 >
                   <Edit2 className="size-3" />
                 </Button>
@@ -427,7 +420,7 @@ export function MessageItem({
         {showDeleteConfirm && (
           <div className="flex items-center justify-between gap-3 mt-2 p-2.5 rounded-xl bg-destructive/10 border border-destructive/30 text-xs text-destructive w-full max-w-md animate-in fade-in-50 duration-150">
             <span className="text-[11px] font-medium">
-              이 메시지와 하위 대화 <strong>{affectedSubtreeCount}개</strong>를 삭제하시겠습니까?
+              이 메시지를 삭제하시겠습니까?
             </span>
             <div className="flex items-center gap-1.5 shrink-0">
               <Button

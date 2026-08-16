@@ -133,7 +133,7 @@ export class ChatEngine {
       }));
   }
 
-  public async loadTree(): Promise<void> {
+  public async loadMessages(): Promise<void> {
     if (!this.sessionId) return;
     this.state = { ...this.state, isLoading: true, error: null };
     this.notify();
@@ -149,7 +149,7 @@ export class ChatEngine {
       };
       this.notify();
     } catch (err: any) {
-      console.error(`[ChatEngine] Failed to load message tree for session ${this.sessionId}:`, err);
+      console.error(`[ChatEngine] Failed to load messages for session ${this.sessionId}:`, err);
       this.state = {
         ...this.state,
         isLoading: false,
@@ -157,6 +157,14 @@ export class ChatEngine {
       };
       this.notify();
     }
+  }
+
+  public async loadTree(): Promise<void> {
+    return this.loadMessages();
+  }
+
+  public async deleteMessage(messageId: string): Promise<void> {
+    return this.deleteNode(messageId);
   }
 
   public async send(

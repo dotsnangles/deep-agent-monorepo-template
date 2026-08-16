@@ -6,7 +6,7 @@ import type {
   ResumeActionDTO,
   AttachmentEntity,
 } from "@repo/validators";
-import type { MessageNode, ToolApprovalRequest, TodoItem } from "../lib/tree";
+import type { MessageNode, ToolApprovalRequest, TodoItem } from "../lib/types";
 
 export interface StreamMessageContext {
   role: "user" | "assistant" | "system";
@@ -52,6 +52,7 @@ export interface StreamCallbacks {
 
 export interface ChatTransport {
   fetchTree(sessionId: string): Promise<TreeFetchResult>;
+  fetchMessages?(sessionId: string): Promise<TreeFetchResult>;
   streamResponse(
     params: StreamRequestParams,
     callbacks: StreamCallbacks | ((chunk: string) => void),
