@@ -39,6 +39,7 @@ import type { MessageNode } from "../lib/types";
 import { MarkdownRenderer } from "./markdown-renderer";
 import { ToolActionCard } from "./tool-action-card";
 import { TodoPlanCard } from "./todo-plan-card";
+import { ReasoningCard } from "./reasoning-card";
 import { SpecialistDelegationCard } from "./specialist-delegation-card";
 import { useCopyToClipboard } from "../hooks/use-copy-to-clipboard";
 import {
@@ -276,6 +277,15 @@ export function MessageItem({
         ) : (
           /* Assistant Message: Clean stream layout with Markdown, Tool Action Card, Todo Plan & Attachments */
           <div className="w-full text-sm leading-relaxed text-foreground py-0.5 space-y-2">
+            {/* Live Model Reasoning & Thought Accordion */}
+            {message.reasoning && (
+              <ReasoningCard
+                reasoning={message.reasoning}
+                duration={message.reasoningDuration}
+                isGenerating={isGenerating}
+              />
+            )}
+
             {/* Live Deep Agents Todo Plan Card */}
             {message.todos && message.todos.length > 0 && (
               <TodoPlanCard todos={message.todos} isGenerating={isGenerating} />

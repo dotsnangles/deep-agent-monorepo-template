@@ -73,4 +73,30 @@ describe("MessageItem Attachment Rendering", () => {
     expect(html).toContain("https://storage.local/quarterly_report.pdf");
     expect(html).toContain("download");
   });
+
+  it("renders ReasoningCard for assistant message with reasoning trace", () => {
+    const mockMessage: MessageNode = {
+      id: "asst-reasoning-1",
+      sessionId: "sess-1",
+      parentId: "user-1",
+      role: "assistant",
+      content: "최종 분석 결과입니다.",
+      reasoning: "단계별 사고 과정: 1. 입력 데이터 검증 2. 결과 도출",
+      reasoningDuration: 4.2,
+      createdAt: new Date(),
+    };
+
+    const html = renderToString(
+      <MessageItem
+        message={mockMessage}
+        isGenerating={false}
+        onRegenerate={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    );
+
+    expect(html).toContain("data-testid=\"reasoning-card\"");
+    expect(html).toContain("4.2초 동안 생각함");
+    expect(html).toContain("최종 분석 결과입니다.");
+  });
 });
