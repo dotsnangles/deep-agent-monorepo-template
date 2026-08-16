@@ -104,7 +104,7 @@ class DeepAgentEnvironmentFactory:
         model_id = getattr(llm, "model", getattr(llm, "model_name", "deep_agent_model"))
 
         # -----------------------------------------------------------------
-        # 1. LOCAL SLM MODE (Ollama / Small Local Models)
+        # 1. Environment-Specific Defaults & Profile Registration
         # -----------------------------------------------------------------
         if effective_mode == EnvironmentMode.LOCAL_SLM:
             is_subagents_allowed = (
@@ -140,47 +140,6 @@ class DeepAgentEnvironmentFactory:
                     ToolCallLimitMiddleware(run_limit=effective_tool_limit),
                 ]
             )
-            if fallback_model is not None:
-                effective_middleware.append(ModelFallbackMiddleware(fallback_model))
-            if tool_retry_config is not None:
-                effective_middleware.append(ToolRetryMiddleware(**tool_retry_config))
-
-            if enable_summarization_tool:
-                compaction_backend = (
-                    effective_backend if effective_backend is not None else StateBackend()
-                )
-                try:
-                    effective_middleware.append(
-                        create_summarization_tool_middleware(llm, compaction_backend)
-                    )
-                except Exception as sum_err:
-                    logger.debug("Summarization tool attachment skipped: %s", sum_err)
-
-            if rubric is not None or grader_model is not None:
-                target_grader = grader_model if grader_model is not None else llm
-                rubric_kwargs: dict[str, Any] = {
-                    "model": target_grader,
-                    "max_iterations": max_rubric_iterations,
-                }
-                if on_rubric_evaluation is not None:
-                    rubric_kwargs["on_evaluation"] = on_rubric_evaluation
-                if rubric_tools is not None:
-                    rubric_kwargs["tools"] = rubric_tools
-                effective_middleware.append(RubricMiddleware(**rubric_kwargs))
-
-            agent_kwargs: dict[str, Any] = {
-                "model": llm,
-                "system_prompt": effective_prompt,
-                "tools": effective_tools,
-                "subagents": effective_subagents,
-                "middleware": effective_middleware,
-                "interrupt_on": effective_interrupt_on,
-                "checkpointer": effective_checkpointer,
-                "store": effective_store,
-                **kwargs,
-            }
-            if effective_backend is not None:
-                agent_kwargs["backend"] = effective_backend
 
         # -----------------------------------------------------------------
         # 2. CLOUD PROVIDER MULTI-LLM MODE (OpenAI, Anthropic, Gemini, etc.)
@@ -217,10 +176,6 @@ class DeepAgentEnvironmentFactory:
                     ToolCallLimitMiddleware(run_limit=effective_tool_limit),
                 ]
             )
-            if fallback_model is not None:
-                effective_middleware.append(ModelFallbackMiddleware(fallback_model))
-            if tool_retry_config is not None:
-                effective_middleware.append(ToolRetryMiddleware(**tool_retry_config))
 
             if effective_backend is None and effective_store is not None:
                 from src.graphs.chat.backends import get_session_backend
@@ -233,54 +188,52 @@ class DeepAgentEnvironmentFactory:
                     },
                 )
 
-            if enable_summarization_tool:
-                compaction_backend = (
-                    effective_backend if effective_backend is not None else StateBackend()
+        # -----------------------------------------------------------------
+        # 3. Dynamic Feature Middlewares (Fault Tolerance, Summarization, Rubric)
+        # -----------------------------------------------------------------
+        if fallback_model is not None:
+            effective_middleware.append(ModelFallbackMiddleware(fallback_model))
+        if tool_retry_config is not None:
+            effective_middleware.append(ToolRetryMiddleware(**tool_retry_config))
+
+        if enable_summarization_tool:
+            compaction_backend = (
+                effective_backend if effective_backend is not None else StateBackend()
+            )
+            try:
+                effective_middleware.append(
+                    create_summarization_tool_middleware(llm, compaction_backend)
                 )
-                try:
-                    effective_middleware.append(
-                        create_summarization_tool_middleware(llm, compaction_backend)
-                    )
-                except Exception as sum_err:
-                    logger.debug("Summarization tool attachment skipped: %s", sum_err)
+            except Exception as sum_err:
+                logger.warning("Summarization tool attachment skipped: %s", sum_err)
 
-            if rubric is not None or grader_model is not None:
-                target_grader = grader_model if grader_model is not None else llm
-                rubric_kwargs = {
-                    "model": target_grader,
-                    "max_iterations": max_rubric_iterations,
-                }
-                if on_rubric_evaluation is not None:
-                    rubric_kwargs["on_evaluation"] = on_rubric_evaluation
-                if rubric_tools is not None:
-                    rubric_kwargs["tools"] = rubric_tools
-                effective_middleware.append(RubricMiddleware(**rubric_kwargs))
-
-            if effective_backend is None and effective_store is not None:
-                from src.graphs.chat.backends import get_session_backend
-
-                session_sb = get_session_backend("default")
-                effective_backend = CompositeBackend(
-                    default=session_sb,
-                    routes={
-                        "/memories/": StoreBackend(store=effective_store, namespace=("memories",)),
-                    },
-                )
-
-            agent_kwargs = {
-                "model": llm,
-                "system_prompt": effective_prompt,
-                "tools": effective_tools,
-                "subagents": effective_subagents,
-                "middleware": effective_middleware,
-                "interrupt_on": effective_interrupt_on,
-                "checkpointer": effective_checkpointer,
-                "store": effective_store,
-                **kwargs,
+        if rubric is not None or grader_model is not None:
+            target_grader = grader_model if grader_model is not None else llm
+            rubric_kwargs: dict[str, Any] = {
+                "model": target_grader,
+                "max_iterations": max_rubric_iterations,
             }
-            if effective_backend is not None:
-                agent_kwargs["backend"] = effective_backend
+            if on_rubric_evaluation is not None:
+                rubric_kwargs["on_evaluation"] = on_rubric_evaluation
+            if rubric_tools is not None:
+                rubric_kwargs["tools"] = rubric_tools
+            effective_middleware.append(RubricMiddleware(**rubric_kwargs))
 
+        agent_kwargs: dict[str, Any] = {
+            "model": llm,
+            "system_prompt": effective_prompt,
+            "tools": effective_tools,
+            "subagents": effective_subagents,
+            "middleware": effective_middleware,
+            "interrupt_on": effective_interrupt_on,
+            "checkpointer": effective_checkpointer,
+            "store": effective_store,
+            **kwargs,
+        }
+        if effective_backend is not None:
+            agent_kwargs["backend"] = effective_backend
+
+        if effective_mode == EnvironmentMode.CLOUD_PROVIDER:
             skills_dir = Path("./.agents/skills")
             if skills_dir.exists():
                 agent_kwargs["skills"] = [str(skills_dir)]

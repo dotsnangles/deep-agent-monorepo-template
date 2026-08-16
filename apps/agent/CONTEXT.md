@@ -30,3 +30,7 @@ Domain glossary and architectural concepts for the Python Deep Agent service:
 | Dual-Environment Preset | Pre-configured runtime profile bundle (`local_slm` vs `cloud_provider`) mapping concurrency limits, subagent topologies, and background worker policies | `src/core/config.py` |
 | Heuristic Title Strategy | Zero-inference title generation via string slicing (`user_prompt[:25]`) in local mode, eliminating background LLM queue contention | `src/workers/title_worker.py` |
 | Environment-Aware Agent Factory | Factory dynamically assembling Deep Agent graphs with tailored profiles, backends, permissions, and middleware per active environment | `src/graphs/chat/factory.py` |
+| General-Purpose Subagent | Native super-model inheriting subagent topology for on-demand context quarantine without pre-declared personas | `src/graphs/chat/subagents.py` |
+| Rubric Quality Loop | Self-correction iterative evaluation middleware (`RubricMiddleware`) using LLM-as-a-judge for automated quality gates | `src/graphs/chat/factory.py` |
+| Fault Tolerance Package | Layered resilience suite (`ModelFallback`, `ToolRetry`, `ModelCallLimit`, `ToolCallLimit`) preventing runaway loops and outages | `src/graphs/chat/factory.py` |
+| Context Compaction Engine | Dual-action context management combining automatic 85% window summarization and on-demand `compact_conversation` tool | `src/graphs/chat/factory.py` |
