@@ -82,6 +82,13 @@ export const patchChatSessionSchema = z.object({
 
 export type PatchChatSessionDTO = z.infer<typeof patchChatSessionSchema>;
 
+export const forkChatSessionSchema = z.object({
+  fromMessageId: z.string().min(1, "fromMessageId is required"),
+  title: z.string().optional(),
+});
+
+export type ForkChatSessionDTO = z.infer<typeof forkChatSessionSchema>;
+
 // Chat Message Tree DTO Schemas
 export const createChatMessageSchema = z.object({
   sessionId: z.string().min(1, "sessionId is required"),

@@ -7,6 +7,7 @@ import type {
   CreateMessageParams,
   SaveMessageResult,
   CreateSessionParams,
+  ForkSessionResult,
 } from "./chat-repository";
 import {
   traverseActivePath,
@@ -107,6 +108,71 @@ export class FakeChatRepository implements ChatRepository {
       activeLeafId: session.activeLeafId,
       messages: clonedMessages,
       activePath,
+    };
+  }
+
+  public async getMessages(sessionId: string, userId: string): Promise<MessageNode[] | null> {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.userId !== userId) {
+      return null;
+    }
+    const sessionMessages = this.messages.get(sessionId) || [];
+    return sessionMessages
+      .map((m) => ({ ...m }))
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  }
+
+  public async forkSession(
+    sourceSessionId: string,
+    fromMessageId: string,
+    userId: string,
+    newTitle?: string
+  ): Promise<ForkSessionResult | null> {
+    const sourceSession = this.sessions.get(sourceSessionId);
+    if (!sourceSession || sourceSession.userId !== userId) {
+      return null;
+    }
+
+    const sourceMessages = (this.messages.get(sourceSessionId) || [])
+      .slice()
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+
+    const targetIdx = sourceMessages.findIndex((m) => m.id === fromMessageId);
+    if (targetIdx === -1) {
+      return null;
+    }
+
+    const sliced = sourceMessages.slice(0, targetIdx + 1);
+    const newSessionId = `sess_fork_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const title = newTitle || `${sourceSession.title} (분기)`;
+
+    let lastClonedId: string | null = null;
+    const clonedMessages: MessageNode[] = sliced.map((m, idx) => {
+      const clonedId = `msg_fork_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 6)}`;
+      lastClonedId = clonedId;
+      return {
+        ...m,
+        id: clonedId,
+        sessionId: newSessionId,
+        createdAt: new Date(m.createdAt.getTime() + idx),
+      };
+    });
+
+    const newSession: ChatSessionEntity = {
+      id: newSessionId,
+      userId,
+      title,
+      activeLeafId: lastClonedId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    this.sessions.set(newSessionId, newSession);
+    this.messages.set(newSessionId, clonedMessages);
+
+    return {
+      session: { ...newSession },
+      messages: clonedMessages.map((m) => ({ ...m })),
     };
   }
 

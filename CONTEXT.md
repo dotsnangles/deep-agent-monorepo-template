@@ -40,3 +40,10 @@ Key terms and definitions used across `hollow-echo-distant-signal`:
 | Active Path Synchronization | Replacing LangGraph checkpointer state with the client-provided active path on every turn to prevent $O(N^2)$ history accumulation | Agent (`apps/agent`) |
 | Live LLM Inference | Mandatory live token generation without global exact-match response caching (`set_llm_cache`) for interactive chat endpoints | Agent (`apps/agent`) |
 | Bounded Checkpointer | Confining LangGraph checkpointer scope to in-turn HITL approval interrupts and resumption rather than multi-turn tree history | Agent (`apps/agent`) |
+| Linear Chat Session | A 1D chronological sequence of messages mapping 1:1 with a LangGraph execution thread and isolated sandbox workspace | Fullstack (`@repo/db`, `apps/web`, `apps/agent`) |
+| Session Forking | Spawning an independent, new chat session cloned up to a specific historical message turn without in-session DAG branching | Fullstack (`@repo/db`, `apps/web`) |
+| Todo Plan Card | Inline collapsible UI component displaying real-time task decomposition and progress tracking from `TodoListMiddleware` | Web Client (`apps/web`) |
+| Specialist Delegation Card | Inline UI component showing delegated subagent activities (`data_analyst`, `chart_generator`), task prompts, and summarized results | Web Client (`apps/web`) |
+| Artifact Lightbox | Interactive modal viewer allowing users to zoom, inspect, and download generated data charts (`chart.png`) and datasets from the Docker sandbox | Web Client (`apps/web`) |
+| Session Artifact Endpoint | HTTP proxy endpoint (`/api/chat/sessions/:sessionId/artifacts/:filename`) serving files created in the session sandbox directory | Backend & Web (`apps/web`, `apps/server`) |
+

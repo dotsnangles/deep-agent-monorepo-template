@@ -53,6 +53,11 @@ export interface CreateSessionParams {
   activeLeafId?: string | null;
 }
 
+export interface ForkSessionResult {
+  session: ChatSessionEntity;
+  messages: MessageNode[];
+}
+
 export interface ChatRepository {
   getSessions(userId: string): Promise<ChatSessionEntity[]>;
   getSession(sessionId: string, userId: string): Promise<ChatSessionEntity | null>;
@@ -62,6 +67,13 @@ export interface ChatRepository {
   updateSessionActiveLeaf(sessionId: string, userId: string, activeLeafId: string | null): Promise<boolean>;
   deleteSession(sessionId: string, userId: string): Promise<boolean>;
   getTree(sessionId: string, userId: string): Promise<TreeResult | null>;
+  getMessages(sessionId: string, userId: string): Promise<MessageNode[] | null>;
   saveMessage(params: CreateMessageParams, userId: string): Promise<SaveMessageResult | null>;
   deleteSubtree(sessionId: string, messageId: string, userId: string): Promise<DeleteSubtreeResult | null>;
+  forkSession(
+    sourceSessionId: string,
+    fromMessageId: string,
+    userId: string,
+    newTitle?: string
+  ): Promise<ForkSessionResult | null>;
 }

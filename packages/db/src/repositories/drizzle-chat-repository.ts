@@ -8,6 +8,7 @@ import type {
   CreateMessageParams,
   CreateSessionParams,
   DeleteSubtreeResult,
+  ForkSessionResult,
   MessageNode,
   SaveMessageResult,
   TreeResult,
@@ -153,6 +154,115 @@ export class DrizzleChatRepository implements ChatRepository {
       messages,
       activePath,
     };
+  }
+
+  public async getMessages(sessionId: string, userId: string): Promise<MessageNode[] | null> {
+    const session = await this.getSession(sessionId, userId);
+    if (!session) {
+      return null;
+    }
+
+    const records = await this.db
+      .select()
+      .from(chatMessage)
+      .where(eq(chatMessage.sessionId, sessionId))
+      .orderBy(asc(chatMessage.createdAt));
+
+    return records.map(toMessageNode);
+  }
+
+  public async forkSession(
+    sourceSessionId: string,
+    fromMessageId: string,
+    userId: string,
+    newTitle?: string
+  ): Promise<ForkSessionResult | null> {
+    return await this.db.transaction(async (tx) => {
+      // 1. Verify source session ownership
+      const [sourceSession] = await tx
+        .select()
+        .from(chatSession)
+        .where(and(eq(chatSession.id, sourceSessionId), eq(chatSession.userId, userId)))
+        .limit(1);
+
+      if (!sourceSession) {
+        return null;
+      }
+
+      // 2. Fetch all messages ordered by createdAt
+      const records = await tx
+        .select()
+        .from(chatMessage)
+        .where(eq(chatMessage.sessionId, sourceSessionId))
+        .orderBy(asc(chatMessage.createdAt));
+
+      const targetIdx = records.findIndex((r) => r.id === fromMessageId);
+      if (targetIdx === -1) {
+        return null;
+      }
+
+      const slicedRecords = records.slice(0, targetIdx + 1);
+      const newSessionId = crypto.randomUUID();
+      const title = newTitle || `${sourceSession.title} (분기)`;
+
+      // 3. Create new session record
+      const [newSession] = await tx
+        .insert(chatSession)
+        .values({
+          id: newSessionId,
+          userId,
+          title,
+          activeLeafId: null,
+        })
+        .returning();
+
+      if (!newSession) {
+        throw new Error("Failed to create forked session record");
+      }
+
+      // 4. Clone messages
+      let lastClonedId: string | null = null;
+      const clonedToInsert = slicedRecords.map((r, idx) => {
+        const clonedId = crypto.randomUUID();
+        lastClonedId = clonedId;
+        return {
+          id: clonedId,
+          sessionId: newSessionId,
+          parentId: r.parentId,
+          role: r.role,
+          content: r.content,
+          attachments: r.attachments ?? [],
+          createdAt: new Date(r.createdAt.getTime() + idx),
+        };
+      });
+
+      if (clonedToInsert.length > 0) {
+        const insertedMessages = await tx
+          .insert(chatMessage)
+          .values(clonedToInsert)
+          .returning();
+
+        if (lastClonedId) {
+          await tx
+            .update(chatSession)
+            .set({ activeLeafId: lastClonedId })
+            .where(eq(chatSession.id, newSessionId));
+        }
+
+        return {
+          session: {
+            ...toSessionEntity(newSession),
+            activeLeafId: lastClonedId,
+          },
+          messages: insertedMessages.map(toMessageNode),
+        };
+      }
+
+      return {
+        session: toSessionEntity(newSession),
+        messages: [],
+      };
+    });
   }
 
   public async saveMessage(

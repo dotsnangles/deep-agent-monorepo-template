@@ -300,4 +300,65 @@ describe("ChatRepository Contract Tests (FakeChatRepository)", () => {
       expect(tree?.messages.map((m) => m.id)).toEqual(["u2", "a2"]);
     });
   });
+
+  describe("Linear Message Sequence & Session Forking", () => {
+    it("retrieves messages in chronological linear order", async () => {
+      await repo.createSession({ id: "linear-sess", userId: USER_A, title: "Linear Chat" });
+      await repo.saveMessage({ id: "m1", sessionId: "linear-sess", role: "user", content: "Hello" }, USER_A);
+      await repo.saveMessage({ id: "m2", sessionId: "linear-sess", role: "assistant", content: "Hi there" }, USER_A);
+      await repo.saveMessage({ id: "m3", sessionId: "linear-sess", role: "user", content: "How are you?" }, USER_A);
+
+      const messages = await repo.getMessages("linear-sess", USER_A);
+      expect(messages).toHaveLength(3);
+      expect(messages?.map((m) => m.id)).toEqual(["m1", "m2", "m3"]);
+      expect(messages?.[0].content).toBe("Hello");
+      expect(messages?.[1].content).toBe("Hi there");
+      expect(messages?.[2].content).toBe("How are you?");
+    });
+
+    it("forks a session up to a specified message into a new independent session", async () => {
+      await repo.createSession({ id: "orig-sess", userId: USER_A, title: "Original Research" });
+      await repo.saveMessage({ id: "m1", sessionId: "orig-sess", role: "user", content: "Step 1" }, USER_A);
+      await repo.saveMessage({ id: "m2", sessionId: "orig-sess", role: "assistant", content: "Result 1" }, USER_A);
+      await repo.saveMessage({ id: "m3", sessionId: "orig-sess", role: "user", content: "Step 2" }, USER_A);
+      await repo.saveMessage({ id: "m4", sessionId: "orig-sess", role: "assistant", content: "Result 2" }, USER_A);
+
+      // Fork from message m2 (Step 1 + Result 1)
+      const forkResult = await repo.forkSession("orig-sess", "m2", USER_A, "Custom Forked Title");
+      expect(forkResult).not.toBeNull();
+      expect(forkResult?.session.id).toBeDefined();
+      expect(forkResult?.session.id).not.toBe("orig-sess");
+      expect(forkResult?.session.userId).toBe(USER_A);
+      expect(forkResult?.session.title).toBe("Custom Forked Title");
+      expect(forkResult?.messages).toHaveLength(2);
+      expect(forkResult?.messages[0].content).toBe("Step 1");
+      expect(forkResult?.messages[1].content).toBe("Result 1");
+      expect(forkResult?.messages[0].sessionId).toBe(forkResult?.session.id);
+      expect(forkResult?.messages[1].sessionId).toBe(forkResult?.session.id);
+
+      // Verify the new session exists independently
+      const newSessionMessages = await repo.getMessages(forkResult!.session.id, USER_A);
+      expect(newSessionMessages).toHaveLength(2);
+
+      // Verify original session is unchanged
+      const origMessages = await repo.getMessages("orig-sess", USER_A);
+      expect(origMessages).toHaveLength(4);
+    });
+
+    it("prevents unauthorized users from forking other users' sessions", async () => {
+      await repo.createSession({ id: "secret-sess", userId: USER_A, title: "Secret" });
+      await repo.saveMessage({ id: "s1", sessionId: "secret-sess", role: "user", content: "Confidential" }, USER_A);
+
+      const forkByB = await repo.forkSession("secret-sess", "s1", USER_B);
+      expect(forkByB).toBeNull();
+    });
+
+    it("returns null if the target message does not exist in the session", async () => {
+      await repo.createSession({ id: "valid-sess", userId: USER_A, title: "Valid" });
+      await repo.saveMessage({ id: "v1", sessionId: "valid-sess", role: "user", content: "Hello" }, USER_A);
+
+      const forkNonExistent = await repo.forkSession("valid-sess", "non_existent_id", USER_A);
+      expect(forkNonExistent).toBeNull();
+    });
+  });
 });

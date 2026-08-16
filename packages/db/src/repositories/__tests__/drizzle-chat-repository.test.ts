@@ -345,5 +345,80 @@ describe("DrizzleChatRepository Unit & Transaction Tests", () => {
       expect(result?.deletedIds).toEqual(["msg-2"]);
       expect(result?.activeLeafId).toBe("msg-1");
     });
+
+    it("fetches linear messages in chronological order", async () => {
+      const sessionSelectChain = {
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValue([
+          { id: "s1", userId: USER_ID, title: "Chat", activeLeafId: "m2", createdAt: new Date(), updatedAt: new Date() },
+        ]),
+      };
+      const messagesSelectChain = {
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        orderBy: vi.fn().mockResolvedValue([
+          { id: "m1", sessionId: "s1", role: "user", content: "Q1", createdAt: new Date() },
+          { id: "m2", sessionId: "s1", role: "assistant", content: "A1", createdAt: new Date() },
+        ]),
+      };
+
+      mockDb.select.mockReturnValueOnce(sessionSelectChain).mockReturnValueOnce(messagesSelectChain);
+
+      const msgs = await repo.getMessages("s1", USER_ID);
+      expect(msgs).toHaveLength(2);
+      expect(msgs?.[0].content).toBe("Q1");
+      expect(msgs?.[1].content).toBe("A1");
+    });
+
+    it("forks a session atomically in transaction", async () => {
+      const sourceSessionSelect = {
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValue([
+          { id: "s-source", userId: USER_ID, title: "Source Session", activeLeafId: "m2", createdAt: new Date(), updatedAt: new Date() },
+        ]),
+      };
+      const messagesSelect = {
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        orderBy: vi.fn().mockResolvedValue([
+          { id: "m1", sessionId: "s-source", role: "user", content: "Q1", createdAt: new Date() },
+          { id: "m2", sessionId: "s-source", role: "assistant", content: "A1", createdAt: new Date() },
+          { id: "m3", sessionId: "s-source", role: "user", content: "Q2", createdAt: new Date() },
+        ]),
+      };
+      mockDb.select.mockReturnValueOnce(sourceSessionSelect).mockReturnValueOnce(messagesSelect);
+
+      const sessionInsert = {
+        values: vi.fn().mockReturnThis(),
+        returning: vi.fn().mockResolvedValue([
+          { id: "s-new", userId: USER_ID, title: "Forked", activeLeafId: null, createdAt: new Date(), updatedAt: new Date() },
+        ]),
+      };
+      const messageInsert = {
+        values: vi.fn().mockReturnThis(),
+        returning: vi.fn().mockResolvedValue([
+          { id: "cloned-1", sessionId: "s-new", role: "user", content: "Q1", createdAt: new Date() },
+          { id: "cloned-2", sessionId: "s-new", role: "assistant", content: "A1", createdAt: new Date() },
+        ]),
+      };
+      mockDb.insert.mockReturnValueOnce(sessionInsert).mockReturnValueOnce(messageInsert);
+
+      const updateChain = {
+        set: vi.fn().mockReturnThis(),
+        where: vi.fn().mockResolvedValue([]),
+      };
+      mockDb.update.mockReturnValue(updateChain);
+
+      const forkResult = await repo.forkSession("s-source", "m2", USER_ID, "Forked");
+      expect(mockDb.transaction).toHaveBeenCalledTimes(1);
+      expect(forkResult).not.toBeNull();
+      expect(forkResult?.session.id).toBe("s-new");
+      expect(forkResult?.session.title).toBe("Forked");
+      expect(forkResult?.messages).toHaveLength(2);
+      expect(forkResult?.messages[0].content).toBe("Q1");
+      expect(forkResult?.messages[1].content).toBe("A1");
+    });
   });
 });

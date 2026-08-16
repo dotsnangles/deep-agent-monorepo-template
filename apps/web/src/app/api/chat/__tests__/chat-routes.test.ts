@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import * as sessionsRoute from "../sessions/route";
 import * as sessionIdRoute from "../sessions/[id]/route";
+import * as forkRoute from "../sessions/[id]/fork/route";
 import * as messagesRoute from "../messages/route";
 import { auth } from "@repo/auth";
 
@@ -290,6 +291,84 @@ describe("Zero-DB Chat API Route Handlers Integration", () => {
         "sess-precreated",
         "파이썬으로 최적화된 피보나치 수열 생성 함수를 작성하고 시간 복잡도를 설명해줘."
       );
+    });
+  });
+
+  describe("/api/chat/sessions/[id]/fork (POST)", () => {
+    it("returns 401 when unauthorized", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(null as any);
+
+      const req = new NextRequest("http://localhost:3000/api/chat/sessions/s1/fork", {
+        method: "POST",
+        body: JSON.stringify({ fromMessageId: "m1" }),
+      });
+      const res = await forkRoute.POST(req, {
+        params: Promise.resolve({ id: "s1" }),
+      });
+      expect(res.status).toBe(401);
+    });
+
+    it("returns 400 when fromMessageId is missing", async () => {
+      const req = new NextRequest("http://localhost:3000/api/chat/sessions/s1/fork", {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      const res = await forkRoute.POST(req, {
+        params: Promise.resolve({ id: "s1" }),
+      });
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error).toBe("Validation failed");
+    });
+
+    it("returns 404 when session or target message is not found", async () => {
+      const req = new NextRequest("http://localhost:3000/api/chat/sessions/non-existent/fork", {
+        method: "POST",
+        body: JSON.stringify({ fromMessageId: "m1" }),
+      });
+      const res = await forkRoute.POST(req, {
+        params: Promise.resolve({ id: "non-existent" }),
+      });
+      expect(res.status).toBe(404);
+    });
+
+    it("successfully forks session and returns 201 with cloned messages", async () => {
+      await hoisted.fakeRepo.createSession({
+        id: "sess-source",
+        userId: TEST_USER.user.id,
+        title: "Source Session",
+      });
+      await hoisted.fakeRepo.saveMessage(
+        { id: "msg-1", sessionId: "sess-source", role: "user", content: "Prompt 1" },
+        TEST_USER.user.id
+      );
+      await hoisted.fakeRepo.saveMessage(
+        { id: "msg-2", sessionId: "sess-source", role: "assistant", content: "Response 1" },
+        TEST_USER.user.id
+      );
+      await hoisted.fakeRepo.saveMessage(
+        { id: "msg-3", sessionId: "sess-source", role: "user", content: "Prompt 2" },
+        TEST_USER.user.id
+      );
+
+      const req = new NextRequest("http://localhost:3000/api/chat/sessions/sess-source/fork", {
+        method: "POST",
+        body: JSON.stringify({
+          fromMessageId: "msg-2",
+          title: "Forked Chat",
+        }),
+      });
+      const res = await forkRoute.POST(req, {
+        params: Promise.resolve({ id: "sess-source" }),
+      });
+      expect(res.status).toBe(201);
+      const data = await res.json();
+      expect(data.session.id).toBeDefined();
+      expect(data.session.id).not.toBe("sess-source");
+      expect(data.session.title).toBe("Forked Chat");
+      expect(data.messages).toHaveLength(2);
+      expect(data.messages[0].content).toBe("Prompt 1");
+      expect(data.messages[1].content).toBe("Response 1");
     });
   });
 });
