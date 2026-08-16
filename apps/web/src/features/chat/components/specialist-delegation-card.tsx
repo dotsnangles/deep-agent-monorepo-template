@@ -11,9 +11,16 @@ import {
   LineChart,
   Loader2,
   Search,
-  Sparkles,
-  Users,
 } from "lucide-react";
+import { Badge } from "@repo/ui/components/badge";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardAction,
+  CardContent,
+} from "@repo/ui/components/card";
 import type { SubagentExecution } from "../lib/types";
 
 interface SpecialistDelegationCardProps {
@@ -28,34 +35,29 @@ function getSpecialistMeta(name: string) {
       return {
         label: "데이터 분석가",
         icon: BarChart3,
-        accent: "text-blue-500 bg-blue-500/10 border-blue-500/20",
       };
     case "chart_generator":
     case "visualizer":
       return {
         label: "시각화 / 차트 생성기",
         icon: LineChart,
-        accent: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
       };
     case "researcher":
     case "research":
       return {
         label: "연구 / 조사 전문가",
         icon: Search,
-        accent: "text-amber-500 bg-amber-500/10 border-amber-500/20",
       };
     case "coder":
     case "developer":
       return {
         label: "코드 작성기",
         icon: FileCode,
-        accent: "text-purple-500 bg-purple-500/10 border-purple-500/20",
       };
     default:
       return {
         label: name || "하위 에이전트",
         icon: Bot,
-        accent: "text-primary bg-primary/10 border-primary/20",
       };
   }
 }
@@ -90,67 +92,66 @@ export function SpecialistDelegationCard({
         const isExpanded = expandedIndices[idx] ?? true;
 
         return (
-          <div
+          <Card
             key={agent.runId || `${agent.subagent}-${idx}`}
             data-testid={`specialist-card-${idx}`}
-            className={`rounded-2xl border bg-card/60 backdrop-blur-xs overflow-hidden transition-all duration-200 shadow-2xs ${
-              isRunning
-                ? "border-primary/40 ring-1 ring-primary/20 animate-pulse"
-                : "border-border/70"
-            }`}
+            size="sm"
+            className="shadow-2xs"
           >
-            {/* Header */}
+            {/* Header as Toggle */}
             <button
               type="button"
               onClick={() => toggleExpand(idx)}
-              className="w-full flex items-center justify-between px-3.5 py-2.5 bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer text-left"
+              className="w-full text-left cursor-pointer"
             >
-              <div className="flex items-center gap-2.5">
-                <div
-                  className={`flex size-6 items-center justify-center rounded-lg border ${meta.accent}`}
-                >
-                  <Icon className="size-3.5" />
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-semibold text-foreground">
-                    {meta.label}
-                  </span>
-                  <span className="text-[11px] text-muted-foreground">
-                    위임 작업
-                  </span>
+              <CardHeader className="flex-row items-center justify-between pb-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="flex size-6 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Icon data-icon="inline-start" />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <CardTitle className="text-xs font-semibold text-foreground">
+                      {meta.label}
+                    </CardTitle>
+                    <CardDescription className="text-[11px]">
+                      위임 작업
+                    </CardDescription>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    {isRunning ? (
+                      <Badge variant="secondary" className="gap-1 text-[10px] font-medium">
+                        <Loader2 data-icon="inline-start" className="animate-spin" />
+                        <span>실행 중</span>
+                      </Badge>
+                    ) : isCompleted ? (
+                      <Badge variant="outline" className="gap-1 text-[10px] font-medium">
+                        <CheckCircle2 data-icon="inline-start" className="text-primary" />
+                        <span>완료</span>
+                      </Badge>
+                    ) : (
+                      <Badge variant="destructive" className="gap-1 text-[10px] font-medium">
+                        <span>오류</span>
+                      </Badge>
+                    )}
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-1">
-                  {isRunning ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary">
-                      <Loader2 className="size-2.5 animate-spin" />
-                      실행 중
-                    </span>
-                  ) : isCompleted ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                      <CheckCircle2 className="size-2.5" />
-                      완료
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-destructive/10 text-destructive">
-                      오류
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="text-muted-foreground">
-                {isExpanded ? (
-                  <ChevronUp className="size-4" />
-                ) : (
-                  <ChevronDown className="size-4" />
-                )}
-              </div>
+                <CardAction>
+                  <div className="text-muted-foreground">
+                    {isExpanded ? (
+                      <ChevronUp data-icon="inline-start" />
+                    ) : (
+                      <ChevronDown data-icon="inline-start" />
+                    )}
+                  </div>
+                </CardAction>
+              </CardHeader>
             </button>
 
             {/* Content Details */}
             {isExpanded && (
-              <div className="px-3.5 py-2.5 space-y-2 border-t border-border/40 bg-background/40 text-xs">
+              <CardContent className="space-y-2 pt-1 border-t border-border/40 text-xs">
                 {agent.task && (
                   <div>
                     <span className="text-[11px] font-medium text-muted-foreground block mb-0.5">
@@ -174,9 +175,9 @@ export function SpecialistDelegationCard({
                     </div>
                   </div>
                 )}
-              </div>
+              </CardContent>
             )}
-          </div>
+          </Card>
         );
       })}
     </div>
