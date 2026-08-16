@@ -58,6 +58,20 @@ class ApprovalRequestEventData(BaseModel):
     requires_approval: bool = Field(default=True, serialization_alias="requiresApproval")
 
 
+class ArtifactCreatedEventData(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    session_id: str = Field(..., serialization_alias="sessionId")
+    message_id: str | None = Field(default=None, serialization_alias="messageId")
+    name: str
+    url: str
+    storage_key: str = Field(..., serialization_alias="storageKey")
+    mime_type: str = Field(..., serialization_alias="mimeType")
+    size_bytes: int | None = Field(default=None, serialization_alias="sizeBytes")
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 class NodeTransitionEventData(BaseModel):
     node: str
     state_summary: dict[str, Any] | None = None
@@ -81,6 +95,7 @@ AgentEventType = Literal[
     "subagent_start",
     "subagent_end",
     "approval_request",
+    "artifact_created",
     "node_transition",
     "error",
     "done",
@@ -182,6 +197,34 @@ class AgentStreamEvent(BaseModel):
                 input=tool_input,
                 tool_call_id=tool_call_id,
                 description=description,
+            ),
+        )
+
+    @classmethod
+    def artifact_created(
+        cls,
+        id: str,
+        session_id: str,
+        name: str,
+        url: str,
+        storage_key: str,
+        mime_type: str,
+        message_id: str | None = None,
+        size_bytes: int | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> "AgentStreamEvent":
+        return cls(
+            event="artifact_created",
+            data=ArtifactCreatedEventData(
+                id=id,
+                session_id=session_id,
+                message_id=message_id,
+                name=name,
+                url=url,
+                storage_key=storage_key,
+                mime_type=mime_type,
+                size_bytes=size_bytes,
+                metadata=metadata or {},
             ),
         )
 

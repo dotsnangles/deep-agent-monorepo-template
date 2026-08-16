@@ -315,6 +315,7 @@ class AgentExecutionGateway:
         store: Any = None,
         model: Any = None,
         event_broker: RedisEventBroker | None = None,
+        artifact_processor: Any = None,
     ):
         if registry is None:
             from src.graphs.chat.graph import build_agent
@@ -337,6 +338,7 @@ class AgentExecutionGateway:
         self.store = store if store is not None else CheckpointerFactory.get_default_store()
         self.default_model = model
         self.event_broker = event_broker
+        self.artifact_processor = artifact_processor
 
     def _build_callbacks(self, thread_id: str | None) -> list[Any]:
         callbacks: list[Any] = []
@@ -615,6 +617,33 @@ class AgentExecutionGateway:
                             )
                             return
 
+                    # Synchronize and emit generated artifacts
+                    try:
+                        from src.core.artifacts import get_artifact_sync_processor
+
+                        sync_processor = (
+                            self.artifact_processor
+                            if self.artifact_processor is not None
+                            else get_artifact_sync_processor()
+                        )
+                        artifact_events = await sync_processor.sync_session_artifacts(
+                            session_id=effective_thread_id,
+                        )
+                        for art_ev in artifact_events:
+                            yield AgentStreamEvent.artifact_created(
+                                id=art_ev.id,
+                                session_id=art_ev.session_id,
+                                message_id=art_ev.message_id,
+                                name=art_ev.name,
+                                url=art_ev.url,
+                                storage_key=art_ev.storage_key,
+                                mime_type=art_ev.mime_type,
+                                size_bytes=art_ev.size_bytes,
+                                metadata=art_ev.metadata,
+                            )
+                    except Exception as art_err:
+                        logger.warning("Artifact synchronization skipped: %s", art_err)
+
                     yield AgentStreamEvent.done(
                         finish_reason="stop",
                         metadata={
@@ -640,6 +669,33 @@ class AgentExecutionGateway:
                             tool_input=tc.get("args", {}),
                             run_id=tc.get("id"),
                         )
+
+            # Synchronize and emit generated artifacts in direct mode
+            try:
+                from src.core.artifacts import get_artifact_sync_processor
+
+                sync_processor = (
+                    self.artifact_processor
+                    if self.artifact_processor is not None
+                    else get_artifact_sync_processor()
+                )
+                artifact_events = await sync_processor.sync_session_artifacts(
+                    session_id=effective_thread_id,
+                )
+                for art_ev in artifact_events:
+                    yield AgentStreamEvent.artifact_created(
+                        id=art_ev.id,
+                        session_id=art_ev.session_id,
+                        message_id=art_ev.message_id,
+                        name=art_ev.name,
+                        url=art_ev.url,
+                        storage_key=art_ev.storage_key,
+                        mime_type=art_ev.mime_type,
+                        size_bytes=art_ev.size_bytes,
+                        metadata=art_ev.metadata,
+                    )
+            except Exception as art_err:
+                logger.warning("Artifact synchronization skipped: %s", art_err)
 
             yield AgentStreamEvent.done(
                 finish_reason="stop",
