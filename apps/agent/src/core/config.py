@@ -51,6 +51,7 @@ def get_inference_concurrency_limit() -> int | None:
 DEEP_AGENT_MODE: str = get_deep_agent_mode().value
 OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "gemma4:e4b-it-q4_K_M")
+OLLAMA_NUM_CTX: int = int(os.getenv("OLLAMA_NUM_CTX", "16384"))
 OPENAI_API_KEY: str | None = os.getenv("OPENAI_API_KEY")
 OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 ANTHROPIC_API_KEY: str | None = os.getenv("ANTHROPIC_API_KEY")
@@ -86,4 +87,9 @@ def get_llm():
     else:
         from langchain_ollama import ChatOllama
 
-        return ChatOllama(base_url=OLLAMA_BASE_URL, model=OLLAMA_MODEL, temperature=0.7)
+        return ChatOllama(
+            base_url=OLLAMA_BASE_URL,
+            model=OLLAMA_MODEL,
+            temperature=0.7,
+            num_ctx=OLLAMA_NUM_CTX,
+        )
