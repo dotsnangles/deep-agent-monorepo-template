@@ -97,7 +97,7 @@ class TitleGenerationWorker:
                 task = TitleTaskPayload(**raw_data)
 
                 # 1. Generate title (Heuristic slicing in local_slm mode to avoid compute
-                # contention; LLM generator in production_cloud)
+                # contention; LLM generator in cloud_provider)
                 from src.core.config import EnvironmentMode, get_deep_agent_mode
 
                 if get_deep_agent_mode() == EnvironmentMode.LOCAL_SLM:

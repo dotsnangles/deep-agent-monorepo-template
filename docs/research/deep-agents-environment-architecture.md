@@ -346,7 +346,7 @@ In Local SLM environments, the primary failure mode is **hardware compute starva
 
 ## 4. Concrete Python Implementation: Dual-Environment Factory Pattern
 
-The following production-ready factory pattern dynamically constructs an optimal Deep Agent graph based on the active runtime environment (`local_slm` vs `production_cloud`).
+The following production-ready factory pattern dynamically constructs an optimal Deep Agent graph based on the active runtime environment (`local_slm` vs `cloud_provider`).
 
 ```python
 """deep_agent_factory.py
@@ -404,7 +404,7 @@ from langgraph.store.memory import InMemoryStore
 
 class EnvironmentMode(str, enum.Enum):
     LOCAL_SLM = "local_slm"
-    PRODUCTION_CLOUD = "production_cloud"
+    CLOUD_PROVIDER = "cloud_provider"
 
 
 @dataclass
