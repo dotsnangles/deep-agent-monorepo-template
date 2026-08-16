@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@repo/auth";
+import { env } from "@repo/env/server";
 import { chatStreamRequestSchema } from "@repo/validators";
 import { headers } from "next/headers";
 
-const AGENT_SERVER_URL = process.env.AGENT_SERVER_URL || "http://127.0.0.1:8000";
+const AGENT_SERVER_URL = env.AGENT_SERVER_URL;
 
 export async function POST(req: NextRequest) {
   try {
@@ -26,17 +27,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { threadId, messages } = parseResult.data;
+    const { threadId, messages, agentType, systemPrompt, resume } = parseResult.data;
 
     const agentRes = await fetch(`${AGENT_SERVER_URL}/chat/stream`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        thread_id: threadId,
-        messages: messages.map((m) => ({
+        threadId,
+        messages: messages?.map((m) => ({
           role: m.role,
           content: m.content,
         })),
+        agentType,
+        systemPrompt,
+        resume,
       }),
     });
 
@@ -50,9 +54,9 @@ export async function POST(req: NextRequest) {
 
     return new Response(agentRes.body, {
       headers: {
-        "Content-Type": "text/plain; charset=utf-8",
+        "Content-Type": "text/event-stream; charset=utf-8",
         "Cache-Control": "no-cache, no-transform",
-        "Transfer-Encoding": "chunked",
+        "X-Accel-Buffering": "no",
       },
     });
   } catch (error) {

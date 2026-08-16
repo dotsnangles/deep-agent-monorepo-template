@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ChatEngineRegistry } from "../../engine/chat-engine-registry";
 import { FakeChatTransport } from "../../engine/transport";
+import type { ToolApprovalRequest } from "../../lib/tree";
 
 describe("useChatEngine and UI Integration State Flow", () => {
   let transport: FakeChatTransport;
@@ -59,9 +60,38 @@ describe("useChatEngine and UI Integration State Flow", () => {
     transport.setMockStreamChunks(["Recovered response"]);
     await engine.retry(failedAssistant.id);
 
-
     expect(engine.getState().error).toBeNull();
     expect(engine.getState().activePath[1].status).toBe("complete");
     expect(engine.getState().activePath[1].content).toBe("Recovered response");
+  });
+
+  it("handles reactive tool approval request and subsequent resume stream", async () => {
+    const engine = registry.getEngine("hitl-session");
+    const mockApproval: ToolApprovalRequest = {
+      toolCallId: "call_hook_1",
+      tool: "execute_command",
+      input: { command: "git status" },
+      description: "Git 상태 확인",
+      status: "pending",
+    };
+
+    transport.setMockApprovalRequest(mockApproval);
+    transport.setMockResumeChunks([" On branch main"]);
+
+    await engine.send("상태 확인해줘");
+
+    const state = engine.getState();
+    const assistantNode = state.activePath[1];
+    expect(assistantNode.toolApproval?.status).toBe("pending");
+    expect(assistantNode.toolApproval?.tool).toBe("execute_command");
+
+    // Trigger approval response from UI button callback
+    transport.setMockApprovalRequest(null);
+    await engine.respondToApproval("call_hook_1", true);
+
+    const resumedState = engine.getState();
+    const resumedAssistant = resumedState.activePath[1];
+    expect(resumedAssistant.toolApproval?.status).toBe("approved");
+    expect(resumedAssistant.content).toContain("On branch main");
   });
 });

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ChatEngine } from "../chat-engine";
 import { FakeChatTransport } from "../transport";
-import type { MessageNode } from "../../lib/tree";
+import type { MessageNode, ToolApprovalRequest } from "../../lib/tree";
 
 describe("ChatTransport & FakeChatTransport", () => {
   it("allows setting up mock tree responses", async () => {
@@ -137,6 +137,100 @@ describe("ChatEngine (In-Process State Machine)", () => {
     unsubscribe();
   });
 
+  it("captures approval_request events in node state and halts stream", async () => {
+    const mockApproval: ToolApprovalRequest = {
+      toolCallId: "call_test_123",
+      tool: "execute_command",
+      input: { command: "rm -rf /tmp" },
+      description: "삭제 승인 요청",
+      status: "pending",
+    };
+
+    transport.setMockApprovalRequest(mockApproval);
+
+    const engine = new ChatEngine({
+      sessionId: "session-hitl-1",
+      transport,
+    });
+    await engine.loadTree();
+
+    await engine.send("파일 정리해줘");
+
+    const state = engine.getState();
+    expect(state.isGenerating).toBe(false);
+    expect(state.allNodes).toHaveLength(2);
+    const assistantNode = state.activePath[1];
+    expect(assistantNode.toolApproval).toBeDefined();
+    expect(assistantNode.toolApproval?.toolCallId).toBe("call_test_123");
+    expect(assistantNode.toolApproval?.tool).toBe("execute_command");
+    expect(assistantNode.toolApproval?.status).toBe("pending");
+  });
+
+  it("handles respondToApproval with approval and resumes stream", async () => {
+    const mockApproval: ToolApprovalRequest = {
+      toolCallId: "call_test_456",
+      tool: "write_file",
+      input: { filepath: "/tmp/a.txt", content: "data" },
+      description: "파일 작성 승인",
+      status: "pending",
+    };
+
+    transport.setMockApprovalRequest(mockApproval);
+    transport.setMockResumeChunks([" 파일이 성공적으로 작성되었습니다."]);
+
+    const engine = new ChatEngine({
+      sessionId: "session-hitl-2",
+      transport,
+    });
+    await engine.loadTree();
+
+    await engine.send("파일 생성해줘");
+
+    expect(engine.getState().activePath[1].toolApproval?.status).toBe("pending");
+
+    // Respond with approval
+    transport.setMockApprovalRequest(null);
+    await engine.respondToApproval("call_test_456", true);
+
+    const updatedState = engine.getState();
+    expect(updatedState.isGenerating).toBe(false);
+    const assistantNode = updatedState.activePath[1];
+    expect(assistantNode.toolApproval?.status).toBe("approved");
+    expect(assistantNode.content).toContain("파일이 성공적으로 작성되었습니다.");
+  });
+
+  it("handles respondToApproval with rejection and updates status", async () => {
+    const mockApproval: ToolApprovalRequest = {
+      toolCallId: "call_test_789",
+      tool: "delete_resource",
+      input: { resource_id: "res_99" },
+      description: "리소스 삭제 승인",
+      status: "pending",
+    };
+
+    transport.setMockApprovalRequest(mockApproval);
+    transport.setMockResumeChunks([" 삭제 작업이 취소되었습니다."]);
+
+    const engine = new ChatEngine({
+      sessionId: "session-hitl-3",
+      transport,
+    });
+    await engine.loadTree();
+
+    await engine.send("리소스 삭제해줘");
+
+    // Respond with rejection
+    transport.setMockApprovalRequest(null);
+    await engine.respondToApproval("call_test_789", false, "위험한 작업으로 거부함");
+
+    const updatedState = engine.getState();
+    expect(updatedState.isGenerating).toBe(false);
+    const assistantNode = updatedState.activePath[1];
+    expect(assistantNode.toolApproval?.status).toBe("rejected");
+    expect(assistantNode.toolApproval?.reason).toBe("위험한 작업으로 거부함");
+    expect(assistantNode.content).toContain("삭제 작업이 취소되었습니다.");
+  });
+
   it("allows setting title explicitly and notifying subscribers", () => {
     const engine = new ChatEngine({
       sessionId: "session-1",
@@ -210,14 +304,11 @@ describe("ChatEngine (In-Process State Machine)", () => {
     await engine.forkAndEdit("u-1", "Edited prompt");
 
     const state = engine.getState();
-    // All nodes should now have 4 nodes (2 original + 2 in new branch)
     expect(state.allNodes).toHaveLength(4);
-    // Active path should show the edited prompt and new response
     expect(state.activePath).toHaveLength(2);
     expect(state.activePath[0].content).toBe("Edited prompt");
     expect(state.activePath[1].content).toBe("Edited response");
 
-    // Check branch info on the root
     const branchInfo = engine.getBranchInfo(state.activePath[0].id);
     expect(branchInfo.totalBranches).toBe(2);
     expect(branchInfo.currentIndex).toBe(2);
@@ -318,7 +409,7 @@ describe("ChatEngine (In-Process State Machine)", () => {
     await engine.regenerate("a-1");
 
     const state = engine.getState();
-    expect(state.allNodes).toHaveLength(3); // 1 user + 2 assistant variants
+    expect(state.allNodes).toHaveLength(3);
     expect(state.activePath).toHaveLength(2);
     expect(state.activePath[1].content).toBe("Violets are blue...");
     expect(state.activePath[1].parentId).toBe("u-1");
@@ -338,7 +429,6 @@ describe("ChatEngine (In-Process State Machine)", () => {
     const state = engine.getState();
     expect(state.isGenerating).toBe(false);
     expect(state.error).toContain("Network connection dropped");
-    // User message and assistant error message are preserved
     expect(state.activePath).toHaveLength(2);
     expect(state.activePath[1].status).toBe("error");
 
@@ -396,7 +486,6 @@ describe("ChatEngine (In-Process State Machine)", () => {
     await engine.deleteNode("a-1");
 
     const state = engine.getState();
-    // a-1 and u-2 should be pruned, leaving u-1
     expect(state.allNodes).toHaveLength(1);
     expect(state.activePath).toHaveLength(1);
     expect(state.activeLeafId).toBe("u-1");

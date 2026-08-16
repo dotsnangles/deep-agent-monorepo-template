@@ -37,6 +37,7 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
     isGenerating,
     generatingAssistantId,
     send,
+    respondToApproval,
     forkAndEdit,
     regenerate,
     deleteNode,
@@ -196,6 +197,14 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
                     isPinnedToBottomRef.current = true;
                     retry(msg.id);
                   }}
+                  onApprove={(toolCallId) => {
+                    isPinnedToBottomRef.current = true;
+                    respondToApproval(toolCallId, true);
+                  }}
+                  onReject={(toolCallId, reason) => {
+                    isPinnedToBottomRef.current = true;
+                    respondToApproval(toolCallId, false, reason);
+                  }}
                 />
               );
             })}
@@ -268,4 +277,3 @@ export function MessageTreeFeed({ sessionId }: MessageTreeFeedProps) {
     </div>
   );
 }
-

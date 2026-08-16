@@ -8,6 +8,7 @@ import type { BranchInfo } from "../lib/tree";
 export interface UseChatEngineReturn extends ChatEngineState {
   engine: ChatEngine;
   send: (content: string, titleSnippet?: string) => Promise<void>;
+  respondToApproval: (toolCallId: string, approved: boolean, reason?: string) => Promise<void>;
   forkAndEdit: (nodeId: string, content: string) => Promise<void>;
   regenerate: (nodeId: string) => Promise<void>;
   selectBranch: (nodeId: string, direction: "prev" | "next") => Promise<void>;
@@ -42,6 +43,12 @@ export function useChatEngine(
 
   const send = useCallback(
     (content: string, titleSnippet?: string) => engine.send(content, titleSnippet),
+    [engine]
+  );
+
+  const respondToApproval = useCallback(
+    (toolCallId: string, approved: boolean, reason?: string) =>
+      engine.respondToApproval(toolCallId, approved, reason),
     [engine]
   );
 
@@ -81,6 +88,7 @@ export function useChatEngine(
     engine,
     ...state,
     send,
+    respondToApproval,
     forkAndEdit,
     regenerate,
     selectBranch,

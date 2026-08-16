@@ -8,6 +8,7 @@ import { Textarea } from "@repo/ui/components/textarea";
 import type { MessageNode, BranchInfo } from "../lib/tree";
 import { MessageBranchSwitcher } from "./message-branch-switcher";
 import { MarkdownRenderer } from "./markdown-renderer";
+import { ToolActionCard } from "./tool-action-card";
 import { useCopyToClipboard } from "../hooks/use-copy-to-clipboard";
 
 interface MessageItemProps {
@@ -20,6 +21,8 @@ interface MessageItemProps {
   onRegenerate: () => void;
   onDelete: () => void;
   onRetry?: () => void;
+  onApprove?: (toolCallId: string) => void;
+  onReject?: (toolCallId: string, reason?: string) => void;
 }
 
 export function MessageItem({
@@ -32,6 +35,8 @@ export function MessageItem({
   onRegenerate,
   onDelete,
   onRetry,
+  onApprove,
+  onReject,
 }: MessageItemProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editDraft, setEditDraft] = useState(message.content);
@@ -39,7 +44,6 @@ export function MessageItem({
   const { copied, copy } = useCopyToClipboard("메시지가 클립보드에 복사되었습니다.");
 
   const isUser = message.role === "user";
-
 
   const handleCopy = () => {
     copy(message.content);
@@ -129,17 +133,27 @@ export function MessageItem({
             {message.content}
           </div>
         ) : (
-          /* Assistant Message: Clean stream layout with Markdown & LaTeX */
+          /* Assistant Message: Clean stream layout with Markdown & Tool Action Card */
           <div className="w-full text-sm leading-relaxed text-foreground py-0.5 space-y-2">
             {message.content ? (
               <MarkdownRenderer content={message.content} isGenerating={isGenerating} />
-            ) : isGenerating ? (
+            ) : isGenerating && !message.toolApproval ? (
               <div className="flex items-center gap-2 py-1 text-sm text-muted-foreground">
                 <span className="flex size-2 rounded-full bg-primary animate-pulse" />
                 <span className="animate-pulse">답변을 생성하고 있습니다...</span>
               </div>
-            ) : message.status === "error" || message.error ? null : (
+            ) : message.status === "error" || message.error ? null : message.toolApproval ? null : (
               <span className="text-muted-foreground italic text-xs">(내용 없음)</span>
+            )}
+
+            {/* Inline Interactive Tool Action Card */}
+            {message.toolApproval && (
+              <ToolActionCard
+                approval={message.toolApproval}
+                isGenerating={isGenerating}
+                onApprove={() => onApprove?.(message.toolApproval!.toolCallId)}
+                onReject={(reason) => onReject?.(message.toolApproval!.toolCallId, reason)}
+              />
             )}
 
             {/* Error Message & Retry Banner */}
@@ -165,7 +179,6 @@ export function MessageItem({
             )}
           </div>
         )}
-
 
         {/* Action Bar (Branch Switcher + Quick Actions) */}
         {!isEditing && (

@@ -1,5 +1,11 @@
-import type { CreateChatMessageDTO, ChatStreamRequestDTO, PatchChatLeafDTO, DeleteChatMessageDTO } from "@repo/validators";
-import type { MessageNode } from "../lib/tree";
+import type {
+  CreateChatMessageDTO,
+  ChatStreamRequestDTO,
+  PatchChatLeafDTO,
+  DeleteChatMessageDTO,
+  ResumeActionDTO,
+} from "@repo/validators";
+import type { MessageNode, ToolApprovalRequest } from "../lib/tree";
 
 export interface StreamMessageContext {
   role: "user" | "assistant" | "system";
@@ -11,6 +17,7 @@ export interface StreamRequestParams {
   assistantMessageId: string;
   userMessageId: string | null;
   contextMessages: StreamMessageContext[];
+  resume?: ResumeActionDTO;
 }
 
 export interface TreeFetchResult {
@@ -24,11 +31,18 @@ export interface DeleteSubtreeResult {
   activeLeafId: string | null;
 }
 
+export interface StreamCallbacks {
+  onToken?: (token: string) => void;
+  onApprovalRequest?: (approval: ToolApprovalRequest) => void;
+  onDone?: (finishReason: string) => void;
+  onError?: (error: string) => void;
+}
+
 export interface ChatTransport {
   fetchTree(sessionId: string): Promise<TreeFetchResult>;
   streamResponse(
     params: StreamRequestParams,
-    onChunk: (chunk: string) => void,
+    callbacks: StreamCallbacks | ((chunk: string) => void),
     signal: AbortSignal
   ): Promise<void>;
   persistNode(dto: CreateChatMessageDTO): Promise<boolean>;
@@ -39,14 +53,22 @@ export interface ChatTransport {
 export class HttpChatTransport implements ChatTransport {
   private fetchFn: typeof fetch;
 
-  constructor(fetchFn: typeof fetch = typeof window !== "undefined" ? window.fetch.bind(window) : fetch) {
+  constructor(
+    fetchFn: typeof fetch = typeof window !== "undefined"
+      ? window.fetch.bind(window)
+      : fetch
+  ) {
     this.fetchFn = fetchFn;
   }
 
   async fetchTree(sessionId: string): Promise<TreeFetchResult> {
-    const res = await this.fetchFn(`/api/chat/messages?sessionId=${encodeURIComponent(sessionId)}`);
+    const res = await this.fetchFn(
+      `/api/chat/messages?sessionId=${encodeURIComponent(sessionId)}`
+    );
     if (!res.ok) {
-      throw new Error(`Failed to fetch message tree for session ${sessionId}: HTTP ${res.status}`);
+      throw new Error(
+        `Failed to fetch message tree for session ${sessionId}: HTTP ${res.status}`
+      );
     }
     const data = await res.json();
     return {
@@ -58,12 +80,16 @@ export class HttpChatTransport implements ChatTransport {
 
   async streamResponse(
     params: StreamRequestParams,
-    onChunk: (chunk: string) => void,
+    callbacks: StreamCallbacks | ((chunk: string) => void),
     signal: AbortSignal
   ): Promise<void> {
+    const cb: StreamCallbacks =
+      typeof callbacks === "function" ? { onToken: callbacks } : callbacks;
+
     const payload: ChatStreamRequestDTO = {
       threadId: params.sessionId,
       messages: params.contextMessages,
+      resume: params.resume,
     };
 
     const res = await this.fetchFn("/api/chat/stream", {
@@ -83,13 +109,77 @@ export class HttpChatTransport implements ChatTransport {
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
+    let buffer = "";
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      const chunk = decoder.decode(value, { stream: true });
-      if (chunk) {
-        onChunk(chunk);
+      buffer += decoder.decode(value, { stream: true });
+
+      // Process SSE blocks separated by double newlines
+      const blocks = buffer.split("\n\n");
+      buffer = blocks.pop() || "";
+
+      for (const block of blocks) {
+        if (!block.trim()) continue;
+
+        let eventType = "token";
+        let rawData = "";
+
+        for (const line of block.split("\n")) {
+          if (line.startsWith("event: ")) {
+            eventType = line.slice(7).trim();
+          } else if (line.startsWith("data: ")) {
+            rawData = line.slice(6).trim();
+          }
+        }
+
+        if (!rawData) {
+          // Fallback if not standard SSE
+          if (block && !block.startsWith("event: ")) {
+            cb.onToken?.(block);
+          }
+          continue;
+        }
+
+        try {
+          const parsed = JSON.parse(rawData);
+          if (eventType === "token" && parsed.content) {
+            cb.onToken?.(parsed.content);
+          } else if (eventType === "approval_request") {
+            cb.onApprovalRequest?.({
+              toolCallId: parsed.toolCallId || parsed.tool_call_id || "",
+              tool: parsed.tool || "tool",
+              input: parsed.input || {},
+              description: parsed.description,
+              status: "pending",
+            });
+          } else if (eventType === "done") {
+            cb.onDone?.(parsed.finish_reason || "stop");
+          } else if (eventType === "error") {
+            cb.onError?.(parsed.message || "Agent execution error");
+          }
+        } catch {
+          // If JSON parse fails, treat raw payload as string token
+          cb.onToken?.(rawData);
+        }
+      }
+    }
+
+    // Process leftover buffer if any
+    if (buffer.trim()) {
+      try {
+        if (buffer.includes("data: ")) {
+          const dataMatch = buffer.match(/data:\s*(.+)/);
+          if (dataMatch?.[1]) {
+            const parsed = JSON.parse(dataMatch[1]);
+            if (parsed.content) cb.onToken?.(parsed.content);
+          }
+        } else {
+          cb.onToken?.(buffer);
+        }
+      } catch {
+        cb.onToken?.(buffer);
       }
     }
   }
@@ -123,7 +213,10 @@ export class HttpChatTransport implements ChatTransport {
     }
   }
 
-  async deleteSubtree(sessionId: string, messageId: string): Promise<DeleteSubtreeResult | null> {
+  async deleteSubtree(
+    sessionId: string,
+    messageId: string
+  ): Promise<DeleteSubtreeResult | null> {
     try {
       const payload: DeleteChatMessageDTO = { sessionId, messageId };
       const res = await this.fetchFn("/api/chat/messages", {
@@ -147,6 +240,8 @@ export class FakeChatTransport implements ChatTransport {
   public persistedNodes: CreateChatMessageDTO[] = [];
   public leafUpdates: Array<{ sessionId: string; activeLeafId: string }> = [];
   public mockStreamChunks: string[] = ["Mock response"];
+  public mockApprovalRequest: ToolApprovalRequest | null = null;
+  public mockResumeChunks: string[] = ["Resumed response"];
   public mockStreamDelay: number = 0;
   public mockStreamError: Error | null = null;
 
@@ -156,6 +251,14 @@ export class FakeChatTransport implements ChatTransport {
 
   setMockStreamChunks(chunks: string[]) {
     this.mockStreamChunks = chunks;
+  }
+
+  setMockApprovalRequest(req: ToolApprovalRequest | null) {
+    this.mockApprovalRequest = req;
+  }
+
+  setMockResumeChunks(chunks: string[]) {
+    this.mockResumeChunks = chunks;
   }
 
   setMockStreamDelay(delayMs: number) {
@@ -180,25 +283,44 @@ export class FakeChatTransport implements ChatTransport {
 
   async streamResponse(
     params: StreamRequestParams,
-    onChunk: (chunk: string) => void,
+    callbacks: StreamCallbacks | ((chunk: string) => void),
     signal: AbortSignal
   ): Promise<void> {
     if (this.mockStreamError) {
       throw this.mockStreamError;
     }
 
-    for (const chunk of this.mockStreamChunks) {
-      if (signal.aborted) {
-        break;
+    const cb: StreamCallbacks =
+      typeof callbacks === "function" ? { onToken: callbacks } : callbacks;
+
+    if (params.resume) {
+      for (const chunk of this.mockResumeChunks) {
+        if (signal.aborted) break;
+        if (this.mockStreamDelay > 0) {
+          await new Promise((resolve) => setTimeout(resolve, this.mockStreamDelay));
+        }
+        if (signal.aborted) break;
+        cb.onToken?.(chunk);
       }
+      cb.onDone?.("stop");
+      return;
+    }
+
+    if (this.mockApprovalRequest) {
+      cb.onApprovalRequest?.({ ...this.mockApprovalRequest });
+      cb.onDone?.("interrupt");
+      return;
+    }
+
+    for (const chunk of this.mockStreamChunks) {
+      if (signal.aborted) break;
       if (this.mockStreamDelay > 0) {
         await new Promise((resolve) => setTimeout(resolve, this.mockStreamDelay));
       }
-      if (signal.aborted) {
-        break;
-      }
-      onChunk(chunk);
+      if (signal.aborted) break;
+      cb.onToken?.(chunk);
     }
+    cb.onDone?.("stop");
   }
 
   async persistNode(dto: CreateChatMessageDTO): Promise<boolean> {
@@ -215,7 +337,10 @@ export class FakeChatTransport implements ChatTransport {
     return true;
   }
 
-  async deleteSubtree(sessionId: string, messageId: string): Promise<DeleteSubtreeResult | null> {
+  async deleteSubtree(
+    sessionId: string,
+    messageId: string
+  ): Promise<DeleteSubtreeResult | null> {
     return {
       deletedIds: [messageId],
       activeLeafId: null,

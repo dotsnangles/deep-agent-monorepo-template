@@ -8,6 +8,7 @@ export { MessageTreeFeed } from "./components/message-tree-feed";
 export { MessageItem } from "./components/message-item";
 export { MessageBranchSwitcher } from "./components/message-branch-switcher";
 export { MarkdownRenderer } from "./components/markdown-renderer";
+export { ToolActionCard } from "./components/tool-action-card";
 export {
   useChatEngine,
   useChatRegistry,
@@ -22,6 +23,7 @@ export {
   pruneSubtree,
   type MessageNode,
   type BranchInfo,
+  type ToolApprovalRequest,
 } from "./lib/tree";
 export {
   fuzzyMatch,

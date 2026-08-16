@@ -1,3 +1,12 @@
+export interface ToolApprovalRequest {
+  toolCallId: string;
+  tool: string;
+  input: Record<string, any> | any;
+  description?: string;
+  status: "pending" | "approved" | "rejected";
+  reason?: string;
+}
+
 export interface MessageNode {
   id: string;
   sessionId: string;
@@ -7,6 +16,7 @@ export interface MessageNode {
   createdAt: Date | string;
   status?: "sending" | "streaming" | "complete" | "error";
   error?: string | null;
+  toolApproval?: ToolApprovalRequest | null;
 }
 
 export interface BranchInfo {
@@ -89,7 +99,6 @@ export function getBranchInfo(nodeId: string, nodes: MessageNode[]): BranchInfo 
     return { currentIndex: 1, totalBranches: 1, current: 1, total: 1, siblingIds: [nodeId] };
   }
 
-
   // Siblings are nodes with the same parentId within the same session
   const siblings = nodes.filter(
     (n) => n.sessionId === target.sessionId && n.parentId === target.parentId
@@ -110,8 +119,6 @@ export function getBranchInfo(nodeId: string, nodes: MessageNode[]): BranchInfo 
     siblingIds: siblingIds.length > 0 ? siblingIds : [nodeId],
   };
 }
-
-
 
 /**
  * Recursively finds all descendant node IDs of targetId and partitions

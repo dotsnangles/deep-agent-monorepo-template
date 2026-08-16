@@ -1,6 +1,7 @@
 import type {
   MessageNode,
   BranchInfo,
+  ToolApprovalRequest,
 } from "../lib/tree";
 import {
   traverseActivePath,
@@ -15,6 +16,7 @@ import {
 } from "../lib/session-title";
 import type { ChatTransport, StreamMessageContext } from "./transport";
 import { HttpChatTransport } from "./transport";
+import type { ResumeActionDTO } from "@repo/validators";
 
 export interface ChatEngineOptions {
   sessionId: string;
@@ -210,6 +212,58 @@ export class ChatEngine {
     this.isSending = false;
   }
 
+  public async respondToApproval(
+    toolCallId: string,
+    approved: boolean,
+    reason?: string
+  ): Promise<void> {
+    if (this.isSending) return;
+
+    // Find the assistant node containing this approval request
+    const targetNode = this.state.allNodes.find(
+      (n) => n.toolApproval?.toolCallId === toolCallId
+    );
+    if (!targetNode) return;
+
+    this.isSending = true;
+
+    // Update approval status optimistically
+    const updatedApproval: ToolApprovalRequest = {
+      ...targetNode.toolApproval!,
+      status: approved ? "approved" : "rejected",
+      reason,
+    };
+
+    this.state = {
+      ...this.state,
+      allNodes: this.state.allNodes.map((n) =>
+        n.id === targetNode.id
+          ? { ...n, toolApproval: updatedApproval, status: "streaming" }
+          : n
+      ),
+      isGenerating: true,
+      generatingAssistantId: targetNode.id,
+      error: null,
+    };
+    this.notify();
+
+    const contextMessages = this.buildContextMessages(targetNode.id, targetNode.id);
+    const resumePayload: ResumeActionDTO = {
+      toolCallId,
+      approved,
+      reason,
+    };
+
+    await this.executeStream({
+      assistantMessageId: targetNode.id,
+      userMessageId: targetNode.parentId,
+      contextMessages,
+      resume: resumePayload,
+    });
+
+    this.isSending = false;
+  }
+
   public async forkAndEdit(targetNodeId: string, newContent: string): Promise<void> {
     if (!newContent.trim() || this.isSending) return;
     this.isSending = true;
@@ -329,7 +383,9 @@ export class ChatEngine {
       this.state = {
         ...this.state,
         allNodes: this.state.allNodes.map((n) =>
-          n.id === targetNode.id ? { ...n, content: "", status: "streaming", error: null } : n
+          n.id === targetNode.id
+            ? { ...n, content: "", status: "streaming", error: null, toolApproval: null }
+            : n
         ),
         activeLeafId: targetNode.id,
         isGenerating: true,
@@ -348,7 +404,6 @@ export class ChatEngine {
 
       this.isSending = false;
     } else if (targetNode.role === "user") {
-      // If retrying a user node, regenerate its assistant response
       const childAssistant = this.state.allNodes.find(
         (n) => n.parentId === targetNode.id && n.role === "assistant"
       );
@@ -417,9 +472,12 @@ export class ChatEngine {
     assistantMessageId: string;
     userMessageId: string | null;
     contextMessages: StreamMessageContext[];
+    resume?: ResumeActionDTO;
   }): Promise<void> {
     this.abortController = new AbortController();
-    let accumulatedContent = "";
+    const existingNode = this.state.allNodes.find((n) => n.id === params.assistantMessageId);
+    let accumulatedContent = existingNode?.content || "";
+    let capturedApproval: ToolApprovalRequest | null = existingNode?.toolApproval || null;
 
     try {
       await this.transport.streamResponse(
@@ -428,18 +486,39 @@ export class ChatEngine {
           assistantMessageId: params.assistantMessageId,
           userMessageId: params.userMessageId,
           contextMessages: params.contextMessages,
+          resume: params.resume,
         },
-        (chunk) => {
-          accumulatedContent += chunk;
-          this.state = {
-            ...this.state,
-            allNodes: this.state.allNodes.map((n) =>
-              n.id === params.assistantMessageId
-                ? { ...n, content: accumulatedContent, status: "streaming" }
-                : n
-            ),
-          };
-          this.notify();
+        {
+          onToken: (chunk) => {
+            accumulatedContent += chunk;
+            this.state = {
+              ...this.state,
+              allNodes: this.state.allNodes.map((n) =>
+                n.id === params.assistantMessageId
+                  ? { ...n, content: accumulatedContent, status: "streaming" }
+                  : n
+              ),
+            };
+            this.notify();
+          },
+          onApprovalRequest: (approval) => {
+            capturedApproval = approval;
+            this.state = {
+              ...this.state,
+              allNodes: this.state.allNodes.map((n) =>
+                n.id === params.assistantMessageId
+                  ? { ...n, toolApproval: approval }
+                  : n
+              ),
+            };
+            this.notify();
+          },
+          onDone: (finishReason) => {
+            // Stream complete or interrupted
+          },
+          onError: (errMsg) => {
+            throw new Error(errMsg);
+          },
         },
         this.abortController.signal
       );
@@ -449,7 +528,12 @@ export class ChatEngine {
         ...this.state,
         allNodes: this.state.allNodes.map((n) =>
           n.id === params.assistantMessageId
-            ? { ...n, content: accumulatedContent, status: "complete" }
+            ? {
+                ...n,
+                content: accumulatedContent,
+                status: "complete",
+                toolApproval: capturedApproval,
+              }
             : n
         ),
         isGenerating: false,
