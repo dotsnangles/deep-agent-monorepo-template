@@ -34,6 +34,30 @@ describe("ToolActionCard Component", () => {
     expect(html).toContain("대기 중");
   });
 
+  it("renders visual diff section when diff parameter is present", () => {
+    const approval: ToolApprovalRequest = {
+      toolCallId: "call_diff_1",
+      tool: "write_file",
+      input: {
+        filepath: "src/index.ts",
+        diff: "--- a/src/index.ts\n+++ b/src/index.ts\n-console.log('old');\n+console.log('new');",
+      },
+      status: "pending",
+    };
+
+    const html = renderToString(
+      <ToolActionCard
+        approval={approval}
+        isGenerating={false}
+        onApprove={() => {}}
+        onReject={() => {}}
+      />
+    );
+
+    expect(html).toContain("변경 사항 (Diff)");
+    expect(html).toContain("console.log(&#x27;new&#x27;);");
+  });
+
   it("renders approved state with green badge and hides action buttons", () => {
     const approval: ToolApprovalRequest = {
       toolCallId: "call_456",
@@ -75,6 +99,6 @@ describe("ToolActionCard Component", () => {
     );
 
     expect(html).toContain("delete_resource");
-    expect(html).toContain("거부됨");
+    expect(html).toContain("거절됨");
   });
 });
