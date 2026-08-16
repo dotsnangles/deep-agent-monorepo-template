@@ -111,37 +111,22 @@ export function ReasoningCard({
       {/* Accordion Content Body */}
       {isOpen && (
         <CardContent className="pt-0 pb-3 px-3.5">
-          {sections.length > 1 ? (
-            <div className="space-y-2.5 max-h-80 overflow-y-auto">
-              {sections.map((section, idx) => (
-                <div
-                  key={idx}
-                  className={cn(
-                    "space-y-1",
-                    idx > 0 && "pt-2 mt-2 border-t border-border/40"
-                  )}
-                >
-                  <div className="flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground/80">
-                    <span className="flex size-3.5 items-center justify-center rounded-full bg-primary/10 text-primary text-[9px]">
-                      {idx + 1}
-                    </span>
-                    <span>
-                      {idx === 0
-                        ? "초기 계획 및 문제 분석"
-                        : `도구 실행 후 중간 추론 (${idx + 1}단계)`}
-                    </span>
-                  </div>
-                  <div className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap rounded-md bg-background/50 p-2.5 border border-border/40 font-mono text-[11px]">
+          <div className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap rounded-md bg-background/50 p-2.5 border border-border/40 font-mono text-[11px] max-h-80 overflow-y-auto">
+            {sections.length > 1 ? (
+              <div className="space-y-3">
+                {sections.map((section, idx) => (
+                  <div
+                    key={idx}
+                    className={cn(idx > 0 && "pt-2.5 border-t border-border/40")}
+                  >
                     {section.trim()}
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap rounded-md bg-background/50 p-2.5 border border-border/40 font-mono text-[11px] max-h-80 overflow-y-auto">
-              {reasoning}
-            </div>
-          )}
+                ))}
+              </div>
+            ) : (
+              reasoning
+            )}
+          </div>
         </CardContent>
       )}
     </Card>
