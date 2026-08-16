@@ -1,10 +1,6 @@
-from unittest.mock import patch
-
 import pytest
 from langchain_core.messages import HumanMessage
-from langgraph.checkpoint.memory import MemorySaver
 
-from src.core.checkpointer import CheckpointerFactory
 from src.core.testing import FakeChatModel
 from src.schemas.events import AgentStreamEvent
 

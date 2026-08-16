@@ -96,8 +96,14 @@ class TitleGenerationWorker:
                 raw_data = json.loads(payload_str)
                 task = TitleTaskPayload(**raw_data)
 
-                # 1. Generate smart title using injected or default title generator
-                smart_title = await self.title_generator(task.userPrompt)
+                # 1. Generate title (Heuristic slicing in local_slm mode to avoid compute
+                # contention; LLM generator in production_cloud)
+                from src.core.config import EnvironmentMode, get_deep_agent_mode
+
+                if get_deep_agent_mode() == EnvironmentMode.LOCAL_SLM:
+                    smart_title = task.userPrompt.strip().replace("\n", " ")[:25].strip()
+                else:
+                    smart_title = await self.title_generator(task.userPrompt)
 
                 if not smart_title or len(smart_title.strip()) < 2:
                     return

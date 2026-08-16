@@ -10,7 +10,7 @@ from src.graphs.registry import GraphRegistry
 @pytest.mark.asyncio
 class TestGatewayObservability:
     async def test_build_trace_metadata_extracts_user_prompt_snippet_and_tags(self):
-        """Metadata builder should generate a readable trace name without emojis, user_id, and tags."""
+        """Metadata builder generates a readable trace name without emojis, user_id, and tags."""
         messages = [
             {"role": "user", "content": "첫 번째 질문"},
             {"role": "assistant", "content": "무엇을 도와드릴까요?"},
@@ -27,7 +27,10 @@ class TestGatewayObservability:
 
         assert metadata["langfuse_session_id"] == "session-123"
         assert metadata["langfuse_user_id"] == "usr_123"
-        assert metadata["langfuse_trace_name"] == "[Turn 2] 크레이지하구만 ! 파이썬 피보나치 코드 알려줘"
+        assert (
+            metadata["langfuse_trace_name"]
+            == "[Turn 2] 크레이지하구만 ! 파이썬 피보나치 코드 알려줘"
+        )
         assert "chat" in metadata["langfuse_tags"]
         assert "streaming" in metadata["langfuse_tags"]
         assert "agent:default" in metadata["langfuse_tags"]
@@ -106,4 +109,3 @@ class TestGatewayObservability:
             events.append(ev)
 
         assert any(e.event == "token" for e in events)
-

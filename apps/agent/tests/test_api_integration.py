@@ -117,6 +117,7 @@ async def test_chat_stream_api_endpoint_handles_hitl_interrupt_and_approval():
         tool_calls=[tool_call],
         tokens=["디렉토리", " ", "조회", " ", "완료"],
     )
+
     @tool
     def execute_command(command: str) -> str:
         """Executes command."""

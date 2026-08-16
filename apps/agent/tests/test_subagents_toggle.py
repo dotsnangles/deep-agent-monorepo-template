@@ -4,7 +4,6 @@ from langgraph.checkpoint.memory import MemorySaver
 from src.core.gateway import AgentExecutionGateway
 from src.core.testing import FakeChatModel
 from src.graphs.chat.graph import build_agent
-from src.graphs.chat.subagents import get_default_subagents
 from src.graphs.registry import GraphRegistry
 
 
@@ -45,7 +44,7 @@ class TestSubagentsToggle:
         assert any(e.event == "done" for e in events)
 
     async def test_build_agent_with_custom_subagents_list(self):
-        """When custom subagents are explicitly provided, it injects them into the deep agent graph."""
+        """When custom subagents are provided, it injects them into the deep agent graph."""
         fake_llm = FakeChatModel(responses=["Custom subagent answer"])
         checkpointer = MemorySaver()
         custom_subagents = [

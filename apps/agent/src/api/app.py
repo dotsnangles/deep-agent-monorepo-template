@@ -3,9 +3,6 @@ from contextlib import asynccontextmanager
 
 import redis.asyncio as aioredis
 from fastapi import FastAPI
-from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-from langgraph.store.postgres.aio import AsyncPostgresStore
-from psycopg_pool import AsyncConnectionPool
 
 from src.api.routes.artifacts import artifacts_router
 from src.api.routes.chat import chat_router
@@ -52,7 +49,11 @@ def create_app() -> FastAPI:
                 logger.warning("Redis connection failed: %s. Using memory fallback.", e)
 
         # 2. Initialize PostgreSQL Checkpointer & Store via CheckpointerFactory
-        if DATABASE_URL and not DATABASE_URL.startswith("sqlite") and not CheckpointerFactory.is_test_environment():
+        if (
+            DATABASE_URL
+            and not DATABASE_URL.startswith("sqlite")
+            and not CheckpointerFactory.is_test_environment()
+        ):
             try:
                 pool = await CheckpointerFactory.create_pool(DATABASE_URL)
                 if pool:
@@ -73,7 +74,10 @@ def create_app() -> FastAPI:
                         app.state.copilotkit_agent.graph = build_agent(
                             checkpointer=checkpointer, store=store
                         )
-                    logger.info("PostgreSQL checkpointer & store ready via CheckpointerFactory (%s).", DATABASE_URL)
+                    logger.info(
+                        "PostgreSQL checkpointer & store ready via CheckpointerFactory (%s).",
+                        DATABASE_URL,
+                    )
             except Exception as e:
                 logger.warning("PostgreSQL connection failed: %s. Using in-memory fallback.", e)
 

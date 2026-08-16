@@ -25,3 +25,8 @@ Domain glossary and architectural concepts for the Python Deep Agent service:
 | Declarative Tool Approval | Tool gating mechanism using `interrupt_on` mapping tool names to human-in-the-loop review before execution | `src/graphs/chat/graph.py` |
 | Active Path Synchronization | State replacement strategy synchronizing LangGraph state directly with client active path, avoiding $O(N^2)$ message inflation | `src/core/gateway.py` |
 | Live LLM Inference | Prohibition of global response caches (`set_llm_cache`) in interactive chat pipelines to ensure real-time token streaming | `src/api/app.py` |
+| Inference Serialization Gateway | Global semaphore/concurrency controller enforcing single-flight execution (`concurrency=1`) to prevent local SLM/Ollama OOM and crashes | `src/core/gateway.py` |
+| Single-Flight Inference | Strict execution constraint guaranteeing only one LLM generation request runs at any instant under compute/VRAM-constrained environments | `src/core/gateway.py` |
+| Dual-Environment Preset | Pre-configured runtime profile bundle (`local_slm` vs `production_cloud`) mapping concurrency limits, subagent topologies, and background worker policies | `src/core/config.py` |
+| Heuristic Title Strategy | Zero-inference title generation via string slicing (`user_prompt[:25]`) in local mode, eliminating background LLM queue contention | `src/workers/title_worker.py` |
+| Environment-Aware Agent Factory | Factory dynamically assembling Deep Agent graphs with tailored profiles, backends, permissions, and middleware per active environment | `src/graphs/chat/factory.py` |

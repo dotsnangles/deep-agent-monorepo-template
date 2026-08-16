@@ -1,17 +1,12 @@
-from pathlib import Path
 from typing import Any
 
-from copilotkit import CopilotKitMiddleware
-from deepagents import create_deep_agent
-from langchain.agents.middleware import TodoListMiddleware
 from langchain_core.output_parsers import StrOutputParser
 
-from src.core.checkpointer import CheckpointerFactory
-from src.core.config import ENABLE_SUBAGENTS, get_llm
-from src.graphs.chat.prompts import MAIN_SYSTEM_PROMPT, TITLE_PROMPT
+from src.core.config import get_llm
+from src.graphs.chat.factory import DeepAgentEnvironmentFactory
+from src.graphs.chat.prompts import TITLE_PROMPT
 
 # Default interrupt policy: empty by default so sandboxed tools run autonomously.
-# Custom external/sensitive tools can be added via `interrupt_on` parameter.
 DEFAULT_INTERRUPT_TOOLS: dict[str, Any] = {}
 
 
@@ -28,78 +23,23 @@ def build_agent(
     system_prompt: str | None = None,
     **kwargs: Any,
 ):
-    """Build and compile the unified Deep Agent graph using official create_deep_agent.
+    """Build and compile the unified Deep Agent graph delegating to DeepAgentEnvironmentFactory.
 
-    Defaults to 100% pure vanilla LangChain Deep Agent with DockerSandboxBackend and TodoListMiddleware.
-    Provides open extension points for custom tools and subagents when explicitly supplied.
-
-    Args:
-        checkpointer: Persistent checkpointer (e.g. AsyncPostgresSaver) or MemorySaver.
-        store: Long-term store (e.g. AsyncPostgresStore) or None.
-        subagents: Optional list of custom subagent configuration dicts. Defaults to [].
-        enable_subagents: Boolean flag overriding ENABLE_SUBAGENTS config. If None, defaults to ENABLE_SUBAGENTS.
-        model: Custom LLM instance, or None to use default get_llm().
-        tools: Optional list of custom tools. Defaults to [] (framework built-ins only).
-        interrupt_on: Tool gating map for HITL approval. Defaults to {} (autonomous sandbox execution).
-        middleware: List of middlewares, defaults to [TodoListMiddleware(), CopilotKitMiddleware()].
-        backend: VFS or Sandbox backend instance providing standard sandbox tools.
-        system_prompt: Base prompt override.
+    Preserves 100% backward compatibility with existing callers, routes, and tests.
     """
-    llm = model if model is not None else get_llm()
-    effective_tools = list(tools) if tools is not None else []
-
-    # Check whether subagents should be active (respects ENABLE_SUBAGENTS env toggle for local LLMs)
-    is_subagents_allowed = (
-        enable_subagents if enable_subagents is not None else ENABLE_SUBAGENTS
-    )
-    effective_subagents = (
-        list(subagents) if (subagents is not None and is_subagents_allowed) else []
-    )
-
-    effective_checkpointer = (
-        checkpointer if checkpointer is not None else CheckpointerFactory.get_default_checkpointer()
-    )
-    effective_store = store if store is not None else CheckpointerFactory.get_default_store()
-    effective_interrupt_on = (
-        interrupt_on if interrupt_on is not None else DEFAULT_INTERRUPT_TOOLS
-    )
-    effective_middleware = list(
-        middleware if middleware is not None else [TodoListMiddleware(), CopilotKitMiddleware()]
-    )
-
-    effective_prompt = system_prompt or MAIN_SYSTEM_PROMPT
-
-    agent_kwargs: dict[str, Any] = {
-        "model": llm,
-        "system_prompt": effective_prompt,
-        "tools": effective_tools,
-        "subagents": effective_subagents,
-        "middleware": effective_middleware,
-        "interrupt_on": effective_interrupt_on,
-        "checkpointer": effective_checkpointer,
-        "store": effective_store,
+    return DeepAgentEnvironmentFactory.create_agent(
+        checkpointer=checkpointer,
+        store=store,
+        subagents=subagents,
+        enable_subagents=enable_subagents,
+        model=model,
+        tools=tools,
+        interrupt_on=interrupt_on,
+        middleware=middleware,
+        backend=backend,
+        system_prompt=system_prompt,
         **kwargs,
-    }
-    if backend is not None:
-        agent_kwargs["backend"] = backend
-
-    # Check for repository AGENTS.md memory file
-    agents_md = Path("AGENTS.md")
-    if agents_md.exists():
-        try:
-            agent_kwargs["memory"] = agents_md.read_text(encoding="utf-8")
-        except Exception:
-            pass
-
-    agent_graph = create_deep_agent(**agent_kwargs)
-
-    cp_name = type(effective_checkpointer).__name__
-    st_name = type(effective_store).__name__ if effective_store is not None else "None"
-    mode_str = f"custom_subagents={len(effective_subagents)}" if effective_subagents else "vanilla-deep-agent"
-    print(
-        f"[AGENT] Deep Agent graph compiled ({mode_str}, checkpointer={cp_name}, store={st_name})."
     )
-    return agent_graph
 
 
 def get_title_chain():

@@ -1,11 +1,54 @@
+import enum
 import os
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
+
+class EnvironmentMode(enum.StrEnum):
+    LOCAL_SLM = "local_slm"
+    PRODUCTION_CLOUD = "production_cloud"
+
+
 # LLM Provider selection
 LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "ollama").lower()
+
+
+def get_deep_agent_mode() -> EnvironmentMode:
+    """Resolves active Deep Agent mode: explicit env takes precedence, defaulting by provider."""
+    raw = os.getenv("DEEP_AGENT_MODE", "").strip().lower()
+    if raw in ("local_slm", "local", "slm", "dev", "development"):
+        return EnvironmentMode.LOCAL_SLM
+    if raw in ("production_cloud", "production", "cloud", "prod"):
+        return EnvironmentMode.PRODUCTION_CLOUD
+
+    # Auto-detection: Ollama defaults to LOCAL_SLM; cloud providers default to PRODUCTION_CLOUD
+    if os.getenv("LLM_PROVIDER", "ollama").lower() == "ollama":
+        return EnvironmentMode.LOCAL_SLM
+    return EnvironmentMode.PRODUCTION_CLOUD
+
+
+def get_inference_concurrency_limit() -> int | None:
+    """Returns maximum allowed concurrent LLM inferences.
+
+    Defaults to 1 for LOCAL_SLM (Single-Flight Inference to prevent OOMs),
+    and None (unbounded) for PRODUCTION_CLOUD. Overridable via LLM_CONCURRENCY_LIMIT.
+    """
+    raw_limit = os.getenv("LLM_CONCURRENCY_LIMIT")
+    if raw_limit:
+        try:
+            return max(1, int(raw_limit))
+        except ValueError:
+            pass
+
+    mode = get_deep_agent_mode()
+    if mode == EnvironmentMode.LOCAL_SLM:
+        return 1
+    return None
+
+
+DEEP_AGENT_MODE: str = get_deep_agent_mode().value
 OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "gemma4:e4b-it-q4_K_M")
 OPENAI_API_KEY: str | None = os.getenv("OPENAI_API_KEY")

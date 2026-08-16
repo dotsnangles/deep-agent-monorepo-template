@@ -161,8 +161,11 @@ class DockerSandboxBackend(FilesystemBackend, SandboxBackendProtocol):
         # Detect if command is raw Python code rather than shell command
         cmd_stripped = command.strip()
         is_python_code = False
-        if cmd_stripped.startswith(("import ", "from ", "def ", "class ", "with ", "for ", "if ")) or (
-            "\n" in cmd_stripped and any(kw in cmd_stripped for kw in ("import ", "plt.", "pd.", "np.", "print("))
+        if cmd_stripped.startswith(
+            ("import ", "from ", "def ", "class ", "with ", "for ", "if ")
+        ) or (
+            "\n" in cmd_stripped
+            and any(kw in cmd_stripped for kw in ("import ", "plt.", "pd.", "np.", "print("))
         ):
             if not (
                 cmd_stripped.startswith("python")

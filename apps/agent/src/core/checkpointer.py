@@ -16,7 +16,8 @@ class CheckpointerFactory:
 
     - Production / Development: Connects to PostgreSQL via AsyncPostgresSaver & AsyncPostgresStore
       using connection pooling and automatic schema initialization (`setup()`).
-    - Testing / Fallback: Provides zero-cost in-memory MemorySaver & InMemoryStore for hermetic tests.
+    - Testing / Fallback: Provides zero-cost in-memory MemorySaver & InMemoryStore for
+      hermetic tests.
     """
 
     @classmethod
@@ -25,7 +26,11 @@ class CheckpointerFactory:
             env
             or os.getenv("ENVIRONMENT")
             or os.getenv("NODE_ENV")
-            or ("test" if "pytest" in sys.modules or "pytest" in os.getenv("_", "") else "development")
+            or (
+                "test"
+                if "pytest" in sys.modules or "pytest" in os.getenv("_", "")
+                else "development"
+            )
         )
         return current_env.lower() in ("test", "testing")
 
@@ -56,7 +61,9 @@ class CheckpointerFactory:
         return pool
 
     @classmethod
-    def _get_effective_db_url(cls, env: str | None = None, postgres_url: str | None = None) -> str | None:
+    def _get_effective_db_url(
+        cls, env: str | None = None, postgres_url: str | None = None
+    ) -> str | None:
         if cls.is_test_environment(env):
             return None
         db_url = postgres_url if postgres_url is not None else os.getenv("DATABASE_URL")
@@ -83,7 +90,9 @@ class CheckpointerFactory:
                 return AsyncPostgresSaver(effective_pool)
             return MemorySaver()
         except Exception as e:
-            logger.warning("Failed to initialize PostgreSQL checkpointer: %s. Using MemorySaver.", e)
+            logger.warning(
+                "Failed to initialize PostgreSQL checkpointer: %s. Using MemorySaver.", e
+            )
             return MemorySaver()
 
     @classmethod

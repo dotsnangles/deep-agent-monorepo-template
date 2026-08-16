@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 from collections.abc import AsyncIterator
@@ -173,7 +174,7 @@ def _build_trace_metadata(
     user_id: str | None = None,
     environment: str | None = None,
 ) -> dict[str, Any]:
-    """Constructs enriched Langfuse trace metadata with turn names, active path stats, user_id, and tags."""
+    """Constructs enriched Langfuse trace metadata with turn names, active path stats, and tags."""
     latest_prompt, has_attachments, turn_index = _extract_user_prompt_info(messages)
     effective_thread_id = thread_id or "default"
     effective_env = environment or os.getenv("ENVIRONMENT", "development")
@@ -287,6 +288,20 @@ def _extract_interrupt_events(graph_state: Any) -> list[AgentStreamEvent]:
     return events
 
 
+class InferenceSerializationGateway:
+    """Manages process-wide concurrency semaphores to enforce Single-Flight Inference."""
+
+    _semaphores: dict[int, asyncio.Semaphore] = {}
+
+    @classmethod
+    def get_semaphore(cls, limit: int | None) -> asyncio.Semaphore | None:
+        if limit is None or limit <= 0:
+            return None
+        if limit not in cls._semaphores:
+            cls._semaphores[limit] = asyncio.Semaphore(limit)
+        return cls._semaphores[limit]
+
+
 class AgentExecutionGateway:
     """Deep Domain Gateway encapsulating agent workflow compilation,
 
@@ -319,9 +334,7 @@ class AgentExecutionGateway:
             if checkpointer is not None
             else CheckpointerFactory.get_default_checkpointer()
         )
-        self.store = (
-            store if store is not None else CheckpointerFactory.get_default_store()
-        )
+        self.store = store if store is not None else CheckpointerFactory.get_default_store()
         self.default_model = model
         self.event_broker = event_broker
 
@@ -349,7 +362,56 @@ class AgentExecutionGateway:
         user_id: str | None = None,
         environment: str | None = None,
     ) -> AsyncIterator[AgentStreamEvent]:
-        """Streams structured AgentStreamEvents with Human-In-The-Loop interrupt support."""
+        """Streams structured AgentStreamEvents with HITL interrupt and concurrency control."""
+        from src.core.config import get_inference_concurrency_limit
+
+        concurrency_limit = get_inference_concurrency_limit()
+        semaphore = InferenceSerializationGateway.get_semaphore(concurrency_limit)
+
+        if semaphore is not None:
+            async with semaphore:
+                async for event in self._stream_execution_inner(
+                    messages=messages,
+                    thread_id=thread_id,
+                    agent_type=agent_type,
+                    model=model,
+                    system_prompt=system_prompt,
+                    config=config,
+                    resume_action=resume_action,
+                    backend=backend,
+                    user_id=user_id,
+                    environment=environment,
+                ):
+                    yield event
+        else:
+            async for event in self._stream_execution_inner(
+                messages=messages,
+                thread_id=thread_id,
+                agent_type=agent_type,
+                model=model,
+                system_prompt=system_prompt,
+                config=config,
+                resume_action=resume_action,
+                backend=backend,
+                user_id=user_id,
+                environment=environment,
+            ):
+                yield event
+
+    async def _stream_execution_inner(
+        self,
+        messages: list[BaseMessage | dict[str, Any]] | None = None,
+        thread_id: str | None = None,
+        agent_type: str = "default",
+        model: Any = None,
+        system_prompt: str | None = None,
+        config: dict[str, Any] | None = None,
+        resume_action: dict[str, Any] | None = None,
+        backend: Any = None,
+        user_id: str | None = None,
+        environment: str | None = None,
+    ) -> AsyncIterator[AgentStreamEvent]:
+        """Internal stream execution logic."""
         lc_messages = _normalize_messages(messages, system_prompt=system_prompt)
         effective_model = model or self.default_model or get_llm()
         effective_thread_id = thread_id or "default"
