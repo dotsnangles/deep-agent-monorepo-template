@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ChatEngine } from "../chat-engine";
 import { FakeChatTransport } from "../transport";
 import type { MessageNode, ToolApprovalRequest } from "../../lib/tree";
+import type { AttachmentEntity } from "@repo/validators";
 
 describe("ChatTransport & FakeChatTransport", () => {
   it("allows setting up mock tree responses", async () => {
@@ -137,6 +138,40 @@ describe("ChatEngine (In-Process State Machine)", () => {
     unsubscribe();
   });
 
+  it("attaches file metadata to user message node and persists correctly", async () => {
+    const mockAttachments: AttachmentEntity[] = [
+      {
+        id: "att_1",
+        name: "test-doc.pdf",
+        url: "https://s3.example.com/test-doc.pdf",
+        mimeType: "application/pdf",
+        size: 51200,
+        s3Key: "attachments/usr/test-doc.pdf",
+      },
+    ];
+
+    transport.setMockStreamChunks(["I analyzed your document."]);
+
+    const engine = new ChatEngine({
+      sessionId: "session-att-1",
+      transport,
+    });
+    await engine.loadTree();
+
+    await engine.send("Summarize this document", mockAttachments);
+
+    const state = engine.getState();
+    expect(state.allNodes).toHaveLength(2);
+    const userNode = state.activePath[0];
+    expect(userNode.attachments).toHaveLength(1);
+    expect(userNode.attachments?.[0].name).toBe("test-doc.pdf");
+    expect(userNode.attachments?.[0].mimeType).toBe("application/pdf");
+
+    // Verify persisted payload in transport
+    expect(transport.persistedNodes[0].attachments).toHaveLength(1);
+    expect(transport.persistedNodes[0].attachments?.[0].name).toBe("test-doc.pdf");
+  });
+
   it("captures approval_request events in node state and halts stream", async () => {
     const mockApproval: ToolApprovalRequest = {
       toolCallId: "call_test_123",
@@ -270,14 +305,24 @@ describe("ChatEngine (In-Process State Machine)", () => {
     expect(transport.persistedNodes).toHaveLength(2);
   });
 
-  it("supports forkAndEdit creating an immutable sibling branch", async () => {
+  it("supports forkAndEdit creating an immutable sibling branch and inherits attachments", async () => {
+    const mockAttachment: AttachmentEntity = {
+      id: "att_orig",
+      name: "original.png",
+      url: "https://s3.example.com/original.png",
+      mimeType: "image/png",
+      size: 1024,
+      s3Key: "attachments/original.png",
+    };
+
     const mockNodes: MessageNode[] = [
       {
         id: "u-1",
         sessionId: "session-1",
         parentId: null,
         role: "user",
-        content: "Original prompt",
+        content: "Original prompt with attachment",
+        attachments: [mockAttachment],
         createdAt: new Date(),
       },
       {
@@ -301,14 +346,20 @@ describe("ChatEngine (In-Process State Machine)", () => {
     await engine.loadTree();
 
     transport.setMockStreamChunks(["Edited response"]);
+    // Fork without explicit attachments -> should inherit original attachments
     await engine.forkAndEdit("u-1", "Edited prompt");
 
     const state = engine.getState();
+    // All nodes should now have 4 nodes (2 original + 2 in new branch)
     expect(state.allNodes).toHaveLength(4);
+    // Active path should show the edited prompt and new response
     expect(state.activePath).toHaveLength(2);
     expect(state.activePath[0].content).toBe("Edited prompt");
+    expect(state.activePath[0].attachments).toHaveLength(1);
+    expect(state.activePath[0].attachments?.[0].name).toBe("original.png");
     expect(state.activePath[1].content).toBe("Edited response");
 
+    // Check branch info on the root
     const branchInfo = engine.getBranchInfo(state.activePath[0].id);
     expect(branchInfo.totalBranches).toBe(2);
     expect(branchInfo.currentIndex).toBe(2);
@@ -409,7 +460,7 @@ describe("ChatEngine (In-Process State Machine)", () => {
     await engine.regenerate("a-1");
 
     const state = engine.getState();
-    expect(state.allNodes).toHaveLength(3);
+    expect(state.allNodes).toHaveLength(3); // 1 user + 2 assistant variants
     expect(state.activePath).toHaveLength(2);
     expect(state.activePath[1].content).toBe("Violets are blue...");
     expect(state.activePath[1].parentId).toBe("u-1");

@@ -1,5 +1,6 @@
 import { relations } from "drizzle-orm";
-import { index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { index, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import type { AttachmentEntity } from "@repo/validators";
 
 import { user } from "./auth";
 
@@ -31,6 +32,10 @@ export const chatMessage = pgTable(
     parentId: text("parent_id"), // Self-referencing FK, nullable for root message
     role: text("role").notNull(), // 'user' | 'assistant' | 'system'
     content: text("content").notNull(),
+    attachments: jsonb("attachments")
+      .$type<AttachmentEntity[]>()
+      .default([])
+      .notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()

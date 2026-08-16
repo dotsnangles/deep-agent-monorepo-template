@@ -1,15 +1,24 @@
 "use client";
 
 import { useSyncExternalStore, useEffect, useCallback, useMemo, useRef } from "react";
+import type { AttachmentEntity } from "@repo/validators";
 import { globalChatEngineRegistry } from "../engine";
 import type { ChatEngine, ChatEngineState, ChatEngineOptions } from "../engine";
 import type { BranchInfo } from "../lib/tree";
 
 export interface UseChatEngineReturn extends ChatEngineState {
   engine: ChatEngine;
-  send: (content: string, titleSnippet?: string) => Promise<void>;
+  send: (
+    content: string,
+    attachments?: AttachmentEntity[],
+    titleSnippet?: string
+  ) => Promise<void>;
   respondToApproval: (toolCallId: string, approved: boolean, reason?: string) => Promise<void>;
-  forkAndEdit: (nodeId: string, content: string) => Promise<void>;
+  forkAndEdit: (
+    nodeId: string,
+    content: string,
+    attachments?: AttachmentEntity[]
+  ) => Promise<void>;
   regenerate: (nodeId: string) => Promise<void>;
   selectBranch: (nodeId: string, direction: "prev" | "next") => Promise<void>;
   deleteNode: (nodeId: string) => Promise<void>;
@@ -42,7 +51,8 @@ export function useChatEngine(
   }, [sessionId, engine, state.allNodes.length, state.isGenerating]);
 
   const send = useCallback(
-    (content: string, titleSnippet?: string) => engine.send(content, titleSnippet),
+    (content: string, attachments?: AttachmentEntity[], titleSnippet?: string) =>
+      engine.send(content, attachments, titleSnippet),
     [engine]
   );
 
@@ -53,7 +63,8 @@ export function useChatEngine(
   );
 
   const forkAndEdit = useCallback(
-    (nodeId: string, content: string) => engine.forkAndEdit(nodeId, content),
+    (nodeId: string, content: string, attachments?: AttachmentEntity[]) =>
+      engine.forkAndEdit(nodeId, content, attachments),
     [engine]
   );
 

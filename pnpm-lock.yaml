@@ -304,6 +304,9 @@ importers:
       '@repo/env':
         specifier: workspace:*
         version: link:../env
+      '@repo/validators':
+        specifier: workspace:*
+        version: link:../validators
       dotenv:
         specifier: 'catalog:'
         version: 17.4.2

@@ -1,3 +1,5 @@
+import type { AttachmentEntity } from "@repo/validators";
+
 export interface ToolApprovalRequest {
   toolCallId: string;
   tool: string;
@@ -13,6 +15,7 @@ export interface MessageNode {
   parentId: string | null;
   role: "user" | "assistant" | "system";
   content: string;
+  attachments?: AttachmentEntity[];
   createdAt: Date | string;
   status?: "sending" | "streaming" | "complete" | "error";
   error?: string | null;

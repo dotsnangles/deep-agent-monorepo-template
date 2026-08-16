@@ -39,6 +39,7 @@ function toMessageNode(record: typeof chatMessage.$inferSelect): MessageNode {
     parentId: record.parentId,
     role: record.role as "user" | "assistant" | "system",
     content: record.content,
+    attachments: record.attachments ?? [],
     createdAt: record.createdAt,
   };
 }
@@ -205,6 +206,7 @@ export class DrizzleChatRepository implements ChatRepository {
           parentId: params.parentId || null,
           role: params.role,
           content: params.content,
+          attachments: params.attachments ?? [],
         })
         .returning();
 

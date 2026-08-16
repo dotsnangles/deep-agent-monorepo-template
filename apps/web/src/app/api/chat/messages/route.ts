@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { sessionId, parentId = null, role, content, id } = parseResult.data;
+    const { sessionId, parentId = null, role, content, attachments, id } = parseResult.data;
 
     const result = await chatRepository.saveMessage(
       {
@@ -77,6 +77,7 @@ export async function POST(req: NextRequest) {
         parentId: parentId || null,
         role,
         content,
+        attachments,
       },
       userId
     );

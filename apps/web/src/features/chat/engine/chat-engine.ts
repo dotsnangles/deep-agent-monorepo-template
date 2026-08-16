@@ -1,22 +1,36 @@
 import type {
-  MessageNode,
-  BranchInfo,
-  ToolApprovalRequest,
-} from "../lib/tree";
+  CreateChatMessageDTO,
+  ResumeActionDTO,
+  AttachmentEntity,
+} from "@repo/validators";
 import {
-  traverseActivePath,
-  getBranchInfo,
-  pruneSubtree,
   findNewActiveLeafAfterPrune,
   findDeepestDescendant,
+  getBranchInfo,
+  pruneSubtree,
+  traverseActivePath,
+  type BranchInfo,
+  type MessageNode,
+  type ToolApprovalRequest,
 } from "../lib/tree";
+import { deriveSessionTitle } from "../lib/session-title";
 import {
-  deriveSessionTitle,
-  DEFAULT_SESSION_TITLE,
-} from "../lib/session-title";
-import type { ChatTransport, StreamMessageContext } from "./transport";
-import { HttpChatTransport } from "./transport";
-import type { ResumeActionDTO } from "@repo/validators";
+  HttpChatTransport,
+  type ChatTransport,
+  type StreamMessageContext,
+} from "./transport";
+
+export interface ChatEngineState {
+  sessionId: string;
+  allNodes: MessageNode[];
+  activeLeafId: string | null;
+  activePath: MessageNode[];
+  isLoading: boolean;
+  isGenerating: boolean;
+  generatingAssistantId: string | null;
+  error: string | null;
+  title: string;
+}
 
 export interface ChatEngineOptions {
   sessionId: string;
@@ -24,34 +38,21 @@ export interface ChatEngineOptions {
   initialNodes?: MessageNode[];
   initialActiveLeafId?: string | null;
   initialTitle?: string;
-  onSessionCreated?: (sessionId: string, title?: string) => void;
+  onSessionCreated?: (sessionId: string, title: string) => void;
 }
 
-export interface ChatEngineState {
-  sessionId: string;
-  title: string;
-  allNodes: MessageNode[];
-  activeLeafId: string | null;
-  activePath: MessageNode[];
-  isLoading: boolean;
-  isGenerating: boolean;
-  error: string | null;
-  generatingAssistantId: string | null;
-}
-
-function generateNodeId(prefix: "user" | "asst"): string {
-  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+function generateNodeId(prefix: "user" | "asst" | "sys"): string {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 }
 
 export class ChatEngine {
-  private sessionId: string;
+  public readonly sessionId: string;
   private transport: ChatTransport;
-  private onSessionCreated?: (sessionId: string, title?: string) => void;
-
   private state: ChatEngineState;
-  private listeners: Set<() => void> = new Set();
+  private listeners = new Set<() => void>();
   private abortController: AbortController | null = null;
-  private isSending: boolean = false;
+  private onSessionCreated?: (sessionId: string, title: string) => void;
+  private isSending = false;
 
   constructor(options: ChatEngineOptions) {
     this.sessionId = options.sessionId;
@@ -59,24 +60,35 @@ export class ChatEngine {
     this.onSessionCreated = options.onSessionCreated;
 
     const initialNodes = options.initialNodes || [];
-    const initialLeaf = options.initialActiveLeafId || null;
-    const initialTitle = options.initialTitle || DEFAULT_SESSION_TITLE;
+    const initialActiveLeafId =
+      options.initialActiveLeafId !== undefined ? options.initialActiveLeafId : null;
 
     this.state = {
       sessionId: options.sessionId,
-      title: initialTitle,
       allNodes: initialNodes,
-      activeLeafId: initialLeaf,
-      activePath: traverseActivePath(initialNodes, initialLeaf),
-      isLoading: initialNodes.length === 0,
+      activeLeafId: initialActiveLeafId,
+      activePath:
+        initialNodes.length > 0
+          ? traverseActivePath(initialNodes, initialActiveLeafId)
+          : [],
+      isLoading: !options.initialNodes,
       isGenerating: false,
-      error: null,
       generatingAssistantId: null,
+      error: null,
+      title: options.initialTitle || "새로운 대화",
     };
   }
 
   public getState(): ChatEngineState {
     return this.state;
+  }
+
+  public getSessionId(): string {
+    return this.sessionId;
+  }
+
+  public isCurrentlyGenerating(): boolean {
+    return this.state.isGenerating;
   }
 
   public setTitle(title: string): void {
@@ -111,7 +123,11 @@ export class ChatEngine {
     const activePath = traverseActivePath(this.state.allNodes, activeLeafId);
     return activePath
       .filter((n) => n.id !== excludeId)
-      .map((n) => ({ role: n.role, content: n.content }));
+      .map((n) => ({
+        role: n.role,
+        content: n.content,
+        attachments: n.attachments,
+      }));
   }
 
   public async loadTree(): Promise<void> {
@@ -140,15 +156,19 @@ export class ChatEngine {
     }
   }
 
-  public async send(content: string, titleSnippet?: string): Promise<void> {
-    if (!content.trim() || this.isSending) return;
+  public async send(
+    content: string,
+    attachments?: AttachmentEntity[],
+    titleSnippet?: string
+  ): Promise<void> {
+    if ((!content.trim() && (!attachments || attachments.length === 0)) || this.isSending) return;
     this.isSending = true;
 
     const isInitialMessage = this.state.allNodes.length === 0;
     let derivedTitle = this.state.title;
 
     if (isInitialMessage) {
-      derivedTitle = titleSnippet || deriveSessionTitle(content);
+      derivedTitle = titleSnippet || deriveSessionTitle(content || attachments?.[0]?.name || "새로운 대화");
     }
 
     const userMessageId = generateNodeId("user");
@@ -161,6 +181,7 @@ export class ChatEngine {
       parentId,
       role: "user",
       content: content.trim(),
+      attachments: attachments ? [...attachments] : [],
       createdAt: new Date(),
       status: "complete",
     };
@@ -171,6 +192,7 @@ export class ChatEngine {
       parentId: userMessageId,
       role: "assistant",
       content: "",
+      attachments: [],
       createdAt: new Date(),
       status: "streaming",
     };
@@ -194,6 +216,7 @@ export class ChatEngine {
       parentId: userNode.parentId,
       role: "user",
       content: userNode.content,
+      attachments: userNode.attachments,
     });
 
     // Notify session created only on initial send
@@ -264,8 +287,12 @@ export class ChatEngine {
     this.isSending = false;
   }
 
-  public async forkAndEdit(targetNodeId: string, newContent: string): Promise<void> {
-    if (!newContent.trim() || this.isSending) return;
+  public async forkAndEdit(
+    targetNodeId: string,
+    newContent: string,
+    attachments?: AttachmentEntity[]
+  ): Promise<void> {
+    if (this.isSending) return;
     this.isSending = true;
 
     const targetNode = this.state.allNodes.find((n) => n.id === targetNodeId);
@@ -276,6 +303,12 @@ export class ChatEngine {
 
     const newUserNodeId = generateNodeId("user");
     const newAssistantNodeId = generateNodeId("asst");
+    const inheritedAttachments =
+      attachments !== undefined
+        ? attachments
+        : targetNode.attachments
+        ? [...targetNode.attachments]
+        : [];
 
     const newUserNode: MessageNode = {
       id: newUserNodeId,
@@ -283,6 +316,7 @@ export class ChatEngine {
       parentId: targetNode.parentId, // sibling of targetNode
       role: "user",
       content: newContent.trim(),
+      attachments: inheritedAttachments,
       createdAt: new Date(),
       status: "complete",
     };
@@ -293,6 +327,7 @@ export class ChatEngine {
       parentId: newUserNodeId,
       role: "assistant",
       content: "",
+      attachments: [],
       createdAt: new Date(),
       status: "streaming",
     };
@@ -314,6 +349,7 @@ export class ChatEngine {
       parentId: newUserNode.parentId,
       role: "user",
       content: newUserNode.content,
+      attachments: newUserNode.attachments,
     });
 
     const contextMessages = this.buildContextMessages(newAssistantNodeId, newAssistantNodeId);
@@ -344,6 +380,7 @@ export class ChatEngine {
       parentId: targetAssistant.parentId, // same parent user node
       role: "assistant",
       content: "",
+      attachments: [],
       createdAt: new Date(),
       status: "streaming",
     };
@@ -369,69 +406,67 @@ export class ChatEngine {
     this.isSending = false;
   }
 
-  public async retry(nodeId?: string): Promise<void> {
+  public async retry(failedNodeId?: string): Promise<void> {
     if (this.isSending) return;
-    const targetNodeId = nodeId || this.state.generatingAssistantId || this.state.activeLeafId;
-    if (!targetNodeId) return;
 
-    const targetNode = this.state.allNodes.find((n) => n.id === targetNodeId);
-    if (!targetNode) return;
-
-    if (targetNode.role === "assistant") {
-      this.isSending = true;
-      // Reset content and status
-      this.state = {
-        ...this.state,
-        allNodes: this.state.allNodes.map((n) =>
-          n.id === targetNode.id
-            ? { ...n, content: "", status: "streaming", error: null, toolApproval: null }
-            : n
-        ),
-        activeLeafId: targetNode.id,
-        isGenerating: true,
-        generatingAssistantId: targetNode.id,
-        error: null,
-      };
-      this.notify();
-
-      const contextMessages = this.buildContextMessages(targetNode.id, targetNode.id);
-
-      await this.executeStream({
-        assistantMessageId: targetNode.id,
-        userMessageId: targetNode.parentId,
-        contextMessages,
-      });
-
-      this.isSending = false;
-    } else if (targetNode.role === "user") {
-      const childAssistant = this.state.allNodes.find(
-        (n) => n.parentId === targetNode.id && n.role === "assistant"
-      );
-      if (childAssistant) {
-        await this.retry(childAssistant.id);
-      }
+    let targetNode: MessageNode | undefined;
+    if (failedNodeId) {
+      targetNode = this.state.allNodes.find((n) => n.id === failedNodeId);
+    } else {
+      targetNode = this.state.activePath[this.state.activePath.length - 1];
     }
+
+    if (!targetNode || targetNode.role !== "assistant") return;
+
+    this.isSending = true;
+
+    // Reset status of failed node
+    this.state = {
+      ...this.state,
+      allNodes: this.state.allNodes.map((n) =>
+        n.id === targetNode.id ? { ...n, status: "streaming", error: null, content: "" } : n
+      ),
+      isGenerating: true,
+      generatingAssistantId: targetNode.id,
+      error: null,
+    };
+    this.notify();
+
+    const contextMessages = this.buildContextMessages(targetNode.id, targetNode.id);
+
+    await this.executeStream({
+      assistantMessageId: targetNode.id,
+      userMessageId: targetNode.parentId,
+      contextMessages,
+    });
+
+    this.isSending = false;
   }
 
   public async selectBranch(nodeId: string, direction: "prev" | "next"): Promise<void> {
-    const branchInfo = getBranchInfo(nodeId, this.state.allNodes);
-    if (branchInfo.totalBranches <= 1) return;
+    const targetNode = this.state.allNodes.find((n) => n.id === nodeId);
+    if (!targetNode) return;
 
-    const idx = branchInfo.siblingIds.indexOf(nodeId);
-    if (idx === -1) return;
+    const siblings = this.state.allNodes.filter(
+      (n) => n.sessionId === targetNode.sessionId && n.parentId === targetNode.parentId
+    );
+
+    siblings.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+    const currentIndex = siblings.findIndex((n) => n.id === nodeId);
+    if (currentIndex === -1) return;
 
     const nextIndex =
       direction === "prev"
-        ? (idx - 1 + branchInfo.totalBranches) % branchInfo.totalBranches
-        : (idx + 1) % branchInfo.totalBranches;
+        ? Math.max(0, currentIndex - 1)
+        : Math.min(siblings.length - 1, currentIndex + 1);
 
-    const targetSiblingId = branchInfo.siblingIds[nextIndex];
-    if (!targetSiblingId) return;
+    if (nextIndex === currentIndex) return;
 
-    const targetNode = this.state.allNodes.find((n) => n.id === targetSiblingId);
-    if (!targetNode) return;
+    const targetSibling = siblings[nextIndex];
+    // Find the latest active leaf descending from targetSibling
+    const newLeafId = this.findDeepestDescendantFrom(targetSibling.id);
 
-    const newLeafId = findDeepestDescendant(this.state.allNodes, targetSiblingId);
     this.state = {
       ...this.state,
       activeLeafId: newLeafId,
@@ -581,6 +616,7 @@ export class ChatEngine {
           parentId: params.userMessageId,
           role: "assistant",
           content: accumulatedContent,
+          attachments: [],
         });
       }
 
@@ -589,5 +625,9 @@ export class ChatEngine {
         await this.transport.updateActiveLeaf(this.sessionId, this.state.activeLeafId);
       }
     }
+  }
+
+  private findDeepestDescendantFrom(rootId: string): string {
+    return findDeepestDescendant(this.state.allNodes, rootId);
   }
 }

@@ -1,3 +1,5 @@
+import type { AttachmentEntity } from "@repo/validators";
+
 export interface ChatSessionEntity {
   id: string;
   userId: string;
@@ -13,6 +15,7 @@ export interface MessageNode {
   parentId: string | null;
   role: "user" | "assistant" | "system";
   content: string;
+  attachments?: AttachmentEntity[];
   createdAt: Date;
 }
 
@@ -34,6 +37,7 @@ export interface CreateMessageParams {
   parentId?: string | null;
   role: "user" | "assistant" | "system";
   content: string;
+  attachments?: AttachmentEntity[];
 }
 
 export interface SaveMessageResult {

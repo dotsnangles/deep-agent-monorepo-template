@@ -162,6 +162,42 @@ describe("Zero-DB Chat API Route Handlers Integration", () => {
       expect(deleteRes.status).toBe(400);
     });
 
+    it("persists message attachments via POST and returns them in tree query", async () => {
+      const postReq = new NextRequest("http://localhost:3000/api/chat/messages", {
+        method: "POST",
+        body: JSON.stringify({
+          id: "m-att-1",
+          sessionId: "sess-att-test",
+          role: "user",
+          content: "See attachment",
+          attachments: [
+            {
+              id: "att_1",
+              name: "spec.pdf",
+              url: "https://s3.example.com/spec.pdf",
+              mimeType: "application/pdf",
+              size: 2048,
+              s3Key: "attachments/spec.pdf",
+            },
+          ],
+        }),
+      });
+
+      const postRes = await messagesRoute.POST(postReq);
+      expect(postRes.status).toBe(201);
+      const postData = await postRes.json();
+      expect(postData.message.attachments).toHaveLength(1);
+      expect(postData.message.attachments[0].name).toBe("spec.pdf");
+
+      const getTreeReq = new NextRequest(
+        "http://localhost:3000/api/chat/messages?sessionId=sess-att-test"
+      );
+      const getTreeRes = await messagesRoute.GET(getTreeReq);
+      const treeData = await getTreeRes.json();
+      expect(treeData.messages[0].attachments).toHaveLength(1);
+      expect(treeData.messages[0].attachments[0].name).toBe("spec.pdf");
+    });
+
     it("performs full tree lifecycle: save -> active leaf switch -> prune", async () => {
       // 1. Send first message in lazy session
       const postUserReq = new NextRequest("http://localhost:3000/api/chat/messages", {

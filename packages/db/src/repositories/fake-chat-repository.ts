@@ -138,6 +138,7 @@ export class FakeChatRepository implements ChatRepository {
       parentId: params.parentId || null,
       role: params.role,
       content: params.content,
+      attachments: params.attachments ? [...params.attachments] : [],
       createdAt: new Date(),
     };
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { FakeChatRepository } from "../fake-chat-repository";
 import type { ChatRepository } from "../chat-repository";
+import type { AttachmentEntity } from "@repo/validators";
 
 describe("ChatRepository Contract Tests (FakeChatRepository)", () => {
   let repo: ChatRepository;
@@ -75,7 +76,6 @@ describe("ChatRepository Contract Tests (FakeChatRepository)", () => {
       expect(pruneByB).toBeNull();
     });
 
-
     it("updates session title and active leaf pointer (including nullable)", async () => {
       await repo.createSession({
         id: "sess-update",
@@ -129,7 +129,7 @@ describe("ChatRepository Contract Tests (FakeChatRepository)", () => {
     });
   });
 
-  describe("Message Tree Operations & Atomic Upsert", () => {
+  describe("Message Tree Operations, Attachments & Atomic Upsert", () => {
     it("automatically creates a session on first message if not existing (lazy session)", async () => {
       const result = await repo.saveMessage(
         {
@@ -151,6 +151,37 @@ describe("ChatRepository Contract Tests (FakeChatRepository)", () => {
       expect(tree).not.toBeNull();
       expect(tree?.messages).toHaveLength(1);
       expect(tree?.activePath).toHaveLength(1);
+    });
+
+    it("persists and retrieves attachments on message nodes", async () => {
+      const mockAttachments: AttachmentEntity[] = [
+        {
+          id: "att-1",
+          url: "https://s3.example.com/image.png",
+          name: "image.png",
+          mimeType: "image/png",
+          size: 10240,
+          s3Key: "attachments/usr/image.png",
+        },
+      ];
+
+      const saveResult = await repo.saveMessage(
+        {
+          id: "u-att",
+          sessionId: "sess-att",
+          role: "user",
+          content: "Please analyze this image",
+          attachments: mockAttachments,
+        },
+        USER_A
+      );
+
+      expect(saveResult?.message.attachments).toHaveLength(1);
+      expect(saveResult?.message.attachments?.[0].name).toBe("image.png");
+
+      const tree = await repo.getTree("sess-att", USER_A);
+      expect(tree?.messages[0].attachments).toHaveLength(1);
+      expect(tree?.messages[0].attachments?.[0].url).toBe("https://s3.example.com/image.png");
     });
 
     it("appends user and assistant messages maintaining tree hierarchy", async () => {

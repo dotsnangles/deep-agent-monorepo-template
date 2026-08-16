@@ -4,12 +4,14 @@ import type {
   PatchChatLeafDTO,
   DeleteChatMessageDTO,
   ResumeActionDTO,
+  AttachmentEntity,
 } from "@repo/validators";
 import type { MessageNode, ToolApprovalRequest } from "../lib/tree";
 
 export interface StreamMessageContext {
   role: "user" | "assistant" | "system";
   content: string;
+  attachments?: AttachmentEntity[];
 }
 
 export interface StreamRequestParams {

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ChatEngineRegistry } from "../../engine/chat-engine-registry";
 import { FakeChatTransport } from "../../engine/transport";
 import type { ToolApprovalRequest } from "../../lib/tree";
+import type { AttachmentEntity } from "@repo/validators";
 
 describe("useChatEngine and UI Integration State Flow", () => {
   let transport: FakeChatTransport;
@@ -93,5 +94,26 @@ describe("useChatEngine and UI Integration State Flow", () => {
     const resumedAssistant = resumedState.activePath[1];
     expect(resumedAssistant.toolApproval?.status).toBe("approved");
     expect(resumedAssistant.content).toContain("On branch main");
+  });
+
+  it("handles sending attachments and preserves them across tree state updates", async () => {
+    const engine = registry.getEngine("attachments-session");
+    const mockAttachments: AttachmentEntity[] = [
+      {
+        id: "att-hook-1",
+        name: "diagram.png",
+        url: "http://storage.local/diagram.png",
+        mimeType: "image/png",
+        size: 1024,
+        s3Key: "attachments/diagram.png",
+      },
+    ];
+
+    transport.setMockStreamChunks(["Diagram received"]);
+    await engine.send("Analyze diagram", mockAttachments);
+
+    const userNode = engine.getState().activePath[0];
+    expect(userNode.attachments).toHaveLength(1);
+    expect(userNode.attachments?.[0].name).toBe("diagram.png");
   });
 });
