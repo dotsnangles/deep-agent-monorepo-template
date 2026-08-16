@@ -28,10 +28,22 @@ from src.core.config import (
     get_llm,
 )
 from src.graphs.chat.prompts import MAIN_SYSTEM_PROMPT
+from src.graphs.chat.subagents import get_default_subagents
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_INTERRUPT_TOOLS: dict[str, Any] = {}
+
+
+def _load_agents_memory() -> str | None:
+    """Reads repository AGENTS.md instructions if available."""
+    agents_md = Path("AGENTS.md")
+    if agents_md.exists():
+        try:
+            return agents_md.read_text(encoding="utf-8")
+        except Exception:
+            pass
+    return None
 
 
 class DeepAgentEnvironmentFactory:
@@ -68,11 +80,12 @@ class DeepAgentEnvironmentFactory:
             interrupt_on if interrupt_on is not None else DEFAULT_INTERRUPT_TOOLS
         )
 
+        effective_backend = backend
+
         # -----------------------------------------------------------------
         # 1. LOCAL SLM MODE (Ollama / Small Local Models)
         # -----------------------------------------------------------------
         if effective_mode == EnvironmentMode.LOCAL_SLM:
-            # Enforce single-flight safety: disable general subagents by default
             is_subagents_allowed = (
                 enable_subagents if enable_subagents is not None else ENABLE_SUBAGENTS
             )
@@ -80,13 +93,16 @@ class DeepAgentEnvironmentFactory:
                 list(subagents) if (subagents is not None and is_subagents_allowed) else []
             )
 
-            # Register defensive profile for local model
+            # Defensive harness profile for SLM (concurrency & context protection)
             model_id = getattr(llm, "model", getattr(llm, "model_name", "ollama_slm"))
             try:
                 register_harness_profile(
                     str(model_id),
                     HarnessProfile(
-                        system_prompt_suffix="Keep answers concise.",
+                        system_prompt_suffix="Keep answers concise and direct.",
+                        excluded_tools=(
+                            {"execute", "delete"} if effective_backend is None else set()
+                        ),
                         general_purpose_subagent=GeneralPurposeSubagentProfile(
                             enabled=is_subagents_allowed
                         ),
@@ -112,34 +128,18 @@ class DeepAgentEnvironmentFactory:
                 "store": effective_store,
                 **kwargs,
             }
-            if backend is not None:
-                agent_kwargs["backend"] = backend
-
-            agents_md = Path("AGENTS.md")
-            if agents_md.exists():
-                try:
-                    agent_kwargs["memory"] = agents_md.read_text(encoding="utf-8")
-                except Exception:
-                    pass
-
-            agent_graph = create_deep_agent(**agent_kwargs)
-            logger.info(
-                "[AGENT] Deep Agent graph compiled (mode=LOCAL_SLM, subagents=%d, checkpointer=%s)",
-                len(effective_subagents),
-                type(effective_checkpointer).__name__,
-            )
-            return agent_graph
+            if effective_backend is not None:
+                agent_kwargs["backend"] = effective_backend
 
         # -----------------------------------------------------------------
         # 2. PRODUCTION CLOUD MULTI-LLM MODE
         # -----------------------------------------------------------------
         else:
             is_subagents_allowed = enable_subagents if enable_subagents is not None else True
-            effective_subagents = (
-                list(subagents)
-                if subagents is not None
-                else ([] if not is_subagents_allowed else [])
-            )
+            if subagents is not None:
+                effective_subagents = list(subagents) if is_subagents_allowed else []
+            else:
+                effective_subagents = get_default_subagents() if is_subagents_allowed else []
 
             effective_middleware = list(
                 middleware
@@ -151,7 +151,6 @@ class DeepAgentEnvironmentFactory:
                 ]
             )
 
-            effective_backend = backend
             if effective_backend is None and effective_store is not None:
                 from src.graphs.chat.backends import get_session_backend
 
@@ -177,21 +176,20 @@ class DeepAgentEnvironmentFactory:
             if effective_backend is not None:
                 agent_kwargs["backend"] = effective_backend
 
-            agents_md = Path("AGENTS.md")
-            if agents_md.exists():
-                try:
-                    agent_kwargs["memory"] = agents_md.read_text(encoding="utf-8")
-                except Exception:
-                    pass
-
             skills_dir = Path("./.agents/skills")
             if skills_dir.exists():
                 agent_kwargs["skills"] = [str(skills_dir)]
 
-            agent_graph = create_deep_agent(**agent_kwargs)
-            logger.info(
-                "[AGENT] Graph compiled (mode=PRODUCTION_CLOUD, subagents=%d, cp=%s)",
-                len(effective_subagents),
-                type(effective_checkpointer).__name__,
-            )
-            return agent_graph
+        # Common memory loading
+        memory_content = _load_agents_memory()
+        if memory_content:
+            agent_kwargs["memory"] = memory_content
+
+        agent_graph = create_deep_agent(**agent_kwargs)
+        logger.info(
+            "[AGENT] Graph compiled (mode=%s, subagents=%d, cp=%s)",
+            effective_mode.value,
+            len(effective_subagents),
+            type(effective_checkpointer).__name__,
+        )
+        return agent_graph

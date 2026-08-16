@@ -362,28 +362,15 @@ class AgentExecutionGateway:
         user_id: str | None = None,
         environment: str | None = None,
     ) -> AsyncIterator[AgentStreamEvent]:
-        """Streams structured AgentStreamEvents with HITL interrupt and concurrency control."""
+        from contextlib import nullcontext
+
         from src.core.config import get_inference_concurrency_limit
 
         concurrency_limit = get_inference_concurrency_limit()
         semaphore = InferenceSerializationGateway.get_semaphore(concurrency_limit)
+        lock_ctx = semaphore if semaphore is not None else nullcontext()
 
-        if semaphore is not None:
-            async with semaphore:
-                async for event in self._stream_execution_inner(
-                    messages=messages,
-                    thread_id=thread_id,
-                    agent_type=agent_type,
-                    model=model,
-                    system_prompt=system_prompt,
-                    config=config,
-                    resume_action=resume_action,
-                    backend=backend,
-                    user_id=user_id,
-                    environment=environment,
-                ):
-                    yield event
-        else:
+        async with lock_ctx:
             async for event in self._stream_execution_inner(
                 messages=messages,
                 thread_id=thread_id,
