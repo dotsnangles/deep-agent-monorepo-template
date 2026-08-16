@@ -31,3 +31,8 @@ Key terms and definitions used across `hollow-echo-distant-signal`:
 | Approval Request Event | SSE stream event (`approval_request`) emitted when an agent encounters an approval-required tool breakpoint | Agent & Web (`apps/agent`, `apps/web`) |
 | Tool Action Card | Interactive React component rendering pending tool parameters, formatted diffs, and Approve/Reject buttons | Web Client (`apps/web`) |
 | Resume Command | LangGraph `Command(resume=...)` payload sent over `/chat/stream` delivering human approval or rejection to continue execution | Agent & Web (`apps/agent`, `apps/web`) |
+| Storage Port (`StorageService`) | Deep domain storage interface exposing presigned upload/download URL generation and object management | Storage (`@repo/storage`) |
+| Presigned Upload Gateway | Pre-authenticated direct-to-S3 URL endpoint (`/api/storage/presigned-url`) allowing zero-server-overhead uploads | Web & Storage (`apps/web`, `@repo/storage`) |
+| Message Attachment | Embedded metadata record (`id`, `url`, `name`, `mimeType`, `size`, `s3Key`) bound directly to a `MessageNode` | Database & Web (`@repo/db`, `apps/web`) |
+| Multimodal Context Injection | Transforming attached images into vision blocks and document attachments into contextual prompt sections | Agent (`apps/agent`) |
+| Attachment Staging Bar | Input area component displaying staged file upload chips, progress bars, and image thumbnail previews | Web Client (`apps/web`) |
