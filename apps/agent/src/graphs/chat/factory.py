@@ -24,6 +24,7 @@ from langchain.agents.middleware import (
     ModelCallLimitMiddleware,
     ModelFallbackMiddleware,
     ModelRetryMiddleware,
+    TodoListMiddleware,
     ToolCallLimitMiddleware,
     ToolRetryMiddleware,
 )
@@ -37,7 +38,6 @@ from src.core.config import (
 )
 from src.core.settings import get_agent_config
 from src.graphs.chat.prompts import get_prompt_catalog
-from src.graphs.chat.todo_middleware import RobustTodoListMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +148,7 @@ class DeepAgentEnvironmentFactory:
                 middleware
                 if middleware is not None
                 else [
-                    RobustTodoListMiddleware(),
+                    TodoListMiddleware(),
                     CopilotKitMiddleware(),
                     ModelCallLimitMiddleware(run_limit=effective_model_limit),
                     ToolCallLimitMiddleware(run_limit=effective_tool_limit),
@@ -186,7 +186,7 @@ class DeepAgentEnvironmentFactory:
                 middleware
                 if middleware is not None
                 else [
-                    RobustTodoListMiddleware(),
+                    TodoListMiddleware(),
                     CopilotKitMiddleware(),
                     ModelRetryMiddleware(max_retries=3),
                     ModelCallLimitMiddleware(run_limit=effective_model_limit),
