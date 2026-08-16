@@ -37,6 +37,7 @@ export async function POST(req: NextRequest) {
         messages: messages?.map((m) => ({
           role: m.role,
           content: m.content,
+          attachments: m.attachments,
         })),
         agentType,
         systemPrompt,

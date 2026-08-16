@@ -231,6 +231,16 @@ class AgentExecutionGateway:
                                     yield AgentStreamEvent.token(content=content)
                             elif kind == "on_chat_model_end":
                                 output = event.get("data", {}).get("output")
+                                # Non-streaming fallback if model did not emit token stream events
+                                end_content = getattr(output, "content", "")
+                                if (
+                                    end_content
+                                    and isinstance(end_content, str)
+                                    and total_tokens == 0
+                                ):
+                                    total_tokens += len(end_content)
+                                    yield AgentStreamEvent.token(content=end_content)
+
                                 tool_calls = getattr(output, "tool_calls", None) or []
                                 for tc in tool_calls:
                                     yield AgentStreamEvent.tool_start(
@@ -259,7 +269,13 @@ class AgentExecutionGateway:
                                     node=event.get("name", "node")
                                 )
                     except Exception as stream_err:
-                        logger.debug("Stream completed or interrupted: %s", stream_err)
+                        logger.error(
+                            "Stream execution error for thread %s: %s",
+                            effective_thread_id,
+                            stream_err,
+                        )
+                        yield AgentStreamEvent.error(message=str(stream_err), code="STREAM_FAILED")
+                        return
 
                     # After stream finishes, check if graph entered an interrupted state
                     if hasattr(graph, "aget_state"):
