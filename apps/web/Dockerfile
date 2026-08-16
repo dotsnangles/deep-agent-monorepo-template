@@ -7,6 +7,7 @@ RUN --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store -
 
 ARG NEXT_PUBLIC_SERVER_URL
 ENV NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL}
+ENV SKIP_ENV_VALIDATION=1
 ENV NODE_ENV=production
 RUN cd apps/web && pnpm run build
 # standalone output excludes public/; ensure it exists so the runner copy never fails
