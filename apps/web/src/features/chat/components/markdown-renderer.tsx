@@ -8,6 +8,7 @@ import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import { Check, Copy } from "lucide-react";
 import { useCopyToClipboard } from "../hooks/use-copy-to-clipboard";
+import { InteractiveChartImage } from "./interactive-chart-image";
 
 interface CodeBlockProps {
   language?: string;
@@ -143,6 +144,12 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
           },
           hr() {
             return <hr className="my-3.5 border-border/50" />;
+          },
+          img({ src, alt }) {
+            if (!src) return null;
+            const srcStr = typeof src === "string" ? src : "";
+            if (!srcStr) return null;
+            return <InteractiveChartImage src={srcStr} alt={alt || ""} />;
           },
           a({ href, children }) {
             return (

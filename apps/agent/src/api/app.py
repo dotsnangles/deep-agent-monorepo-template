@@ -7,6 +7,7 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.store.postgres.aio import AsyncPostgresStore
 from psycopg_pool import AsyncConnectionPool
 
+from src.api.routes.artifacts import artifacts_router
 from src.api.routes.chat import chat_router
 from src.api.routes.copilotkit import register_copilotkit_agent
 from src.api.routes.events import events_router
@@ -126,5 +127,6 @@ def create_app() -> FastAPI:
     app.include_router(events_router)
     app.include_router(title_router)
     app.include_router(chat_router)
+    app.include_router(artifacts_router)
 
     return app
