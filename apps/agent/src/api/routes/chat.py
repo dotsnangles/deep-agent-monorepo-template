@@ -54,6 +54,11 @@ class ChatStreamRequestDTO(BaseModel):
         alias="threadId",
         description="Unique conversation session or thread ID",
     )
+    user_id: str | None = Field(
+        default=None,
+        alias="userId",
+        description="User identifier for tenant isolation and Langfuse user tracking",
+    )
     messages: list[ChatMessageInput] = Field(
         default_factory=list,
         description="List of messages in active path",
@@ -100,6 +105,7 @@ async def stream_chat(
         async for event in gateway.stream_execution(
             messages=[msg.model_dump(by_alias=False) for msg in req.messages],
             thread_id=req.thread_id,
+            user_id=req.user_id,
             agent_type=req.agent_type,
             system_prompt=req.system_prompt,
             resume_action=resume_dict,

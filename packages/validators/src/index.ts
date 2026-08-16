@@ -133,6 +133,7 @@ export type StreamMessageContextDTO = z.infer<typeof streamMessageContextSchema>
 
 export const chatStreamRequestSchema = z.object({
   threadId: z.string().optional(),
+  userId: z.string().optional(),
   messages: z.array(streamMessageContextSchema).optional().default([]),
   agentType: z.string().optional(),
   systemPrompt: z.string().optional(),
@@ -140,3 +141,4 @@ export const chatStreamRequestSchema = z.object({
 });
 
 export type ChatStreamRequestDTO = z.infer<typeof chatStreamRequestSchema>;
+

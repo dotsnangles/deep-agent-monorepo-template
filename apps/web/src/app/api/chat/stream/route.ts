@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         threadId,
+        userId: session.user.id,
         messages: messages?.map((m) => ({
           role: m.role,
           content: m.content,

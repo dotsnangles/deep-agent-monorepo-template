@@ -4,6 +4,7 @@ import * as sessionsRoute from "../sessions/route";
 import * as sessionIdRoute from "../sessions/[id]/route";
 import * as forkRoute from "../sessions/[id]/fork/route";
 import * as messagesRoute from "../messages/route";
+import * as streamRoute from "../stream/route";
 import { auth } from "@repo/auth";
 
 const hoisted = vi.hoisted(() => {
@@ -371,4 +372,49 @@ describe("Zero-DB Chat API Route Handlers Integration", () => {
       expect(data.messages[1].content).toBe("Response 1");
     });
   });
+
+  describe("/api/chat/stream (POST)", () => {
+    it("returns 401 when user is not authenticated", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(null as any);
+
+      const req = new NextRequest("http://localhost:3000/api/chat/stream", {
+        method: "POST",
+        body: JSON.stringify({ threadId: "t1", messages: [] }),
+      });
+      const res = await streamRoute.POST(req);
+      expect(res.status).toBe(401);
+    });
+
+    it("forwards userId from session to agent server request payload", async () => {
+      const mockFetch = vi.fn().mockResolvedValue(
+        new Response("event: token\ndata: {}\n\n", {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        })
+      );
+      vi.stubGlobal("fetch", mockFetch);
+
+      const req = new NextRequest("http://localhost:3000/api/chat/stream", {
+        method: "POST",
+        body: JSON.stringify({
+          threadId: "sess-stream-1",
+          messages: [{ role: "user", content: "Test prompt" }],
+        }),
+      });
+
+      const res = await streamRoute.POST(req);
+      expect(res.status).toBe(200);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      const [calledUrl, calledOptions] = mockFetch.mock.calls[0];
+      expect(calledUrl).toContain("/chat/stream");
+      const parsedBody = JSON.parse(calledOptions.body);
+      expect(parsedBody.threadId).toBe("sess-stream-1");
+      expect(parsedBody.userId).toBe(TEST_USER.user.id);
+      expect(parsedBody.messages[0].content).toBe("Test prompt");
+
+      vi.unstubAllGlobals();
+    });
+  });
 });
+

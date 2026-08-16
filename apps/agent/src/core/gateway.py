@@ -1,4 +1,5 @@
 import logging
+import os
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -169,23 +170,27 @@ def _build_trace_metadata(
     messages: list[BaseMessage | dict[str, Any]] | None,
     agent_type: str = "default",
     thread_id: str | None = None,
+    user_id: str | None = None,
+    environment: str | None = None,
 ) -> dict[str, Any]:
-    """Constructs enriched Langfuse trace metadata with turn names, active path stats, and tags."""
+    """Constructs enriched Langfuse trace metadata with turn names, active path stats, user_id, and tags."""
     latest_prompt, has_attachments, turn_index = _extract_user_prompt_info(messages)
     effective_thread_id = thread_id or "default"
+    effective_env = environment or os.getenv("ENVIRONMENT", "development")
 
-    # Truncate trace name if prompt is too long
+    turn_prefix = f"[Turn {turn_index}] " if turn_index > 0 else ""
     if latest_prompt:
         clean_snippet = latest_prompt.replace("\n", " ").strip()
-        if len(clean_snippet) > 35:
-            snippet = f"{clean_snippet[:35]}..."
+        max_snippet_len = max(10, 45 - len(turn_prefix) - 3)
+        if len(clean_snippet) > max_snippet_len:
+            snippet = f"{clean_snippet[:max_snippet_len]}..."
         else:
             snippet = clean_snippet
-        trace_name = f"💬 {snippet}"
+        trace_name = f"{turn_prefix}{snippet}"
     else:
         trace_name = f"Hollow Echo Stream ({agent_type})"
 
-    tags = ["chat", "streaming", f"agent:{agent_type}"]
+    tags = ["chat", "streaming", f"agent:{agent_type}", f"env:{effective_env}"]
     if has_attachments:
         tags.append("multimodal")
 
@@ -196,7 +201,12 @@ def _build_trace_metadata(
         "user_prompt": latest_prompt,
         "active_path_length": len(messages) if messages else 0,
         "turn_index": turn_index,
+        "environment": effective_env,
     }
+    if user_id:
+        metadata["langfuse_user_id"] = user_id
+        metadata["user_id"] = user_id
+
     if has_attachments:
         metadata["has_attachments"] = True
 
@@ -228,7 +238,6 @@ def _extract_interrupt_events(graph_state: Any) -> list[AgentStreamEvent]:
     if not graph_state or not getattr(graph_state, "tasks", None):
         return events
 
-    # Extract pending tool_calls from state messages if available
     pending_tool_calls = []
     if hasattr(graph_state, "values") and isinstance(graph_state.values, dict):
         messages = graph_state.values.get("messages", [])
@@ -236,46 +245,53 @@ def _extract_interrupt_events(graph_state: Any) -> list[AgentStreamEvent]:
             pending_tool_calls = messages[-1].tool_calls or []
 
     for task in graph_state.tasks:
-        if task.interrupts:
-            for interrupt_item in task.interrupts:
-                val = interrupt_item.value
-                if isinstance(val, dict):
-                    # Official Deep Agents action_requests format
-                    if "action_requests" in val and isinstance(val["action_requests"], list):
-                        for req in val["action_requests"]:
-                            tool_name = req.get("name", "tool")
-                            tool_args = req.get("args", {})
-                            matched_id = req.get("id") or req.get("tool_call_id")
-                            if not matched_id and pending_tool_calls:
-                                for tc in pending_tool_calls:
-                                    if tc.get("name") == tool_name and tc.get("args") == tool_args:
-                                        matched_id = tc.get("id")
-                                        break
-                                if not matched_id and len(pending_tool_calls) == 1:
-                                    matched_id = pending_tool_calls[0].get("id")
+        interrupts = getattr(task, "interrupts", [])
+        for intr in interrupts:
+            val = getattr(intr, "value", intr)
+            if isinstance(val, dict) and "action_requests" in val:
+                for req in val.get("action_requests", []):
+                    tool_name = req.get("name", "unknown_tool")
+                    tool_args = req.get("args", {})
+                    matched_id = req.get("id") or req.get("tool_call_id")
+                    if not matched_id and pending_tool_calls:
+                        for tc in pending_tool_calls:
+                            if tc.get("name") == tool_name and tc.get("args") == tool_args:
+                                matched_id = tc.get("id")
+                                break
+                        if not matched_id and len(pending_tool_calls) == 1:
+                            matched_id = pending_tool_calls[0].get("id")
 
-                            events.append(
-                                AgentStreamEvent.approval_request(
-                                    tool=tool_name,
-                                    tool_input=tool_args,
-                                    tool_call_id=matched_id or "",
-                                    description=req.get("description"),
-                                )
-                            )
-                    elif "tool" in val or "input" in val:
-                        events.append(
-                            AgentStreamEvent.approval_request(
-                                tool=val.get("tool", "tool"),
-                                tool_input=val.get("input", {}),
-                                tool_call_id=val.get("tool_call_id", ""),
-                                description=val.get("description"),
-                            )
+                    events.append(
+                        AgentStreamEvent.approval_request(
+                            tool=tool_name,
+                            tool_input=tool_args,
+                            tool_call_id=matched_id or getattr(task, "id", "call_unknown"),
+                            description=req.get(
+                                "description",
+                                f"Action '{tool_name}' requires authorization before execution.",
+                            ),
                         )
+                    )
+            elif isinstance(val, dict) and ("tool" in val or "input" in val):
+                events.append(
+                    AgentStreamEvent.approval_request(
+                        tool=val.get("tool", "unknown_tool"),
+                        tool_input=val.get("input", val.get("args", {})),
+                        tool_call_id=val.get("tool_call_id") or getattr(task, "id", "call_unknown"),
+                        description=val.get(
+                            "description",
+                            f"Action '{val.get('tool')}' requires authorization before execution.",
+                        ),
+                    )
+                )
     return events
 
 
 class AgentExecutionGateway:
-    """Deep domain execution facade orchestrating graph resolution, HITL, and SSE streaming."""
+    """Deep Domain Gateway encapsulating agent workflow compilation,
+
+    streaming, and Human-In-The-Loop execution boundaries.
+    """
 
     def __init__(
         self,
@@ -286,7 +302,11 @@ class AgentExecutionGateway:
         event_broker: RedisEventBroker | None = None,
     ):
         if registry is None:
+            from src.graphs.chat.graph import build_agent
             from src.graphs.registry import global_graph_registry
+
+            if not global_graph_registry.has_graph("default"):
+                global_graph_registry.register("default", build_agent)
 
             self.registry = global_graph_registry
         else:
@@ -318,6 +338,8 @@ class AgentExecutionGateway:
         config: dict[str, Any] | None = None,
         resume_action: dict[str, Any] | None = None,
         backend: Any = None,
+        user_id: str | None = None,
+        environment: str | None = None,
     ) -> AsyncIterator[AgentStreamEvent]:
         """Streams structured AgentStreamEvents with Human-In-The-Loop interrupt support."""
         lc_messages = _normalize_messages(messages, system_prompt=system_prompt)
@@ -325,16 +347,29 @@ class AgentExecutionGateway:
         effective_thread_id = thread_id or "default"
         callbacks = self._build_callbacks(thread_id)
 
+        trace_meta = _build_trace_metadata(
+            messages=messages,
+            agent_type=agent_type,
+            thread_id=effective_thread_id,
+            user_id=user_id,
+            environment=environment,
+        )
+
         stream_config: dict[str, Any] = {
             "configurable": {
                 "thread_id": effective_thread_id,
             },
             "callbacks": callbacks,
+            "metadata": trace_meta,
         }
         if config:
             stream_config.update(config)
             if "configurable" in config:
                 stream_config["configurable"].update(config["configurable"])
+            if "metadata" in config:
+                merged_meta = dict(trace_meta)
+                merged_meta.update(config["metadata"])
+                stream_config["metadata"] = merged_meta
 
         try:
             # Check if a compilable LangGraph workflow is available in the registry

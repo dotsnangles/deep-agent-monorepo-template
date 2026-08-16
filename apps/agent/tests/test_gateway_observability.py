@@ -10,9 +10,9 @@ from src.graphs.registry import GraphRegistry
 @pytest.mark.asyncio
 class TestGatewayObservability:
     async def test_build_trace_metadata_extracts_user_prompt_snippet_and_tags(self):
-        """Metadata builder should generate a readable trace name and tags from messages."""
+        """Metadata builder should generate a readable trace name without emojis, user_id, and tags."""
         messages = [
-            {"role": "user", "content": "메롱"},
+            {"role": "user", "content": "첫 번째 질문"},
             {"role": "assistant", "content": "무엇을 도와드릴까요?"},
             {"role": "user", "content": "크레이지하구만 ! 파이썬 피보나치 코드 알려줘"},
         ]
@@ -21,13 +21,17 @@ class TestGatewayObservability:
             messages=messages,
             agent_type="default",
             thread_id="session-123",
+            user_id="usr_123",
+            environment="test",
         )
 
         assert metadata["langfuse_session_id"] == "session-123"
-        assert metadata["langfuse_trace_name"] == "💬 크레이지하구만 ! 파이썬 피보나치 코드 알려줘"
+        assert metadata["langfuse_user_id"] == "usr_123"
+        assert metadata["langfuse_trace_name"] == "[Turn 2] 크레이지하구만 ! 파이썬 피보나치 코드 알려줘"
         assert "chat" in metadata["langfuse_tags"]
         assert "streaming" in metadata["langfuse_tags"]
         assert "agent:default" in metadata["langfuse_tags"]
+        assert "env:test" in metadata["langfuse_tags"]
         assert metadata["user_prompt"] == "크레이지하구만 ! 파이썬 피보나치 코드 알려줘"
         assert metadata["active_path_length"] == 3
         assert metadata["turn_index"] == 2
@@ -54,8 +58,11 @@ class TestGatewayObservability:
             messages=messages,
             agent_type="default",
             thread_id="session-456",
+            user_id="usr_456",
         )
 
+        assert metadata["langfuse_user_id"] == "usr_456"
+        assert metadata["langfuse_trace_name"] == "[Turn 1] 이 사진 설명해줘"
         assert "multimodal" in metadata["langfuse_tags"]
         assert metadata["has_attachments"] is True
 
@@ -68,8 +75,11 @@ class TestGatewayObservability:
             messages=messages,
             agent_type="default",
             thread_id="session-789",
+            user_id="usr_789",
         )
 
+        assert metadata["langfuse_user_id"] == "usr_789"
+        assert metadata["langfuse_trace_name"].startswith("[Turn 1] ")
         assert len(metadata["langfuse_trace_name"]) <= 45
         assert metadata["langfuse_trace_name"].endswith("...")
 
@@ -91,7 +101,9 @@ class TestGatewayObservability:
             messages=[{"role": "user", "content": "안녕하세요!"}],
             thread_id="test-observability-stream",
             agent_type="default",
+            user_id="usr_stream_test",
         ):
             events.append(ev)
 
         assert any(e.event == "token" for e in events)
+
