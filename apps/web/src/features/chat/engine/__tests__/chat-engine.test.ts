@@ -100,25 +100,30 @@ describe("ChatEngine (In-Process State Machine)", () => {
     expect(state.activePath[1].content).toBe("2+2 is 4.");
   });
 
-  it("sends message, streams chunks, accumulates content, and persists upon completion", async () => {
+  it("sends message, derives optimistic title, streams chunks, and persists upon completion", async () => {
     transport.setMockStreamChunks(["Thinking...", " Answer is 42."]);
+    const sessionCreatedSpy = vi.fn();
+
     const engine = new ChatEngine({
       sessionId: "session-1",
       transport,
+      onSessionCreated: sessionCreatedSpy,
     });
     await engine.loadTree();
 
     const subscriber = vi.fn();
     const unsubscribe = engine.subscribe(subscriber);
 
-    await engine.send("What is the meaning of life?");
+    await engine.send("# What is life?");
 
     const state = engine.getState();
     expect(state.isGenerating).toBe(false);
+    expect(state.title).toBe("What is life?");
+    expect(sessionCreatedSpy).toHaveBeenCalledWith("session-1", "What is life?");
     expect(state.allNodes).toHaveLength(2);
     expect(state.activePath).toHaveLength(2);
     expect(state.activePath[0].role).toBe("user");
-    expect(state.activePath[0].content).toBe("What is the meaning of life?");
+    expect(state.activePath[0].content).toBe("# What is life?");
     expect(state.activePath[1].role).toBe("assistant");
     expect(state.activePath[1].content).toBe("Thinking... Answer is 42.");
     expect(state.activeLeafId).toBe(state.activePath[1].id);
@@ -130,6 +135,21 @@ describe("ChatEngine (In-Process State Machine)", () => {
     expect(transport.persistedNodes[1].content).toBe("Thinking... Answer is 42.");
 
     unsubscribe();
+  });
+
+  it("allows setting title explicitly and notifying subscribers", () => {
+    const engine = new ChatEngine({
+      sessionId: "session-1",
+      transport,
+    });
+    const subscriber = vi.fn();
+    engine.subscribe(subscriber);
+
+    expect(engine.getState().title).toBe("새로운 대화");
+
+    engine.setTitle("Promoted AI Title");
+    expect(engine.getState().title).toBe("Promoted AI Title");
+    expect(subscriber).toHaveBeenCalled();
   });
 
   it("handles stop generation (abort) and persists partial streamed content", async () => {
@@ -199,8 +219,8 @@ describe("ChatEngine (In-Process State Machine)", () => {
 
     // Check branch info on the root
     const branchInfo = engine.getBranchInfo(state.activePath[0].id);
-    expect(branchInfo.total).toBe(2);
-    expect(branchInfo.current).toBe(2);
+    expect(branchInfo.totalBranches).toBe(2);
+    expect(branchInfo.currentIndex).toBe(2);
   });
 
   it("allows navigating between branches with selectBranch", async () => {

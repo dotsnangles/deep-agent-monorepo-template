@@ -11,12 +11,12 @@ export interface StreamRequestParams {
   assistantMessageId: string;
   userMessageId: string | null;
   contextMessages: StreamMessageContext[];
-  titleSnippet?: string;
 }
 
 export interface TreeFetchResult {
   messages: MessageNode[];
   activeLeafId: string | null;
+  title?: string;
 }
 
 export interface DeleteSubtreeResult {
@@ -52,6 +52,7 @@ export class HttpChatTransport implements ChatTransport {
     return {
       messages: data.messages || [],
       activeLeafId: data.activeLeafId || null,
+      title: data.session?.title || data.title,
     };
   }
 
@@ -64,7 +65,6 @@ export class HttpChatTransport implements ChatTransport {
       threadId: params.sessionId,
       messages: params.contextMessages,
     };
-
 
     const res = await this.fetchFn("/api/chat/stream", {
       method: "POST",
@@ -172,6 +172,7 @@ export class FakeChatTransport implements ChatTransport {
       return {
         messages: tree.messages.map((m) => ({ ...m })),
         activeLeafId: tree.activeLeafId,
+        title: tree.title,
       };
     }
     return { messages: [], activeLeafId: null };
@@ -213,7 +214,6 @@ export class FakeChatTransport implements ChatTransport {
     }
     return true;
   }
-
 
   async deleteSubtree(sessionId: string, messageId: string): Promise<DeleteSubtreeResult | null> {
     return {

@@ -2,6 +2,7 @@ import { ChatEngine } from "./chat-engine";
 import type { ChatEngineOptions } from "./chat-engine";
 import type { ChatTransport } from "./transport";
 import { HttpChatTransport } from "./transport";
+import { DEFAULT_SESSION_TITLE } from "../lib/session-title";
 
 export type RegistryEvent =
   | { type: "sessionCreated"; sessionId: string; payload: { title?: string } }
@@ -31,6 +32,7 @@ export class ChatEngineRegistry {
       error: string | null;
       assistantMessageId: string | null;
       lastContent: string;
+      title: string;
     }
   > = new Map();
 
@@ -54,6 +56,7 @@ export class ChatEngineRegistry {
         transport,
         initialNodes: options?.initialNodes,
         initialActiveLeafId: options?.initialActiveLeafId,
+        initialTitle: options?.initialTitle,
         onSessionCreated: (createdSessionId, title) => {
           if (options?.onSessionCreated) {
             options.onSessionCreated(createdSessionId, title);
@@ -61,7 +64,7 @@ export class ChatEngineRegistry {
           this.emit({
             type: "sessionCreated",
             sessionId: createdSessionId,
-            payload: { title },
+            payload: { title: title || DEFAULT_SESSION_TITLE },
           });
         },
       });
@@ -123,11 +126,16 @@ export class ChatEngineRegistry {
   }
 
   public notifyTitleUpdated(sessionId: string, title: string): void {
-    this.emit({
-      type: "titleUpdated",
-      sessionId,
-      payload: { title },
-    });
+    const engine = this.engines.get(sessionId);
+    if (engine) {
+      engine.setTitle(title);
+    } else {
+      this.emit({
+        type: "titleUpdated",
+        sessionId,
+        payload: { title },
+      });
+    }
   }
 
   public notifySessionDeleted(sessionId: string): void {
@@ -147,12 +155,14 @@ export class ChatEngineRegistry {
   }
 
   private attachEngineListeners(sessionId: string, engine: ChatEngine): void {
+    const initialEngineState = engine.getState();
     this.previousEngineStates.set(sessionId, {
-      isGenerating: engine.getState().isGenerating,
+      isGenerating: initialEngineState.isGenerating,
       contentLength: 0,
       error: null,
       assistantMessageId: null,
       lastContent: "",
+      title: initialEngineState.title,
     });
 
     engine.subscribe(() => {
@@ -163,6 +173,7 @@ export class ChatEngineRegistry {
         error: null,
         assistantMessageId: null,
         lastContent: "",
+        title: DEFAULT_SESSION_TITLE,
       };
 
       const activeAssistantId = state.generatingAssistantId || prev.assistantMessageId;
@@ -170,6 +181,15 @@ export class ChatEngineRegistry {
         state.allNodes.find((n) => n.id === activeAssistantId);
       const currentContent = activeAssistant?.content || "";
       const currentLength = currentContent.length;
+
+      // Detect title updated
+      if (state.title !== prev.title) {
+        this.emit({
+          type: "titleUpdated",
+          sessionId,
+          payload: { title: state.title },
+        });
+      }
 
       // Detect stream started
       if (!prev.isGenerating && state.isGenerating) {
@@ -220,6 +240,7 @@ export class ChatEngineRegistry {
         error: state.error,
         assistantMessageId: state.generatingAssistantId || prev.assistantMessageId,
         lastContent: currentContent || prev.lastContent,
+        title: state.title,
       });
     });
   }

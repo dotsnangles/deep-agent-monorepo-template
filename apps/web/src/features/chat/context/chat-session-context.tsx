@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
 import { globalChatEngineRegistry } from "../engine";
+import { DEFAULT_SESSION_TITLE } from "../lib/session-title";
 
 export interface ChatSession {
   id: string;
@@ -37,7 +38,7 @@ const ChatSessionContext = createContext<ChatSessionContextType | null>(null);
 
 const STORAGE_KEY = "hollow_echo_active_thread_id";
 
-function createDraftSession(id: string, title = "새로운 대화", userId = "guest"): ChatSession {
+function createDraftSession(id: string, title = DEFAULT_SESSION_TITLE, userId = "guest"): ChatSession {
   return {
     id,
     userId,
@@ -106,7 +107,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
               .filter((genId) => !fetchedSessions.some((s) => s.id === genId))
               .map((genId) => {
                 const existing = prev.find((p) => p.id === genId);
-                return existing || createDraftSession(genId, "새로운 대화", sessionData?.user?.id);
+                return existing || createDraftSession(genId, DEFAULT_SESSION_TITLE, sessionData?.user?.id);
               });
 
             return [...memorySessions, ...fetchedSessions];
@@ -135,17 +136,25 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
     return () => window.removeEventListener("focus", onFocus);
   }, [fetchSessions]);
 
-  // Optimistically add session to local list
+  // Optimistically add session to local list or update placeholder title
   const optimisticAddSession = useCallback(
-    (id: string, title = "새로운 대화") => {
+    (id: string, title = DEFAULT_SESSION_TITLE) => {
       setSessions((prev) => {
-        if (prev.some((s) => s.id === id)) return prev;
+        const existingIdx = prev.findIndex((s) => s.id === id);
+        if (existingIdx !== -1) {
+          const existing = prev[existingIdx];
+          if (existing.title === DEFAULT_SESSION_TITLE && title !== DEFAULT_SESSION_TITLE) {
+            const updated = [...prev];
+            updated[existingIdx] = { ...existing, title };
+            return updated;
+          }
+          return prev;
+        }
         return [createDraftSession(id, title, sessionData?.user?.id), ...prev];
       });
     },
     [sessionData?.user?.id]
   );
-
 
   // Subscribe to ChatEngineRegistry event bus (replaces legacy StreamManager polling & subscriptions)
   useEffect(() => {
@@ -153,7 +162,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
       setGeneratingSessionIds(globalChatEngineRegistry.getGeneratingSessionIds());
 
       if (event.type === "sessionCreated") {
-        optimisticAddSession(event.sessionId, event.payload?.title || "새로운 대화");
+        optimisticAddSession(event.sessionId, event.payload?.title || DEFAULT_SESSION_TITLE);
       } else if (event.type === "titleUpdated") {
         setSessions((prev) =>
           prev.map((s) => (s.id === event.sessionId ? { ...s, title: event.payload.title } : s))

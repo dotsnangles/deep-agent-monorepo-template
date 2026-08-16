@@ -9,6 +9,10 @@ import {
   findNewActiveLeafAfterPrune,
   findDeepestDescendant,
 } from "../lib/tree";
+import {
+  deriveSessionTitle,
+  DEFAULT_SESSION_TITLE,
+} from "../lib/session-title";
 import type { ChatTransport, StreamMessageContext } from "./transport";
 import { HttpChatTransport } from "./transport";
 
@@ -17,11 +21,13 @@ export interface ChatEngineOptions {
   transport?: ChatTransport;
   initialNodes?: MessageNode[];
   initialActiveLeafId?: string | null;
+  initialTitle?: string;
   onSessionCreated?: (sessionId: string, title?: string) => void;
 }
 
 export interface ChatEngineState {
   sessionId: string;
+  title: string;
   allNodes: MessageNode[];
   activeLeafId: string | null;
   activePath: MessageNode[];
@@ -52,9 +58,11 @@ export class ChatEngine {
 
     const initialNodes = options.initialNodes || [];
     const initialLeaf = options.initialActiveLeafId || null;
+    const initialTitle = options.initialTitle || DEFAULT_SESSION_TITLE;
 
     this.state = {
       sessionId: options.sessionId,
+      title: initialTitle,
       allNodes: initialNodes,
       activeLeafId: initialLeaf,
       activePath: traverseActivePath(initialNodes, initialLeaf),
@@ -67,6 +75,16 @@ export class ChatEngine {
 
   public getState(): ChatEngineState {
     return this.state;
+  }
+
+  public setTitle(title: string): void {
+    if (this.state.title !== title) {
+      this.state = {
+        ...this.state,
+        title,
+      };
+      this.notify();
+    }
   }
 
   public subscribe(listener: () => void): () => void {
@@ -105,6 +123,7 @@ export class ChatEngine {
         ...this.state,
         allNodes: result.messages,
         activeLeafId: result.activeLeafId,
+        title: result.title || this.state.title,
         isLoading: false,
       };
       this.notify();
@@ -122,6 +141,13 @@ export class ChatEngine {
   public async send(content: string, titleSnippet?: string): Promise<void> {
     if (!content.trim() || this.isSending) return;
     this.isSending = true;
+
+    const isInitialMessage = this.state.allNodes.length === 0;
+    let derivedTitle = this.state.title;
+
+    if (isInitialMessage) {
+      derivedTitle = titleSnippet || deriveSessionTitle(content);
+    }
 
     const userMessageId = generateNodeId("user");
     const assistantMessageId = generateNodeId("asst");
@@ -147,9 +173,10 @@ export class ChatEngine {
       status: "streaming",
     };
 
-    // Optimistically append user and empty assistant node
+    // Optimistically append user and empty assistant node + derived title on initial send
     this.state = {
       ...this.state,
+      title: isInitialMessage ? derivedTitle : this.state.title,
       allNodes: [...this.state.allNodes, userNode, assistantNode],
       activeLeafId: assistantMessageId,
       isGenerating: true,
@@ -167,9 +194,9 @@ export class ChatEngine {
       content: userNode.content,
     });
 
-    // Notify session created if lazy
-    if (this.onSessionCreated) {
-      this.onSessionCreated(this.sessionId, content.slice(0, 30));
+    // Notify session created only on initial send
+    if (isInitialMessage && this.onSessionCreated) {
+      this.onSessionCreated(this.sessionId, derivedTitle);
     }
 
     const contextMessages = this.buildContextMessages(assistantMessageId, assistantMessageId);
@@ -178,7 +205,6 @@ export class ChatEngine {
       assistantMessageId,
       userMessageId,
       contextMessages,
-      titleSnippet,
     });
 
     this.isSending = false;
@@ -332,7 +358,6 @@ export class ChatEngine {
     }
   }
 
-
   public async selectBranch(nodeId: string, direction: "prev" | "next"): Promise<void> {
     const branchInfo = getBranchInfo(nodeId, this.state.allNodes);
     if (branchInfo.totalBranches <= 1) return;
@@ -388,12 +413,10 @@ export class ChatEngine {
     return getBranchInfo(nodeId, this.state.allNodes);
   }
 
-
   private async executeStream(params: {
     assistantMessageId: string;
     userMessageId: string | null;
     contextMessages: StreamMessageContext[];
-    titleSnippet?: string;
   }): Promise<void> {
     this.abortController = new AbortController();
     let accumulatedContent = "";
@@ -405,7 +428,6 @@ export class ChatEngine {
           assistantMessageId: params.assistantMessageId,
           userMessageId: params.userMessageId,
           contextMessages: params.contextMessages,
-          titleSnippet: params.titleSnippet,
         },
         (chunk) => {
           accumulatedContent += chunk;

@@ -79,7 +79,29 @@ describe("ChatEngineRegistry (Multi-Session Lifecycle & Event Bus)", () => {
     expect(reconnectedEngine.getState().activePath[1].content).toBe("Part 1 Part 2 Part 3");
   });
 
-  it("emits lifecycle events to global subscribers on stream events, chunk reception, and title updates", async () => {
+  it("automatically emits titleUpdated on initial optimistic derivation during send", async () => {
+    transport.setMockStreamChunks(["Response chunk"]);
+
+    const events: RegistryEvent[] = [];
+    const unsubscribe = registry.subscribe((event) => {
+      events.push(event);
+    });
+
+    const engine = registry.getEngine("session-title-auto");
+    await engine.send("# React Query vs SWR 비교");
+
+    const eventTypes = events.map((e) => e.type);
+    expect(eventTypes).toContain("sessionCreated");
+    expect(eventTypes).toContain("titleUpdated");
+
+    const titleEvent = events.find((e) => e.type === "titleUpdated");
+    expect(titleEvent?.sessionId).toBe("session-title-auto");
+    expect(titleEvent?.payload?.title).toBe("React Query vs SWR 비교");
+
+    unsubscribe();
+  });
+
+  it("emits lifecycle events to global subscribers on stream events, chunk reception, and manual title updates", async () => {
     transport.setMockStreamChunks(["Chunk 1", " Chunk 2"]);
 
     const events: RegistryEvent[] = [];
@@ -88,26 +110,33 @@ describe("ChatEngineRegistry (Multi-Session Lifecycle & Event Bus)", () => {
     });
 
     const engine = registry.getEngine("session-1");
-    await engine.send("Hi");
+    await engine.send("# Hi there!");
 
     registry.notifyTitleUpdated("session-1", "New Greeting Title");
 
     const eventTypes = events.map((e) => e.type);
+    expect(eventTypes).toContain("sessionCreated");
     expect(eventTypes).toContain("streamStarted");
     expect(eventTypes).toContain("streamChunk");
     expect(eventTypes).toContain("streamCompleted");
     expect(eventTypes).toContain("titleUpdated");
 
+    const sessionCreatedEvent = events.find((e) => e.type === "sessionCreated");
+    expect(sessionCreatedEvent?.payload?.title).toBe("Hi there!");
+
     const completedEvent = events.find((e) => e.type === "streamCompleted");
     expect(completedEvent?.payload?.assistantMessageId).toBeDefined();
     expect(completedEvent?.payload?.content).toBe("Chunk 1 Chunk 2");
 
-    const titleEvent = events.find((e) => e.type === "titleUpdated");
-    expect(titleEvent?.payload?.title).toBe("New Greeting Title");
+    const titleEvents = events.filter((e) => e.type === "titleUpdated");
+    expect(titleEvents.length).toBeGreaterThanOrEqual(1);
+    expect(titleEvents[titleEvents.length - 1].payload.title).toBe("New Greeting Title");
+
+    // Check engine's in-memory title was updated
+    expect(engine.getState().title).toBe("New Greeting Title");
 
     unsubscribe();
   });
-
 
   it("emits streamError event on network failure", async () => {
     transport.setMockStreamError(new Error("Stream timeout"));
