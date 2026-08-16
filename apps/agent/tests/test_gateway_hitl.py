@@ -27,9 +27,7 @@ def hitl_gateway_fixture():
 
 class TestAgentExecutionGatewayHITL:
     @pytest.mark.asyncio
-    async def test_stream_execution_emits_approval_request_on_interrupt(
-        self, hitl_gateway_fixture
-    ):
+    async def test_stream_execution_emits_approval_request_on_interrupt(self, hitl_gateway_fixture):
         tool_call = {
             "name": "execute_command",
             "args": {"command": "npm install"},
@@ -112,9 +110,7 @@ class TestAgentExecutionGatewayHITL:
         assert done_event.data.finish_reason == "stop"
 
     @pytest.mark.asyncio
-    async def test_stream_execution_resumes_with_rejection(
-        self, hitl_gateway_fixture
-    ):
+    async def test_stream_execution_resumes_with_rejection(self, hitl_gateway_fixture):
         tool_call = {
             "name": "delete_resource",
             "args": {"resource_id": "res_123"},

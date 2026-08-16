@@ -3,14 +3,17 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.core import AgentExecutionGateway
+from src.schemas import AttachmentInput
 
 chat_router = APIRouter(prefix="/chat", tags=["chat"])
 
 
 class ChatMessageInput(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     role: str = Field(
         default="user",
         description="Message author role: user, assistant, system",
@@ -19,9 +22,15 @@ class ChatMessageInput(BaseModel):
         default="",
         description="Text content of the message",
     )
+    attachments: list[AttachmentInput] = Field(
+        default_factory=list,
+        description="List of attached files (multimodal images, documents)",
+    )
 
 
 class ResumeActionInput(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     tool_call_id: str | None = Field(
         default=None,
         alias="toolCallId",
@@ -38,6 +47,8 @@ class ResumeActionInput(BaseModel):
 
 
 class ChatStreamRequestDTO(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     thread_id: str | None = Field(
         default=None,
         alias="threadId",
@@ -87,7 +98,7 @@ async def stream_chat(
 
     async def sse_event_generator() -> AsyncIterator[str]:
         async for event in gateway.stream_execution(
-            messages=[msg.model_dump() for msg in req.messages],
+            messages=[msg.model_dump(by_alias=False) for msg in req.messages],
             thread_id=req.thread_id,
             agent_type=req.agent_type,
             system_prompt=req.system_prompt,

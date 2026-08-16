@@ -19,10 +19,12 @@ async def test_title_worker_processes_job_and_publishes_event():
         title_generator=mock_title_generator,
     )
 
-    task_payload = json.dumps({
-        "sessionId": "sess_abc_123",
-        "userPrompt": "React Next.js 아키텍처 설계 질문",
-    })
+    task_payload = json.dumps(
+        {
+            "sessionId": "sess_abc_123",
+            "userPrompt": "React Next.js 아키텍처 설계 질문",
+        }
+    )
 
     await worker._process_task(task_payload)
 

@@ -10,7 +10,7 @@ def sensitive_tool(
     description: str | None = None,
     name: str | None = None,
 ) -> Callable:
-    """Decorator marking a LangChain tool as requiring Human-In-The-Loop approval before execution."""
+    """Decorator marking a LangChain tool as requiring HITL approval before execution."""
 
     def decorator(func: Callable) -> BaseTool:
         func_doc = getattr(func, "__doc__", None) or ""

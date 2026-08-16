@@ -59,7 +59,7 @@ def build_hitl_agent_graph(
     system_prompt: str | None = None,
     **kwargs: Any,
 ):
-    """Builds and compiles a LangGraph workflow with dynamic Human-In-The-Loop (HITL) tool execution."""
+    """Builds and compiles a LangGraph workflow with Human-In-The-Loop (HITL) tool execution."""
     llm = model if model is not None else get_llm()
     all_tools = list(tools if tools is not None else (get_default_tools() + get_sensitive_tools()))
     tool_map = {t.name: t for t in all_tools}

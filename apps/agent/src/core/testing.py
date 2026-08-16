@@ -17,6 +17,7 @@ class FakeChatModel(BaseChatModel):
     tokens: list[str] | None = None
     tool_calls: list[dict[str, Any]] | None = None
     bound_tools: list[Any] = []
+    received_messages: list[list[BaseMessage]] = []
     _idx: int = 0
 
     @property
@@ -34,6 +35,7 @@ class FakeChatModel(BaseChatModel):
             tokens=self.tokens,
             tool_calls=self.tool_calls,
             bound_tools=list(tools),
+            received_messages=self.received_messages,
         )
 
     def _get_tokens(self) -> list[str]:
@@ -70,6 +72,7 @@ class FakeChatModel(BaseChatModel):
         run_manager: CallbackManagerForLLMRun | None = None,
         **kwargs: Any,
     ) -> ChatResult:
+        self.received_messages.append(list(messages))
         response_text = self.responses[self._idx % len(self.responses)]
         self._idx += 1
         message = AIMessage(
@@ -95,6 +98,7 @@ class FakeChatModel(BaseChatModel):
         run_manager: CallbackManagerForLLMRun | None = None,
         **kwargs: Any,
     ) -> Iterator[ChatGenerationChunk]:
+        self.received_messages.append(list(messages))
         tool_chunks = self._generate_tool_chunks()
         if tool_chunks:
             for chunk in tool_chunks:
@@ -114,6 +118,7 @@ class FakeChatModel(BaseChatModel):
         run_manager: AsyncCallbackManagerForLLMRun | None = None,
         **kwargs: Any,
     ) -> AsyncIterator[ChatGenerationChunk]:
+        self.received_messages.append(list(messages))
         tool_chunks = self._generate_tool_chunks()
         if tool_chunks:
             for chunk in tool_chunks:

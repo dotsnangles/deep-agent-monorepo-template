@@ -37,6 +37,46 @@ async def test_chat_stream_api_endpoint_returns_sse_stream():
 
 
 @pytest.mark.asyncio
+async def test_chat_stream_api_endpoint_accepts_attachments():
+    app = create_app()
+
+    fake_model = FakeChatModel(tokens=["Visual", " ", "Summary"])
+    app.state.gateway = AgentExecutionGateway(model=fake_model)
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        payload = {
+            "threadId": "test_session_multimodal_sse",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Please analyze this image",
+                    "attachments": [
+                        {
+                            "id": "att-api-1",
+                            "name": "preview.png",
+                            "url": "https://s3.local/preview.png",
+                            "mimeType": "image/png",
+                            "size": 4096,
+                            "s3Key": "attachments/preview.png",
+                        }
+                    ],
+                },
+            ],
+            "agentType": "direct",
+        }
+
+        response = await client.post("/chat/stream", json=payload)
+        assert response.status_code == 200
+        assert "text/event-stream" in response.headers.get("content-type", "")
+
+        body_text = response.text
+        assert "event: token" in body_text
+        assert "Visual" in body_text
+        assert "event: done" in body_text
+
+
+@pytest.mark.asyncio
 async def test_chat_stream_api_endpoint_handles_hitl_interrupt_and_approval():
     app = create_app()
 

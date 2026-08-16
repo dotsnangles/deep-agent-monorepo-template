@@ -1,5 +1,6 @@
 """Data Transfer Objects (DTOs) and Pydantic schemas for the agent service."""
 
+from src.schemas.attachments import AttachmentInput
 from src.schemas.events import (
     AgentEventType,
     AgentStreamEvent,
@@ -16,6 +17,7 @@ __all__ = [
     "AgentEventType",
     "AgentStreamEvent",
     "ApprovalRequestEventData",
+    "AttachmentInput",
     "DoneEventData",
     "ErrorEventData",
     "NodeTransitionEventData",

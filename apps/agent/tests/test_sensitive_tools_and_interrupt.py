@@ -1,4 +1,3 @@
-import json
 import pytest
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
@@ -109,7 +108,7 @@ class TestLangGraphHITLInterruptAndResume:
             "args": {"command": "echo 'hello'"},
             "id": "call_approve_1",
         }
-        # First invocation returns tool call, second invocation (after tool execution) returns final answer
+        # First invocation returns tool call, second invocation returns final answer
         fake_llm = FakeChatModel(
             tool_calls=[tool_call],
             responses=["도구가 성공적으로 실행되었습니다."],
@@ -134,7 +133,9 @@ class TestLangGraphHITLInterruptAndResume:
         )
 
         messages = resume_result["messages"]
-        tool_messages = [m for m in messages if getattr(m, "tool_call_id", None) == "call_approve_1"]
+        tool_messages = [
+            m for m in messages if getattr(m, "tool_call_id", None) == "call_approve_1"
+        ]
         assert len(tool_messages) == 1
         assert "Executed command" in tool_messages[0].content
 

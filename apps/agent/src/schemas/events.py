@@ -63,9 +63,7 @@ class AgentStreamEvent(BaseModel):
     def to_sse(self) -> str:
         """Serializes the event into Server-Sent Events (SSE) format with camelCase aliases."""
         payload = (
-            self.data.model_dump(by_alias=True)
-            if isinstance(self.data, BaseModel)
-            else self.data
+            self.data.model_dump(by_alias=True) if isinstance(self.data, BaseModel) else self.data
         )
         json_data = json.dumps(payload, ensure_ascii=False)
         return f"event: {self.event}\ndata: {json_data}\n\n"

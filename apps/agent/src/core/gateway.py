@@ -1,6 +1,6 @@
 import logging
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
@@ -10,10 +10,7 @@ from src.core.config import get_llm
 from src.core.observability import get_langfuse_callback
 from src.core.redis import RedisEventBroker, RedisStreamingCallbackHandler
 from src.graphs.chat import MAIN_SYSTEM_PROMPT
-from src.schemas import AgentStreamEvent
-
-if TYPE_CHECKING:
-    from src.graphs.registry import GraphRegistry
+from src.schemas import AgentStreamEvent, AttachmentInput
 
 logger = logging.getLogger(__name__)
 
@@ -26,11 +23,40 @@ ROLE_MAP = {
 }
 
 
+def _is_image_attachment(att: AttachmentInput) -> bool:
+    return att.mime_type.lower().startswith("image/")
+
+
+def _format_document_attachments(docs: list[AttachmentInput]) -> str:
+    sections = [
+        f"- **{doc.name}** ({doc.mime_type}, {doc.size} bytes): [Download/View Document]({doc.url})"
+        for doc in docs
+    ]
+    return "\n[Attached Documents]\n" + "\n".join(sections)
+
+
+def _build_multimodal_content(
+    text_content: str,
+    images: list[AttachmentInput],
+) -> list[dict[str, Any]]:
+    blocks: list[dict[str, Any]] = []
+    if text_content:
+        blocks.append({"type": "text", "text": text_content})
+    for img in images:
+        blocks.append(
+            {
+                "type": "image_url",
+                "image_url": {"url": img.url},
+            }
+        )
+    return blocks
+
+
 def _normalize_messages(
     messages: list[BaseMessage | dict[str, Any]] | None,
     system_prompt: str | None = None,
 ) -> list[BaseMessage]:
-    """Converts mixed dicts/BaseMessages into BaseMessages with effective system prompt."""
+    """Converts input messages into BaseMessages with system prompt and attachments."""
     if not messages:
         return [SystemMessage(content=system_prompt or MAIN_SYSTEM_PROMPT)]
 
@@ -47,13 +73,38 @@ def _normalize_messages(
                 normalized.append(msg)
         elif isinstance(msg, dict):
             role = str(msg.get("role", "user")).lower()
-            content = str(msg.get("content", ""))
+            raw_content = str(msg.get("content", ""))
+            attachments_raw = msg.get("attachments") or []
+
+            parsed_attachments: list[AttachmentInput] = []
+            for att in attachments_raw:
+                if isinstance(att, AttachmentInput):
+                    parsed_attachments.append(att)
+                elif isinstance(att, dict):
+                    parsed_attachments.append(AttachmentInput.model_validate(att))
+
+            # Partition typed attachments into images and documents
+            images = [att for att in parsed_attachments if _is_image_attachment(att)]
+            docs = [att for att in parsed_attachments if not _is_image_attachment(att)]
+
+            text_content = raw_content
+            if docs:
+                doc_header = _format_document_attachments(docs)
+                if text_content:
+                    text_content = f"{text_content}\n\n{doc_header}"
+                else:
+                    text_content = doc_header.strip()
+
             cls = ROLE_MAP.get(role, HumanMessage)
             if cls is SystemMessage:
                 has_system = True
                 normalized.append(SystemMessage(content=effective_system))
             else:
-                normalized.append(cls(content=content))
+                if images:
+                    content_blocks = _build_multimodal_content(text_content, images)
+                    normalized.append(cls(content=content_blocks))
+                else:
+                    normalized.append(cls(content=text_content))
 
     if not has_system:
         normalized.insert(0, SystemMessage(content=effective_system))
@@ -84,7 +135,7 @@ def _extract_interrupt_events(graph_state: Any) -> list[AgentStreamEvent]:
 
 
 class AgentExecutionGateway:
-    """Deep domain execution facade orchestrating graph resolution, HITL interrupts, and SSE event streaming."""
+    """Deep domain execution facade orchestrating graph resolution, HITL, and SSE streaming."""
 
     def __init__(
         self,
@@ -127,7 +178,7 @@ class AgentExecutionGateway:
         config: dict[str, Any] | None = None,
         resume_action: dict[str, Any] | None = None,
     ) -> AsyncIterator[AgentStreamEvent]:
-        """Streams structured AgentStreamEvents with support for Human-In-The-Loop interrupt and resume."""
+        """Streams structured AgentStreamEvents with Human-In-The-Loop interrupt support."""
         lc_messages = _normalize_messages(messages, system_prompt=system_prompt)
         effective_model = model or self.default_model or get_llm()
         effective_thread_id = thread_id or "default"
@@ -156,7 +207,7 @@ class AgentExecutionGateway:
                     model=effective_model,
                 )
 
-                # Determine graph input: Command(resume=...) for HITL resume or {"messages": ...} for initial input
+                # Determine graph input: Command(resume=...) for HITL resume or initial input
                 if resume_action is not None:
                     graph_input = Command(resume=resume_action)
                 else:
@@ -204,7 +255,9 @@ class AgentExecutionGateway:
                                 "tools",
                                 "generate",
                             ):
-                                yield AgentStreamEvent.node_transition(node=event.get("name", "node"))
+                                yield AgentStreamEvent.node_transition(
+                                    node=event.get("name", "node")
+                                )
                     except Exception as stream_err:
                         logger.debug("Stream completed or interrupted: %s", stream_err)
 
