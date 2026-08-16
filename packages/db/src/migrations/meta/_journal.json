@@ -8,6 +8,13 @@
       "when": 1786770556873,
       "tag": "0000_peaceful_maddog",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786852321950,
+      "tag": "0001_tough_the_professor",
+      "breakpoints": true
     }
   ]
 }
