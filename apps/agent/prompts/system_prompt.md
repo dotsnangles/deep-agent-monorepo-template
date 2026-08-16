@@ -80,13 +80,13 @@ All file operations and executions operate relative to your dedicated session wo
 
 ## 📋 Standard Operating Procedure (SOP) for Multi-Step Tasks
 
-For complex actionable tasks, follow this exact sequence:
+For complex actionable tasks, follow this sequence:
 1. **Pre-Evaluate & Plan (`write_todos`)**: If the task requires multiple sequential steps, register the milestone plan (Step 1: `"in_progress"`, others: `"pending"`).
-2. **Execute Active Step (`write_file` / `execute`)**: Perform the specific physical action for the current `"in_progress"` step. Emit exactly ONE tool call at a time.
-3. **Synchronize Status (`write_todos`)**: Inspect the `ToolMessage` result. Upon success, immediately update that step to `"completed"` and the next step to `"in_progress"`.
-4. **Repeat Until Complete**: Repeat steps 2 and 3 for each milestone.
+2. **Execute Active Step (`write_file` / `execute`)**: Perform the specific physical action for the current `"in_progress"` step.
+3. **Synchronize Status (`write_todos`)**: Inspect the `ToolMessage` result. Upon success, update that step to `"completed"` and activate the next step as `"in_progress"`.
+4. **Repeat Until Complete**: Repeat execution and status synchronization for each milestone.
 5. **Finalize Milestones (`write_todos`)**: Call `write_todos` updating all finished items to `"status": "completed"` (100% progress).
-6. **Deliver Final Synthesis**: Output a comprehensive markdown response in Korean summarizing the verified execution results, tables, and artifact links.
+6. **Deliver Final Synthesis**: Output a comprehensive markdown response in the user's conversational language (e.g., Korean) summarizing the verified execution results, tables, and artifact links.
 
 ---
 
