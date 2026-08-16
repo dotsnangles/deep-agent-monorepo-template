@@ -1,6 +1,5 @@
 import logging
 import os
-import sys
 from typing import Any
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
@@ -12,37 +11,28 @@ logger = logging.getLogger(__name__)
 
 
 class CheckpointerFactory:
-    """Single Source of Truth for LangGraph Checkpointers and Stores.
+    """Single Source of Truth for LangGraph Checkpointers and Stores (ADR-0024).
 
-    - Production / Development: Connects to PostgreSQL via AsyncPostgresSaver & AsyncPostgresStore
-      using connection pooling and automatic schema initialization (`setup()`).
-    - Testing / Fallback: Provides zero-cost in-memory MemorySaver & InMemoryStore for
-      hermetic tests.
+    - PostgreSQL Mode: When `DATABASE_URL` or an active `AsyncConnectionPool` is provided,
+      instantiates `AsyncPostgresSaver` and `AsyncPostgresStore`.
+    - Memory Fallback: When no database URL or pool is provided, safely returns
+      `MemorySaver` and `InMemoryStore` for lightweight testing or stateless workflows.
     """
-
-    @classmethod
-    def is_test_environment(cls, env: str | None = None) -> bool:
-        current_env = (
-            env
-            or os.getenv("ENVIRONMENT")
-            or os.getenv("NODE_ENV")
-            or (
-                "test"
-                if "pytest" in sys.modules or "pytest" in os.getenv("_", "")
-                else "development"
-            )
-        )
-        return current_env.lower() in ("test", "testing")
 
     _pool: Any = None
 
     @classmethod
     def get_pool(cls, db_url: str | None = None) -> Any:
+        """Returns the active shared connection pool instance if opened."""
         return cls._pool
 
     @classmethod
     async def create_pool(cls, db_url: str | None = None, max_size: int = 20) -> Any:
-        url = cls._get_effective_db_url(None, db_url)
+        """Asynchronously initializes and opens the singleton connection pool.
+
+        Must be called within an active async event loop (e.g. during FastAPI lifespan).
+        """
+        url = cls._get_effective_db_url(db_url)
         if not url:
             return None
         if cls._pool is None:
@@ -58,11 +48,8 @@ class CheckpointerFactory:
         return cls._pool
 
     @classmethod
-    def _get_effective_db_url(
-        cls, env: str | None = None, postgres_url: str | None = None
-    ) -> str | None:
-        if cls.is_test_environment(env):
-            return None
+    def _get_effective_db_url(cls, postgres_url: str | None = None) -> str | None:
+        """Extracts and validates database connection URL without heuristic sniffing."""
         db_url = postgres_url if postgres_url is not None else os.getenv("DATABASE_URL")
         if not db_url or db_url.startswith("sqlite") or db_url == "memory":
             return None
@@ -71,11 +58,12 @@ class CheckpointerFactory:
     @classmethod
     def create_checkpointer(
         cls,
-        env: str | None = None,
         postgres_url: str | None = None,
         pool: Any = None,
+        env: str | None = None,
     ) -> BaseCheckpointSaver:
-        db_url = cls._get_effective_db_url(env, postgres_url)
+        """Creates a checkpointer instance deterministically based on pool or URL."""
+        db_url = cls._get_effective_db_url(postgres_url)
         effective_pool = pool if pool is not None else cls._pool
 
         if not db_url or effective_pool is None:
@@ -94,11 +82,12 @@ class CheckpointerFactory:
     @classmethod
     def create_store(
         cls,
-        env: str | None = None,
         postgres_url: str | None = None,
         pool: Any = None,
+        env: str | None = None,
     ) -> BaseStore:
-        db_url = cls._get_effective_db_url(env, postgres_url)
+        """Creates a store instance deterministically based on pool or URL."""
+        db_url = cls._get_effective_db_url(postgres_url)
         effective_pool = pool if pool is not None else cls._pool
 
         if not db_url or effective_pool is None:
@@ -115,17 +104,17 @@ class CheckpointerFactory:
     @classmethod
     def get_default_checkpointer(
         cls,
-        env: str | None = None,
         postgres_url: str | None = None,
         pool: Any = None,
+        env: str | None = None,
     ) -> BaseCheckpointSaver:
-        return cls.create_checkpointer(env=env, postgres_url=postgres_url, pool=pool)
+        return cls.create_checkpointer(postgres_url=postgres_url, pool=pool, env=env)
 
     @classmethod
     def get_default_store(
         cls,
-        env: str | None = None,
         postgres_url: str | None = None,
         pool: Any = None,
+        env: str | None = None,
     ) -> BaseStore:
-        return cls.create_store(env=env, postgres_url=postgres_url, pool=pool)
+        return cls.create_store(postgres_url=postgres_url, pool=pool, env=env)

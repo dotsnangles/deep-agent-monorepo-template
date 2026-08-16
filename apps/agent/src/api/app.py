@@ -49,11 +49,7 @@ def create_app() -> FastAPI:
                 logger.warning("Redis connection failed: %s. Using memory fallback.", e)
 
         # 2. Initialize PostgreSQL Checkpointer & Store via CheckpointerFactory
-        if (
-            DATABASE_URL
-            and not DATABASE_URL.startswith("sqlite")
-            and not CheckpointerFactory.is_test_environment()
-        ):
+        if DATABASE_URL and not DATABASE_URL.startswith("sqlite"):
             try:
                 pool = await CheckpointerFactory.create_pool(DATABASE_URL)
                 if pool:

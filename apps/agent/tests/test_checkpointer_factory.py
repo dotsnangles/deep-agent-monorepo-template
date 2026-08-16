@@ -1,6 +1,7 @@
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.store.memory import InMemoryStore
 
@@ -9,31 +10,37 @@ from src.core.gateway import AgentExecutionGateway
 
 
 class TestCheckpointerFactory:
-    def test_test_environment_returns_memory_saver(self):
-        saver = CheckpointerFactory.create_checkpointer(env="test")
-        assert isinstance(saver, MemorySaver)
-
-        store = CheckpointerFactory.create_store(env="test")
-        assert isinstance(store, InMemoryStore)
+    def setup_method(self):
+        CheckpointerFactory._pool = None
 
     def test_no_db_url_returns_memory_saver(self):
-        with patch.dict(os.environ, {"DATABASE_URL": "", "ENVIRONMENT": "production"}):
-            saver = CheckpointerFactory.create_checkpointer(env="production", postgres_url="")
+        with patch.dict(os.environ, {"DATABASE_URL": ""}):
+            saver = CheckpointerFactory.create_checkpointer(postgres_url="")
             assert isinstance(saver, MemorySaver)
 
-            store = CheckpointerFactory.create_store(env="production", postgres_url="")
+            store = CheckpointerFactory.create_store(postgres_url="")
             assert isinstance(store, InMemoryStore)
 
     def test_sqlite_or_memory_url_fallback(self):
+        saver = CheckpointerFactory.create_checkpointer(postgres_url="sqlite:///test.db")
+        assert isinstance(saver, MemorySaver)
+
+        store = CheckpointerFactory.create_store(postgres_url="memory")
+        assert isinstance(store, InMemoryStore)
+
+    def test_unopened_pool_fallback_to_memory(self):
+        # When db_url is set but no pool is opened yet, returns MemorySaver safely
         saver = CheckpointerFactory.create_checkpointer(
-            env="production", postgres_url="sqlite:///test.db"
+            postgres_url="postgresql://user:pass@localhost:5432/db", pool=None
         )
         assert isinstance(saver, MemorySaver)
 
-        store = CheckpointerFactory.create_store(env="production", postgres_url="memory")
+        store = CheckpointerFactory.create_store(
+            postgres_url="postgresql://user:pass@localhost:5432/db", pool=None
+        )
         assert isinstance(store, InMemoryStore)
 
-    def test_postgres_saver_and_store_instantiation(self):
+    def test_postgres_saver_and_store_instantiation_with_pool(self):
         mock_pool = MagicMock()
         mock_saver_inst = MagicMock()
         mock_store_inst = MagicMock()
@@ -47,7 +54,6 @@ class TestCheckpointerFactory:
             ) as mock_store_cls,
         ):
             saver = CheckpointerFactory.create_checkpointer(
-                env="production",
                 postgres_url="postgresql://user:pass@localhost:5432/db",
                 pool=mock_pool,
             )
@@ -55,12 +61,24 @@ class TestCheckpointerFactory:
             assert saver == mock_saver_inst
 
             store = CheckpointerFactory.create_store(
-                env="production",
                 postgres_url="postgresql://user:pass@localhost:5432/db",
                 pool=mock_pool,
             )
             mock_store_cls.assert_called_once_with(mock_pool)
             assert store == mock_store_inst
+
+    @pytest.mark.asyncio
+    async def test_create_pool_async_open(self):
+        mock_pool_instance = MagicMock()
+        mock_pool_instance.open = AsyncMock()
+
+        with patch(
+            "psycopg_pool.AsyncConnectionPool", return_value=mock_pool_instance
+        ) as mock_pool_cls:
+            pool = await CheckpointerFactory.create_pool("postgresql://user:pass@localhost:5432/db")
+            assert pool == mock_pool_instance
+            mock_pool_cls.assert_called_once()
+            mock_pool_instance.open.assert_awaited_once()
 
     def test_gateway_default_checkpointer_integration(self):
         with patch.object(
