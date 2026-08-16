@@ -16,6 +16,7 @@ export default defineConfig({
     "verification",
     "chat_session",
     "chat_message",
+    "chat_artifact",
   ],
   dbCredentials: {
     url: process.env.DATABASE_URL || "",
