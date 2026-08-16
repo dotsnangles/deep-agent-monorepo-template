@@ -18,7 +18,8 @@ from deepagents import (
     create_deep_agent,
     register_harness_profile,
 )
-from deepagents.backends import CompositeBackend, StoreBackend
+from deepagents.backends import CompositeBackend, StateBackend, StoreBackend
+from deepagents.middleware.summarization import create_summarization_tool_middleware
 from langchain.agents.middleware import (
     ModelCallLimitMiddleware,
     ModelFallbackMiddleware,
@@ -79,6 +80,7 @@ class DeepAgentEnvironmentFactory:
         model_call_limit: int | None = None,
         tool_call_limit: int | None = None,
         tool_retry_config: dict[str, Any] | None = None,
+        enable_summarization_tool: bool = True,
         **kwargs: Any,
     ) -> Any:
         effective_mode = mode or get_deep_agent_mode()
@@ -142,6 +144,17 @@ class DeepAgentEnvironmentFactory:
                 effective_middleware.append(ModelFallbackMiddleware(fallback_model))
             if tool_retry_config is not None:
                 effective_middleware.append(ToolRetryMiddleware(**tool_retry_config))
+
+            if enable_summarization_tool:
+                compaction_backend = (
+                    effective_backend if effective_backend is not None else StateBackend()
+                )
+                try:
+                    effective_middleware.append(
+                        create_summarization_tool_middleware(llm, compaction_backend)
+                    )
+                except Exception as sum_err:
+                    logger.debug("Summarization tool attachment skipped: %s", sum_err)
 
             if rubric is not None or grader_model is not None:
                 target_grader = grader_model if grader_model is not None else llm
@@ -208,6 +221,28 @@ class DeepAgentEnvironmentFactory:
                 effective_middleware.append(ModelFallbackMiddleware(fallback_model))
             if tool_retry_config is not None:
                 effective_middleware.append(ToolRetryMiddleware(**tool_retry_config))
+
+            if effective_backend is None and effective_store is not None:
+                from src.graphs.chat.backends import get_session_backend
+
+                session_sb = get_session_backend("default")
+                effective_backend = CompositeBackend(
+                    default=session_sb,
+                    routes={
+                        "/memories/": StoreBackend(store=effective_store, namespace=("memories",)),
+                    },
+                )
+
+            if enable_summarization_tool:
+                compaction_backend = (
+                    effective_backend if effective_backend is not None else StateBackend()
+                )
+                try:
+                    effective_middleware.append(
+                        create_summarization_tool_middleware(llm, compaction_backend)
+                    )
+                except Exception as sum_err:
+                    logger.debug("Summarization tool attachment skipped: %s", sum_err)
 
             if rubric is not None or grader_model is not None:
                 target_grader = grader_model if grader_model is not None else llm
