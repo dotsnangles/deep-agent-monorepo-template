@@ -8,6 +8,7 @@ import {
   AttachmentContent,
   AttachmentTitle,
   AttachmentDescription,
+  AttachmentActions,
   AttachmentAction,
 } from "@repo/ui/components/attachment";
 import {
@@ -55,17 +56,17 @@ export function AttachmentStagingBar({
                       className="size-full object-cover"
                     />
                     {item.status === "uploading" && (
-                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                        <Loader2 className="size-4 text-white animate-spin" />
+                      <div className="absolute inset-0 bg-background/60 flex items-center justify-center">
+                        <Loader2 className="animate-spin text-foreground" />
                       </div>
                     )}
                   </>
                 ) : item.status === "uploading" ? (
-                  <Loader2 className="size-4 animate-spin text-primary" />
+                  <Loader2 className="animate-spin text-primary" />
                 ) : item.status === "error" ? (
-                  <AlertCircle className="size-4 text-destructive" />
+                  <AlertCircle className="text-destructive" />
                 ) : (
-                  <IconComponent className="size-4 text-primary" />
+                  <IconComponent className="text-primary" />
                 )}
               </AttachmentMedia>
 
@@ -78,13 +79,15 @@ export function AttachmentStagingBar({
                 </AttachmentDescription>
               </AttachmentContent>
 
-              <AttachmentAction
-                disabled={disabled}
-                onClick={() => onRemove(item.id)}
-                title="파일 첨부 취소"
-              >
-                <X data-icon="inline-start" />
-              </AttachmentAction>
+              <AttachmentActions>
+                <AttachmentAction
+                  disabled={disabled}
+                  onClick={() => onRemove(item.id)}
+                  title="파일 첨부 취소"
+                >
+                  <X data-icon="inline-start" />
+                </AttachmentAction>
+              </AttachmentActions>
             </Attachment>
           );
         })}

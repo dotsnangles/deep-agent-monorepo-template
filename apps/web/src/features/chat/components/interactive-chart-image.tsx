@@ -1,9 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Download, Maximize2, X, ZoomIn, ZoomOut } from "lucide-react";
+import { useState } from "react";
+import { Download, Maximize2, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@repo/ui/components/button";
+import { Badge } from "@repo/ui/components/badge";
 import { Card, CardContent, CardFooter } from "@repo/ui/components/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@repo/ui/components/dialog";
 import { cn } from "@repo/ui/lib/utils";
 
 interface InteractiveChartImageProps {
@@ -19,19 +26,6 @@ export function InteractiveChartImage({
 }: InteractiveChartImageProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
-
-  // Close on Escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setIsOpen(false);
-      }
-    };
-    if (isOpen) {
-      window.addEventListener("keydown", handleKeyDown);
-    }
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen]);
 
   const handleZoomIn = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -68,11 +62,11 @@ export function InteractiveChartImage({
           />
 
           {/* Hover Action Overlay */}
-          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/chart:opacity-100 transition-opacity duration-150 rounded-none flex items-center justify-center gap-2">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-background/90 text-foreground text-xs font-semibold shadow-lg backdrop-blur-xs">
+          <div className="absolute inset-0 bg-background/60 opacity-0 group-hover/chart:opacity-100 transition-opacity duration-150 rounded-none flex items-center justify-center gap-2">
+            <Badge variant="secondary" className="gap-1.5 px-3 py-1 text-xs font-semibold shadow-md">
               <Maximize2 data-icon="inline-start" className="text-primary" />
               <span>크게 보기</span>
-            </div>
+            </Badge>
           </div>
         </CardContent>
 
@@ -83,81 +77,65 @@ export function InteractiveChartImage({
         )}
       </Card>
 
-      {/* Lightbox Modal */}
-      {isOpen && (
-        <div
+      {/* Artifact Lightbox Dialog */}
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent
           data-testid="chart-lightbox-modal"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 sm:p-8 backdrop-blur-sm animate-in fade-in-50 duration-150"
-          onClick={() => setIsOpen(false)}
+          className="max-w-4xl p-4 gap-3 bg-popover"
         >
-          {/* Top Control Bar */}
-          <div className="absolute top-4 right-4 z-60 flex items-center gap-2">
-            <Button
-              variant="secondary"
-              size="icon"
-              className="size-9 rounded-full bg-black/60 text-white hover:bg-black/90 hover:text-white border-0 shadow-lg cursor-pointer"
-              onClick={handleZoomIn}
-              title="확대"
-            >
-              <ZoomIn data-icon="inline-start" />
-            </Button>
-            <Button
-              variant="secondary"
-              size="icon"
-              className="size-9 rounded-full bg-black/60 text-white hover:bg-black/90 hover:text-white border-0 shadow-lg cursor-pointer"
-              onClick={handleZoomOut}
-              title="축소"
-            >
-              <ZoomOut data-icon="inline-start" />
-            </Button>
-            <Button
-              variant="secondary"
-              size="icon"
-              className="size-9 rounded-full bg-black/60 text-white hover:bg-black/90 hover:text-white border-0 shadow-lg"
-              render={
-                <a
-                  href={src}
-                  download={alt || "chart.png"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  title="원본 다운로드"
-                >
-                  <Download data-icon="inline-start" />
-                </a>
-              }
-            />
-            <Button
-              variant="secondary"
-              size="icon"
-              className="size-9 rounded-full bg-black/60 text-white hover:bg-black/90 hover:text-white border-0 shadow-lg cursor-pointer"
-              onClick={() => setIsOpen(false)}
-              title="닫기 (ESC)"
-            >
-              <X data-icon="inline-start" />
-            </Button>
-          </div>
+          <DialogHeader className="flex-row items-center justify-between pb-2 border-b border-border/50">
+            <DialogTitle className="text-xs font-semibold text-foreground truncate max-w-md">
+              {alt || "아티팩트 시각화 검사"}
+            </DialogTitle>
+
+            <div className="flex items-center gap-1.5 mr-6">
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={handleZoomIn}
+                title="확대"
+              >
+                <ZoomIn data-icon="inline-start" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={handleZoomOut}
+                title="축소"
+              >
+                <ZoomOut data-icon="inline-start" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                render={
+                  <a
+                    href={src}
+                    download={alt || "chart.png"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    title="원본 다운로드"
+                  >
+                    <Download data-icon="inline-start" />
+                  </a>
+                }
+              />
+            </div>
+          </DialogHeader>
 
           {/* Lightbox Image Viewport */}
-          <div
-            className="max-h-[85vh] max-w-[90vw] overflow-auto flex flex-col items-center justify-center"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="max-h-[75vh] max-w-full overflow-auto flex items-center justify-center p-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={src}
               alt={alt}
               style={{ transform: `scale(${zoom})`, transition: "transform 0.15s ease-out" }}
-              className="max-h-[80vh] max-w-full rounded-xl object-contain shadow-2xl origin-center"
+              className="max-h-[70vh] max-w-full rounded-xl object-contain shadow-lg origin-center"
             />
-            {alt && (
-              <span className="text-xs text-white/80 mt-3 font-medium px-3 py-1 rounded-full bg-black/40">
-                {alt}
-              </span>
-            )}
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
