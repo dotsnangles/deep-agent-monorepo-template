@@ -423,15 +423,36 @@ class AgentExecutionGateway:
                                         run_id=tc.get("id"),
                                     )
                             elif kind == "on_tool_start":
+                                tool_name = event.get("name", "tool")
+                                tool_input = event.get("data", {}).get("input")
+                                if tool_name == "write_todos" and isinstance(tool_input, dict):
+                                    todos = tool_input.get("todos")
+                                    if todos and isinstance(todos, list):
+                                        yield AgentStreamEvent.todo_update(todos=todos)
+
                                 yield AgentStreamEvent.tool_start(
-                                    tool=event.get("name", "tool"),
-                                    tool_input=event.get("data", {}).get("input"),
+                                    tool=tool_name,
+                                    tool_input=tool_input,
                                     run_id=event.get("run_id"),
                                 )
                             elif kind == "on_tool_end":
+                                tool_name = event.get("name", "tool")
+                                tool_output = event.get("data", {}).get("output")
+                                if tool_name == "write_todos":
+                                    todos = None
+                                    if hasattr(tool_output, "update") and isinstance(
+                                        tool_output.update, dict
+                                    ):
+                                        todos = tool_output.update.get("todos")
+                                    elif isinstance(tool_output, dict):
+                                        todos = tool_output.get("todos")
+
+                                    if todos and isinstance(todos, list):
+                                        yield AgentStreamEvent.todo_update(todos=todos)
+
                                 yield AgentStreamEvent.tool_end(
-                                    tool=event.get("name", "tool"),
-                                    output=event.get("data", {}).get("output"),
+                                    tool=tool_name,
+                                    output=tool_output,
                                     run_id=event.get("run_id"),
                                 )
                             elif kind == "on_chain_start" and event.get("name") in (

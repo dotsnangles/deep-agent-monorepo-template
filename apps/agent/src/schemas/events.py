@@ -20,6 +20,18 @@ class ToolEndEventData(BaseModel):
     run_id: str | None = None
 
 
+class TodoItem(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    content: str
+    status: Literal["pending", "in_progress", "completed"] = "pending"
+    id: str | None = None
+
+
+class TodoUpdateEventData(BaseModel):
+    todos: list[TodoItem]
+
+
 class ApprovalRequestEventData(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -49,6 +61,7 @@ AgentEventType = Literal[
     "token",
     "tool_start",
     "tool_end",
+    "todo_update",
     "approval_request",
     "node_transition",
     "error",
@@ -94,6 +107,22 @@ class AgentStreamEvent(BaseModel):
         return cls(
             event="tool_end",
             data=ToolEndEventData(tool=tool, output=output, run_id=run_id),
+        )
+
+    @classmethod
+    def todo_update(
+        cls,
+        todos: list[dict[str, Any] | TodoItem],
+    ) -> "AgentStreamEvent":
+        parsed_todos: list[TodoItem] = []
+        for t in todos:
+            if isinstance(t, TodoItem):
+                parsed_todos.append(t)
+            elif isinstance(t, dict):
+                parsed_todos.append(TodoItem.model_validate(t))
+        return cls(
+            event="todo_update",
+            data=TodoUpdateEventData(todos=parsed_todos),
         )
 
     @classmethod

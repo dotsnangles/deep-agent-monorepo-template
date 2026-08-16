@@ -3,6 +3,7 @@ from typing import Any
 
 from copilotkit import CopilotKitMiddleware
 from deepagents import create_deep_agent
+from langchain.agents.middleware import TodoListMiddleware
 from langchain_core.output_parsers import StrOutputParser
 from langgraph.checkpoint.memory import MemorySaver
 
@@ -41,7 +42,7 @@ def build_agent(
         model: Custom or Fake LLM instance, or None to use default get_llm().
         tools: List of tools to provide, or None for default system + sensitive tools.
         interrupt_on: Tool gating map for HITL approval.
-        middleware: List of middlewares, defaults to [CopilotKitMiddleware()].
+        middleware: List of middlewares, defaults to [TodoListMiddleware(), CopilotKitMiddleware()].
         backend: VFS or Sandbox backend instance.
         system_prompt: Base prompt override.
     """
@@ -51,7 +52,9 @@ def build_agent(
     )
     effective_checkpointer = checkpointer if checkpointer is not None else MemorySaver()
     effective_interrupt_on = interrupt_on if interrupt_on is not None else DEFAULT_INTERRUPT_TOOLS
-    effective_middleware = list(middleware if middleware is not None else [CopilotKitMiddleware()])
+    effective_middleware = list(
+        middleware if middleware is not None else [TodoListMiddleware(), CopilotKitMiddleware()]
+    )
     effective_prompt = system_prompt or MAIN_SYSTEM_PROMPT
 
     agent_kwargs: dict[str, Any] = {
