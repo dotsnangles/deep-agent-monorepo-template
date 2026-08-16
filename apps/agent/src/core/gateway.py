@@ -317,6 +317,7 @@ class AgentExecutionGateway:
         system_prompt: str | None = None,
         config: dict[str, Any] | None = None,
         resume_action: dict[str, Any] | None = None,
+        backend: Any = None,
     ) -> AsyncIterator[AgentStreamEvent]:
         """Streams structured AgentStreamEvents with Human-In-The-Loop interrupt support."""
         lc_messages = _normalize_messages(messages, system_prompt=system_prompt)
@@ -324,29 +325,37 @@ class AgentExecutionGateway:
         effective_thread_id = thread_id or "default"
         callbacks = self._build_callbacks(thread_id)
 
-        trace_meta = _build_trace_metadata(
-            messages,
-            agent_type=agent_type,
-            thread_id=effective_thread_id,
-        )
         stream_config: dict[str, Any] = {
-            "callbacks": callbacks,
-            "metadata": trace_meta,
             "configurable": {
                 "thread_id": effective_thread_id,
             },
+            "callbacks": callbacks,
         }
         if config:
             stream_config.update(config)
+            if "configurable" in config:
+                stream_config["configurable"].update(config["configurable"])
 
         try:
             # Check if a compilable LangGraph workflow is available in the registry
             if agent_type != "direct" and self.registry.has_graph(agent_type):
                 graph = self.registry.get_graph(
-                    agent_type=agent_type,
+                    agent_type,
                     checkpointer=self.checkpointer,
                     store=self.store,
                     model=effective_model,
+                    system_prompt=system_prompt,
+                    backend=backend,
+                )
+
+                # 1. State Summary Node Transition
+                state_summary = {
+                    "thread_id": effective_thread_id,
+                    "agent_type": agent_type,
+                    "model": getattr(effective_model, "model_name", "default"),
+                }
+                yield AgentStreamEvent.node_transition(
+                    node="agent_entry", state_summary=state_summary
                 )
 
                 # Determine graph input: Command(resume=...) for HITL resume or initial input
@@ -387,7 +396,7 @@ class AgentExecutionGateway:
                         except Exception as sync_err:
                             logger.debug("State synchronization skipped: %s", sync_err)
 
-                # Check if graph has astream_events capability
+                # Stream graph execution events
                 if hasattr(graph, "astream_events"):
                     total_tokens = 0
                     try:
@@ -425,7 +434,15 @@ class AgentExecutionGateway:
                             elif kind == "on_tool_start":
                                 tool_name = event.get("name", "tool")
                                 tool_input = event.get("data", {}).get("input")
-                                if tool_name == "write_todos" and isinstance(tool_input, dict):
+                                if tool_name == "task" and isinstance(tool_input, dict):
+                                    subagent_type = tool_input.get("subagent_type", "subagent")
+                                    task_desc = tool_input.get("description", "")
+                                    yield AgentStreamEvent.subagent_start(
+                                        subagent=subagent_type,
+                                        task=task_desc,
+                                        run_id=event.get("run_id"),
+                                    )
+                                elif tool_name == "write_todos" and isinstance(tool_input, dict):
                                     todos = tool_input.get("todos")
                                     if todos and isinstance(todos, list):
                                         yield AgentStreamEvent.todo_update(todos=todos)
@@ -438,7 +455,17 @@ class AgentExecutionGateway:
                             elif kind == "on_tool_end":
                                 tool_name = event.get("name", "tool")
                                 tool_output = event.get("data", {}).get("output")
-                                if tool_name == "write_todos":
+                                if tool_name == "task":
+                                    subagent_type = "subagent"
+                                    tool_input = event.get("data", {}).get("input")
+                                    if isinstance(tool_input, dict):
+                                        subagent_type = tool_input.get("subagent_type", "subagent")
+                                    yield AgentStreamEvent.subagent_end(
+                                        subagent=subagent_type,
+                                        output=tool_output,
+                                        run_id=event.get("run_id"),
+                                    )
+                                elif tool_name == "write_todos":
                                     todos = None
                                     if hasattr(tool_output, "update") and isinstance(
                                         tool_output.update, dict
@@ -491,11 +518,14 @@ class AgentExecutionGateway:
 
                     yield AgentStreamEvent.done(
                         finish_reason="stop",
-                        metadata={"total_chars": total_tokens, "thread_id": effective_thread_id},
+                        metadata={
+                            "total_chars": total_tokens,
+                            "thread_id": effective_thread_id,
+                        },
                     )
                     return
 
-            # Direct Model Stream Fallback
+            # Direct Model Stream Fallback (when agent_type == "direct")
             total_tokens = 0
             async for chunk in effective_model.astream(lc_messages, config=stream_config):
                 content = chunk.content if hasattr(chunk, "content") else str(chunk)

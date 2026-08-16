@@ -9,6 +9,7 @@ from langgraph.checkpoint.memory import MemorySaver
 
 from src.core.config import get_llm
 from src.graphs.chat.prompts import MAIN_SYSTEM_PROMPT, TITLE_PROMPT
+from src.graphs.chat.subagents import get_default_subagents
 from src.tools.sensitive import get_sensitive_tools
 from src.tools.system import get_default_tools
 
@@ -55,13 +56,14 @@ def build_agent(
     effective_middleware = list(
         middleware if middleware is not None else [TodoListMiddleware(), CopilotKitMiddleware()]
     )
+    effective_subagents = list(subagents) if subagents is not None else get_default_subagents()
     effective_prompt = system_prompt or MAIN_SYSTEM_PROMPT
 
     agent_kwargs: dict[str, Any] = {
         "model": llm,
         "system_prompt": effective_prompt,
         "tools": effective_tools,
-        "subagents": subagents,
+        "subagents": effective_subagents,
         "middleware": effective_middleware,
         "interrupt_on": effective_interrupt_on,
         "checkpointer": effective_checkpointer,

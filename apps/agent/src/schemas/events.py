@@ -32,6 +32,22 @@ class TodoUpdateEventData(BaseModel):
     todos: list[TodoItem]
 
 
+class SubagentStartEventData(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    subagent: str
+    task: str
+    run_id: str | None = Field(default=None, serialization_alias="runId")
+
+
+class SubagentEndEventData(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    subagent: str
+    output: Any
+    run_id: str | None = Field(default=None, serialization_alias="runId")
+
+
 class ApprovalRequestEventData(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -62,6 +78,8 @@ AgentEventType = Literal[
     "tool_start",
     "tool_end",
     "todo_update",
+    "subagent_start",
+    "subagent_end",
     "approval_request",
     "node_transition",
     "error",
@@ -123,6 +141,30 @@ class AgentStreamEvent(BaseModel):
         return cls(
             event="todo_update",
             data=TodoUpdateEventData(todos=parsed_todos),
+        )
+
+    @classmethod
+    def subagent_start(
+        cls,
+        subagent: str,
+        task: str,
+        run_id: str | None = None,
+    ) -> "AgentStreamEvent":
+        return cls(
+            event="subagent_start",
+            data=SubagentStartEventData(subagent=subagent, task=task, run_id=run_id),
+        )
+
+    @classmethod
+    def subagent_end(
+        cls,
+        subagent: str,
+        output: Any,
+        run_id: str | None = None,
+    ) -> "AgentStreamEvent":
+        return cls(
+            event="subagent_end",
+            data=SubagentEndEventData(subagent=subagent, output=output, run_id=run_id),
         )
 
     @classmethod

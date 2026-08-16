@@ -177,9 +177,8 @@ class DockerSandboxBackend(FilesystemBackend, SandboxBackendProtocol):
             stdout_bytes, stderr_bytes = await asyncio.wait_for(
                 proc.communicate(), timeout=effective_timeout
             )
-            raw_output = (
-                stdout_bytes.decode("utf-8", errors="replace")
-                + stderr_bytes.decode("utf-8", errors="replace")
+            raw_output = stdout_bytes.decode("utf-8", errors="replace") + stderr_bytes.decode(
+                "utf-8", errors="replace"
             )
             exit_code = proc.returncode
 
