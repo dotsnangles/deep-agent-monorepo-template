@@ -18,4 +18,7 @@ Curated offline primary sources for CopilotKit, Deep Agents, and LangGraph live 
 
 ### UI components & shadcn rules
 
-Frontend UI in `@repo/ui` and `apps/web` strictly follows shadcn design and composition rules (`.agents/skills/shadcn/rules/`). Agents MUST compose existing shadcn primitives (`Card`, `Dialog`, `Alert`, `Message`, `Bubble`, `AttachmentGroup`) using semantic tokens and `data-icon` rather than hand-rolling custom markup.
+Frontend UI in `@repo/ui` and `apps/web` strictly follows shadcn design and composition rules (`.agents/skills/shadcn/rules/`).
+- **`@repo/ui` Primitives Purity**: Components under `packages/ui/src/components/` MUST maintain 100% fidelity to the official upstream shadcn registry (`base-lyra`). Do NOT modify base primitives directly for application-specific behaviors or styles so that `npx shadcn add` remains fully idempotent.
+- **Composition Layer Customization**: All application-specific styles, layout behaviors, and responsive adaptations MUST live in the composition layer (`apps/web` or wrapper components), composing existing shadcn primitives (`Card`, `Dialog`, `Alert`, `Message`, `Bubble`, `AttachmentGroup`, `MessageScroller`) using semantic tokens and `data-icon` rather than hand-rolling custom markup.
+
