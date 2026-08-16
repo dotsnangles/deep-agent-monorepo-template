@@ -1,5 +1,6 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
+from langchain_core.tools import tool
 from langgraph.checkpoint.memory import MemorySaver
 
 from src.api import create_app
@@ -116,9 +117,21 @@ async def test_chat_stream_api_endpoint_handles_hitl_interrupt_and_approval():
         tool_calls=[tool_call],
         tokens=["디렉토리", " ", "조회", " ", "완료"],
     )
+    @tool
+    def execute_command(command: str) -> str:
+        """Executes command."""
+        return f"Executed: {command}"
+
     checkpointer = MemorySaver()
     registry = GraphRegistry()
-    registry.register("hitl_api", build_agent)
+    registry.register(
+        "hitl_api",
+        lambda **kw: build_agent(
+            tools=[execute_command],
+            interrupt_on={"execute_command": True},
+            **kw,
+        ),
+    )
 
     app.state.gateway = AgentExecutionGateway(
         registry=registry,
@@ -173,9 +186,22 @@ async def test_chat_stream_api_endpoint_handles_hitl_rejection():
         tool_calls=[tool_call],
         tokens=["삭제가", " ", "거절되었습니다."],
     )
+
+    @tool
+    def delete_resource(resource_id: str) -> str:
+        """Deletes resource."""
+        return f"Deleted: {resource_id}"
+
     checkpointer = MemorySaver()
     registry = GraphRegistry()
-    registry.register("hitl_api", build_agent)
+    registry.register(
+        "hitl_api",
+        lambda **kw: build_agent(
+            tools=[delete_resource],
+            interrupt_on={"delete_resource": True},
+            **kw,
+        ),
+    )
 
     app.state.gateway = AgentExecutionGateway(
         registry=registry,

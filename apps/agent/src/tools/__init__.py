@@ -1,31 +1,10 @@
-from src.tools.sensitive import (
-    delete_resource,
-    execute_command,
-    get_sensitive_tool_metadata,
-    get_sensitive_tools,
-    is_sensitive_tool,
-    sensitive_tool,
-    write_file,
-)
-from src.tools.system import (
-    calculate,
-    finalize,
-    get_current_time,
-    get_default_tools,
-    query_system_info,
-)
+"""Custom tools extension package for LangChain Deep Agents.
 
-__all__ = [
-    "calculate",
-    "finalize",
-    "get_current_time",
-    "get_default_tools",
-    "query_system_info",
-    "sensitive_tool",
-    "is_sensitive_tool",
-    "get_sensitive_tool_metadata",
-    "execute_command",
-    "write_file",
-    "delete_resource",
-    "get_sensitive_tools",
-]
+By default, the agent runs in 100% pure vanilla mode using LangChain Deep Agents
+built-in tools (execute, ls, read_file, write_file, edit_file, delete, write_todos).
+Custom tools created in this module can be passed into `build_agent(tools=[...])`.
+"""
+
+from langchain_core.tools import tool
+
+__all__ = ["tool"]

@@ -1,4 +1,5 @@
 import pytest
+from langchain_core.tools import tool
 from langgraph.checkpoint.memory import MemorySaver
 
 from src.core import AgentExecutionGateway, FakeChatModel
@@ -7,11 +8,24 @@ from src.graphs.registry import GraphRegistry
 from src.schemas import AgentStreamEvent
 
 
+@tool
+def execute_command(command: str) -> str:
+    """Execute a system shell command."""
+    return f"Executed command: '{command}' successfully."
+
+
 @pytest.fixture
 def hitl_gateway_fixture():
     checkpointer = MemorySaver()
     registry = GraphRegistry()
-    registry.register("hitl_test", build_agent)
+    registry.register(
+        "hitl_test",
+        lambda **kw: build_agent(
+            tools=[execute_command],
+            interrupt_on={"execute_command": True},
+            **kw,
+        ),
+    )
     fake_llm = FakeChatModel()
     gateway = AgentExecutionGateway(
         registry=registry,

@@ -10,22 +10,21 @@ from src.graphs.registry import GraphRegistry
 
 @pytest.mark.asyncio
 class TestSubagentsToggle:
-    async def test_build_agent_with_subagents_disabled(self):
-        """When enable_subagents=False, agent compiles in single-agent mode without subagents."""
+    async def test_build_agent_defaults_to_single_vanilla_agent(self):
+        """By default, agent compiles in pure vanilla single-agent mode without subagents."""
         fake_llm = FakeChatModel(responses=["Direct answer from single agent"])
         checkpointer = MemorySaver()
 
         agent_graph = build_agent(
             model=fake_llm,
             checkpointer=checkpointer,
-            enable_subagents=False,
         )
         assert agent_graph is not None
 
         registry = GraphRegistry()
         registry.register(
             "default",
-            lambda **kw: build_agent(model=fake_llm, enable_subagents=False, **kw),
+            lambda **kw: build_agent(model=fake_llm, **kw),
         )
 
         gateway = AgentExecutionGateway(
@@ -45,23 +44,18 @@ class TestSubagentsToggle:
         assert any(e.event == "token" for e in events)
         assert any(e.event == "done" for e in events)
 
-    async def test_build_agent_with_subagents_enabled(self):
-        """When enable_subagents=True, agent graph is compiled with specialized subagents."""
-        fake_llm = FakeChatModel(responses=["Delegated or direct answer"])
-        checkpointer = MemorySaver()
-
-        agent_graph = build_agent(
-            model=fake_llm,
-            checkpointer=checkpointer,
-            enable_subagents=True,
-        )
-        assert agent_graph is not None
-
-    async def test_build_agent_with_explicit_subagents_list(self):
-        """When subagents is explicitly provided, it overrides defaults and enables subagents."""
+    async def test_build_agent_with_custom_subagents_list(self):
+        """When custom subagents are explicitly provided, it injects them into the deep agent graph."""
         fake_llm = FakeChatModel(responses=["Custom subagent answer"])
         checkpointer = MemorySaver()
-        custom_subagents = get_default_subagents()[:1]
+        custom_subagents = [
+            {
+                "name": "custom_specialist",
+                "description": "A custom specialist agent",
+                "system_prompt": "You are a custom specialist.",
+                "tools": [],
+            }
+        ]
 
         agent_graph = build_agent(
             model=fake_llm,

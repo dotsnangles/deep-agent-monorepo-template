@@ -25,10 +25,7 @@ class TestDataAnalysisFlowAndSubagents:
 
     def test_default_subagents_definition(self):
         subagents = get_default_subagents()
-        assert len(subagents) >= 2
-        names = [s["name"] for s in subagents]
-        assert "data_analyst" in names
-        assert "chart_generator" in names
+        assert isinstance(subagents, list)
 
     @pytest.mark.asyncio
     async def test_subagent_event_schema_and_sse_serialization(self):
@@ -143,9 +140,18 @@ class TestDataAnalysisFlowAndSubagents:
             ]
         )
 
+        custom_subagents = [
+            {
+                "name": "data_analyst",
+                "description": "Pandas data analyst",
+                "system_prompt": "You analyze data.",
+                "tools": [],
+            }
+        ]
         registry = GraphRegistry()
         registry.register(
-            "data_analysis", lambda **kw: build_agent(interrupt_on={}, enable_subagents=True, **kw)
+            "data_analysis",
+            lambda **kw: build_agent(interrupt_on={}, subagents=custom_subagents, **kw),
         )
         checkpointer = MemorySaver()
         gateway = AgentExecutionGateway(
@@ -207,7 +213,10 @@ class TestDataAnalysisFlowAndSubagents:
         }
         fake_llm = FakeChatModel(turn_sequence=[t1, t2])
         registry = GraphRegistry()
-        registry.register("data_analysis", build_agent)
+        registry.register(
+            "data_analysis",
+            lambda **kw: build_agent(interrupt_on={"execute": True}, **kw),
+        )
         checkpointer = MemorySaver()
         gateway = AgentExecutionGateway(
             registry=registry,

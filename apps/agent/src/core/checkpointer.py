@@ -46,17 +46,23 @@ class CheckpointerFactory:
         return pool
 
     @classmethod
+    def _get_effective_db_url(cls, env: str | None = None, postgres_url: str | None = None) -> str | None:
+        if cls.is_test_environment(env):
+            return None
+        db_url = postgres_url if postgres_url is not None else os.getenv("DATABASE_URL")
+        if not db_url or db_url.startswith("sqlite") or db_url == "memory":
+            return None
+        return db_url
+
+    @classmethod
     def create_checkpointer(
         cls,
         env: str | None = None,
         postgres_url: str | None = None,
         pool: Any = None,
     ) -> BaseCheckpointSaver:
-        if cls.is_test_environment(env):
-            return MemorySaver()
-
-        db_url = postgres_url if postgres_url is not None else os.getenv("DATABASE_URL")
-        if not db_url or db_url.startswith("sqlite") or db_url == "memory":
+        db_url = cls._get_effective_db_url(env, postgres_url)
+        if not db_url and pool is None:
             return MemorySaver()
 
         try:
@@ -76,11 +82,8 @@ class CheckpointerFactory:
         postgres_url: str | None = None,
         pool: Any = None,
     ) -> BaseStore:
-        if cls.is_test_environment(env):
-            return InMemoryStore()
-
-        db_url = postgres_url if postgres_url is not None else os.getenv("DATABASE_URL")
-        if not db_url or db_url.startswith("sqlite") or db_url == "memory":
+        db_url = cls._get_effective_db_url(env, postgres_url)
+        if not db_url and pool is None:
             return InMemoryStore()
 
         try:
