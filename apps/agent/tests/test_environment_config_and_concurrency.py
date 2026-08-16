@@ -23,12 +23,12 @@ def test_environment_mode_defaults_and_resolution():
 
     with patch.dict(os.environ, {"LLM_PROVIDER": "openai", "DEEP_AGENT_MODE": ""}):
         mode = get_deep_agent_mode()
-        assert mode == EnvironmentMode.PRODUCTION_CLOUD
+        assert mode == EnvironmentMode.CLOUD_PROVIDER
         assert get_inference_concurrency_limit() is None
 
-    with patch.dict(os.environ, {"LLM_PROVIDER": "ollama", "DEEP_AGENT_MODE": "production_cloud"}):
+    with patch.dict(os.environ, {"LLM_PROVIDER": "ollama", "DEEP_AGENT_MODE": "cloud_provider"}):
         mode = get_deep_agent_mode()
-        assert mode == EnvironmentMode.PRODUCTION_CLOUD
+        assert mode == EnvironmentMode.CLOUD_PROVIDER
 
     with patch.dict(os.environ, {"LLM_PROVIDER": "anthropic", "DEEP_AGENT_MODE": "local_slm"}):
         mode = get_deep_agent_mode()

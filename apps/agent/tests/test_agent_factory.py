@@ -27,9 +27,9 @@ def test_factory_creates_local_slm_agent():
         assert get_deep_agent_mode() == EnvironmentMode.LOCAL_SLM
 
 
-def test_factory_creates_production_cloud_agent():
-    """Verify that DeepAgentEnvironmentFactory produces a valid graph in production_cloud mode."""
-    with patch.dict(os.environ, {"DEEP_AGENT_MODE": "production_cloud", "LLM_PROVIDER": "openai"}):
+def test_factory_creates_cloud_provider_agent():
+    """Verify that DeepAgentEnvironmentFactory produces a valid graph in cloud_provider mode."""
+    with patch.dict(os.environ, {"DEEP_AGENT_MODE": "cloud_provider", "LLM_PROVIDER": "openai"}):
         model = FakeChatModel()
         checkpointer = CheckpointerFactory.get_default_checkpointer()
         store = CheckpointerFactory.get_default_store()
@@ -42,7 +42,7 @@ def test_factory_creates_production_cloud_agent():
         )
 
         assert isinstance(agent_graph, CompiledStateGraph)
-        assert get_deep_agent_mode() == EnvironmentMode.PRODUCTION_CLOUD
+        assert get_deep_agent_mode() == EnvironmentMode.CLOUD_PROVIDER
 
 
 def test_build_agent_delegates_seamlessly_across_environments():
@@ -54,7 +54,7 @@ def test_build_agent_delegates_seamlessly_across_environments():
         graph_local = build_agent(model=model)
         assert isinstance(graph_local, CompiledStateGraph)
 
-    # 2. Test in production_cloud mode
-    with patch.dict(os.environ, {"DEEP_AGENT_MODE": "production_cloud"}):
+    # 2. Test in cloud_provider mode
+    with patch.dict(os.environ, {"DEEP_AGENT_MODE": "cloud_provider"}):
         graph_prod = build_agent(model=model, enable_subagents=True)
         assert isinstance(graph_prod, CompiledStateGraph)

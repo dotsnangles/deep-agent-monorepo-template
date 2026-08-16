@@ -132,7 +132,7 @@ class DeepAgentEnvironmentFactory:
                 agent_kwargs["backend"] = effective_backend
 
         # -----------------------------------------------------------------
-        # 2. PRODUCTION CLOUD MULTI-LLM MODE
+        # 2. CLOUD PROVIDER MULTI-LLM MODE (OpenAI, Anthropic, Gemini, etc.)
         # -----------------------------------------------------------------
         else:
             is_subagents_allowed = enable_subagents if enable_subagents is not None else True

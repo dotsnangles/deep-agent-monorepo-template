@@ -9,13 +9,13 @@ from src.workers.title_worker import TITLE_UPDATED_CHANNEL, TitleGenerationWorke
 
 
 @pytest.mark.asyncio
-async def test_title_worker_production_mode_uses_llm_generator():
-    """In production_cloud mode, TitleGenerationWorker uses injected LLM title generator."""
+async def test_title_worker_cloud_provider_mode_uses_llm_generator():
+    """In cloud_provider mode, TitleGenerationWorker uses injected LLM title generator."""
     mock_redis = AsyncMock()
     mock_redis.publish = AsyncMock()
     mock_title_generator = AsyncMock(return_value="React Next.js 아키텍처")
 
-    with patch.dict(os.environ, {"DEEP_AGENT_MODE": "production_cloud"}):
+    with patch.dict(os.environ, {"DEEP_AGENT_MODE": "cloud_provider"}):
         worker = TitleGenerationWorker(
             redis_client=mock_redis,
             event_broker=None,
