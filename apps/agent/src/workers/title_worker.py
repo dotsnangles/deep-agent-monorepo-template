@@ -106,8 +106,12 @@ class TitleGenerationWorker:
                 if self.pg_pool:
                     try:
                         async with self.pg_pool.connection() as conn:
+                            query = (
+                                "UPDATE chat_session SET title = %s, updated_at = NOW() "
+                                "WHERE id = %s"
+                            )
                             await conn.execute(
-                                "UPDATE chat_session SET title = %s, updated_at = NOW() WHERE id = %s",
+                                query,
                                 (smart_title, task.sessionId),
                             )
                             logger.info(

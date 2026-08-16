@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any
 
 from copilotkit import CopilotKitMiddleware
@@ -7,7 +8,16 @@ from langgraph.checkpoint.memory import MemorySaver
 
 from src.core.config import get_llm
 from src.graphs.chat.prompts import MAIN_SYSTEM_PROMPT, TITLE_PROMPT
+from src.tools.sensitive import get_sensitive_tools
 from src.tools.system import get_default_tools
+
+DEFAULT_INTERRUPT_TOOLS = {
+    "execute_command": True,
+    "write_file": True,
+    "delete_resource": True,
+    "execute": True,
+    "delete": True,
+}
 
 
 def build_agent(
@@ -15,28 +25,57 @@ def build_agent(
     store: Any = None,
     subagents: list[dict[str, Any]] | None = None,
     model: Any = None,
+    tools: list[Any] | None = None,
+    interrupt_on: dict[str, Any] | None = None,
+    middleware: list[Any] | None = None,
+    backend: Any = None,
+    system_prompt: str | None = None,
+    **kwargs: Any,
 ):
-    """Build and compile the Deep Agent graph equipped with CopilotKitMiddleware.
+    """Build and compile the unified Deep Agent graph using official create_deep_agent.
 
     Args:
-        checkpointer: Persistent checkpointer (e.g. AsyncPostgresSaver) or None.
+        checkpointer: Persistent checkpointer (e.g. AsyncPostgresSaver) or MemorySaver.
         store: Long-term store (e.g. AsyncPostgresStore) or None.
         subagents: Optional list of subagent configuration dicts.
         model: Custom or Fake LLM instance, or None to use default get_llm().
+        tools: List of tools to provide, or None for default system + sensitive tools.
+        interrupt_on: Tool gating map for HITL approval.
+        middleware: List of middlewares, defaults to [CopilotKitMiddleware()].
+        backend: VFS or Sandbox backend instance.
+        system_prompt: Base prompt override.
     """
     llm = model if model is not None else get_llm()
-    tools = get_default_tools()
-    effective_checkpointer = checkpointer if checkpointer is not None else MemorySaver()
-
-    agent_graph = create_deep_agent(
-        model=llm,
-        system_prompt=MAIN_SYSTEM_PROMPT,
-        tools=tools,
-        subagents=subagents,
-        middleware=[CopilotKitMiddleware()],
-        checkpointer=effective_checkpointer,
-        store=store,
+    effective_tools = list(
+        tools if tools is not None else (get_default_tools() + get_sensitive_tools())
     )
+    effective_checkpointer = checkpointer if checkpointer is not None else MemorySaver()
+    effective_interrupt_on = interrupt_on if interrupt_on is not None else DEFAULT_INTERRUPT_TOOLS
+    effective_middleware = list(middleware if middleware is not None else [CopilotKitMiddleware()])
+    effective_prompt = system_prompt or MAIN_SYSTEM_PROMPT
+
+    agent_kwargs: dict[str, Any] = {
+        "model": llm,
+        "system_prompt": effective_prompt,
+        "tools": effective_tools,
+        "subagents": subagents,
+        "middleware": effective_middleware,
+        "interrupt_on": effective_interrupt_on,
+        "checkpointer": effective_checkpointer,
+        "store": store,
+    }
+    if backend is not None:
+        agent_kwargs["backend"] = backend
+
+    # Check for repository AGENTS.md memory file
+    agents_md = Path("AGENTS.md")
+    if agents_md.exists():
+        try:
+            agent_kwargs["memory"] = agents_md.read_text(encoding="utf-8")
+        except Exception:
+            pass
+
+    agent_graph = create_deep_agent(**agent_kwargs)
 
     cp_name = type(effective_checkpointer).__name__
     st_name = type(store).__name__ if store is not None else "None"

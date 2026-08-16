@@ -3,7 +3,7 @@ from langgraph.checkpoint.memory import MemorySaver
 
 from src.core.gateway import AgentExecutionGateway, _build_trace_metadata
 from src.core.testing import FakeChatModel
-from src.graphs.chat.hitl_graph import build_hitl_agent_graph
+from src.graphs.chat.graph import build_agent
 from src.graphs.registry import GraphRegistry
 
 
@@ -78,7 +78,7 @@ class TestGatewayObservability:
         fake_llm = FakeChatModel(responses=["테스트 답변입니다."])
         registry = GraphRegistry()
         checkpointer = MemorySaver()
-        registry.register("default", build_hitl_agent_graph)
+        registry.register("default", build_agent)
 
         gateway = AgentExecutionGateway(
             registry=registry,

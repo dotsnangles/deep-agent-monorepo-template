@@ -2,7 +2,7 @@ import pytest
 from langgraph.checkpoint.memory import MemorySaver
 
 from src.core import AgentExecutionGateway, FakeChatModel
-from src.graphs.chat import build_hitl_agent_graph
+from src.graphs.chat.graph import build_agent
 from src.graphs.registry import GraphRegistry
 from src.schemas import AgentStreamEvent
 
@@ -11,7 +11,7 @@ from src.schemas import AgentStreamEvent
 def hitl_gateway_fixture():
     checkpointer = MemorySaver()
     registry = GraphRegistry()
-    registry.register("hitl_test", build_hitl_agent_graph)
+    registry.register("hitl_test", build_agent)
     fake_llm = FakeChatModel()
     gateway = AgentExecutionGateway(
         registry=registry,

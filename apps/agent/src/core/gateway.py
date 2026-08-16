@@ -2,7 +2,13 @@ import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages import (
+    AIMessage,
+    BaseMessage,
+    HumanMessage,
+    RemoveMessage,
+    SystemMessage,
+)
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.types import Command
 
@@ -197,25 +203,74 @@ def _build_trace_metadata(
     return metadata
 
 
+def _normalize_resume_action(resume_action: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Normalizes various resume payload formats into official LangChain HITL decisions format."""
+    if resume_action is None:
+        return None
+    if "decisions" in resume_action:
+        return resume_action
+
+    approved = resume_action.get("approved", True)
+    if approved:
+        return {"decisions": [{"type": "approve"}]}
+    else:
+        reason = (
+            resume_action.get("reason")
+            or resume_action.get("feedback")
+            or "사용자에 의해 도구 실행이 거부되었습니다."
+        )
+        return {"decisions": [{"type": "reject", "message": reason}]}
+
+
 def _extract_interrupt_events(graph_state: Any) -> list[AgentStreamEvent]:
     """Encapsulates extraction of approval_request events from LangGraph state."""
     events: list[AgentStreamEvent] = []
     if not graph_state or not getattr(graph_state, "tasks", None):
         return events
 
+    # Extract pending tool_calls from state messages if available
+    pending_tool_calls = []
+    if hasattr(graph_state, "values") and isinstance(graph_state.values, dict):
+        messages = graph_state.values.get("messages", [])
+        if messages and hasattr(messages[-1], "tool_calls"):
+            pending_tool_calls = messages[-1].tool_calls or []
+
     for task in graph_state.tasks:
         if task.interrupts:
             for interrupt_item in task.interrupts:
                 val = interrupt_item.value
                 if isinstance(val, dict):
-                    events.append(
-                        AgentStreamEvent.approval_request(
-                            tool=val.get("tool", "tool"),
-                            tool_input=val.get("input", {}),
-                            tool_call_id=val.get("tool_call_id", ""),
-                            description=val.get("description"),
+                    # Official Deep Agents action_requests format
+                    if "action_requests" in val and isinstance(val["action_requests"], list):
+                        for req in val["action_requests"]:
+                            tool_name = req.get("name", "tool")
+                            tool_args = req.get("args", {})
+                            matched_id = req.get("id") or req.get("tool_call_id")
+                            if not matched_id and pending_tool_calls:
+                                for tc in pending_tool_calls:
+                                    if tc.get("name") == tool_name and tc.get("args") == tool_args:
+                                        matched_id = tc.get("id")
+                                        break
+                                if not matched_id and len(pending_tool_calls) == 1:
+                                    matched_id = pending_tool_calls[0].get("id")
+
+                            events.append(
+                                AgentStreamEvent.approval_request(
+                                    tool=tool_name,
+                                    tool_input=tool_args,
+                                    tool_call_id=matched_id or "",
+                                    description=req.get("description"),
+                                )
+                            )
+                    elif "tool" in val or "input" in val:
+                        events.append(
+                            AgentStreamEvent.approval_request(
+                                tool=val.get("tool", "tool"),
+                                tool_input=val.get("input", {}),
+                                tool_call_id=val.get("tool_call_id", ""),
+                                description=val.get("description"),
+                            )
                         )
-                    )
     return events
 
 
@@ -296,9 +351,41 @@ class AgentExecutionGateway:
 
                 # Determine graph input: Command(resume=...) for HITL resume or initial input
                 if resume_action is not None:
-                    graph_input = Command(resume=resume_action)
+                    norm_resume = _normalize_resume_action(resume_action)
+                    graph_input = Command(resume=norm_resume)
                 else:
-                    graph_input = {"messages": lc_messages}
+                    # Filter redundant default system prompt so compiled graphs use their own
+                    non_default_msgs = [
+                        m
+                        for m in lc_messages
+                        if not (isinstance(m, SystemMessage) and m.content == MAIN_SYSTEM_PROMPT)
+                    ]
+                    graph_input = {
+                        "messages": non_default_msgs if non_default_msgs else lc_messages
+                    }
+
+                    # Synchronize active path by clearing prior checkpoint state messages
+                    if hasattr(graph, "aget_state") and hasattr(graph, "aupdate_state"):
+                        try:
+                            current_state = await graph.aget_state(stream_config)
+                            if (
+                                current_state
+                                and current_state.values
+                                and "messages" in current_state.values
+                            ):
+                                existing_msgs = current_state.values.get("messages", [])
+                                if existing_msgs and len(non_default_msgs) > 1:
+                                    remove_ops = [
+                                        RemoveMessage(id=m.id)
+                                        for m in existing_msgs
+                                        if getattr(m, "id", None)
+                                    ]
+                                    if remove_ops:
+                                        await graph.aupdate_state(
+                                            stream_config, {"messages": remove_ops}
+                                        )
+                        except Exception as sync_err:
+                            logger.debug("State synchronization skipped: %s", sync_err)
 
                 # Check if graph has astream_events capability
                 if hasattr(graph, "astream_events"):

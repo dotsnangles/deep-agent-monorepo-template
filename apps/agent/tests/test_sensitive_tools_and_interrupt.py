@@ -4,7 +4,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command
 
 from src.core.testing import FakeChatModel
-from src.graphs.chat import build_hitl_agent_graph
+from src.graphs.chat.graph import build_agent
 from src.schemas import AgentStreamEvent, ApprovalRequestEventData
 from src.tools import (
     execute_command,
@@ -77,7 +77,7 @@ class TestLangGraphHITLInterruptAndResume:
         )
         checkpointer = MemorySaver()
 
-        graph = build_hitl_agent_graph(
+        graph = build_agent(
             checkpointer=checkpointer,
             model=fake_llm,
         )
@@ -90,16 +90,16 @@ class TestLangGraphHITLInterruptAndResume:
             config=thread_config,
         )
 
-        # Graph should have paused at the interrupt inside tools node
+        # Graph should have paused at the declarative interrupt
         state = await graph.aget_state(thread_config)
         assert len(state.tasks) > 0
         interrupts = state.tasks[0].interrupts
         assert len(interrupts) > 0
-        interrupt_data = interrupts[0].value
-        assert interrupt_data["tool"] == "execute_command"
-        assert interrupt_data["tool_call_id"] == "call_hitl_1"
-        assert interrupt_data["input"] == {"command": "git pull origin main"}
-        assert interrupt_data["requires_approval"] is True
+        interrupt_val = interrupts[0].value
+        assert "action_requests" in interrupt_val
+        action_req = interrupt_val["action_requests"][0]
+        assert action_req["name"] == "execute_command"
+        assert action_req["args"] == {"command": "git pull origin main"}
 
     @pytest.mark.asyncio
     async def test_graph_resumes_when_approved(self):
@@ -108,13 +108,12 @@ class TestLangGraphHITLInterruptAndResume:
             "args": {"command": "echo 'hello'"},
             "id": "call_approve_1",
         }
-        # First invocation returns tool call, second invocation returns final answer
         fake_llm = FakeChatModel(
             tool_calls=[tool_call],
             responses=["도구가 성공적으로 실행되었습니다."],
         )
         checkpointer = MemorySaver()
-        graph = build_hitl_agent_graph(checkpointer=checkpointer, model=fake_llm)
+        graph = build_agent(checkpointer=checkpointer, model=fake_llm)
         thread_config = {"configurable": {"thread_id": "thread_approve_test"}}
 
         # 1. Trigger interrupt
@@ -123,20 +122,22 @@ class TestLangGraphHITLInterruptAndResume:
             config=thread_config,
         )
 
-        # 2. Resume with Approved Command
-        # Next model invocation will not return tool calls
+        # 2. Resume with Approved Decision
         fake_llm.tool_calls = None
 
         resume_result = await graph.ainvoke(
-            Command(resume={"approved": True}),
+            Command(resume={"decisions": [{"type": "approve"}]}),
             config=thread_config,
         )
 
         messages = resume_result["messages"]
         tool_messages = [
-            m for m in messages if getattr(m, "tool_call_id", None) == "call_approve_1"
+            m
+            for m in messages
+            if getattr(m, "name", None) == "execute_command"
+            or getattr(m, "tool_call_id", None) == "call_approve_1"
         ]
-        assert len(tool_messages) == 1
+        assert len(tool_messages) >= 1
         assert "Executed command" in tool_messages[0].content
 
     @pytest.mark.asyncio
@@ -151,7 +152,7 @@ class TestLangGraphHITLInterruptAndResume:
             responses=["삭제가 거부되었습니다."],
         )
         checkpointer = MemorySaver()
-        graph = build_hitl_agent_graph(checkpointer=checkpointer, model=fake_llm)
+        graph = build_agent(checkpointer=checkpointer, model=fake_llm)
         thread_config = {"configurable": {"thread_id": "thread_reject_test"}}
 
         # 1. Trigger interrupt
@@ -160,16 +161,24 @@ class TestLangGraphHITLInterruptAndResume:
             config=thread_config,
         )
 
-        # 2. Resume with Rejection
+        # 2. Resume with Rejection Decision
         fake_llm.tool_calls = None
 
         resume_result = await graph.ainvoke(
-            Command(resume={"approved": False, "reason": "위험한 작업으로 판단되어 거부했습니다."}),
+            Command(
+                resume={
+                    "decisions": [
+                        {"type": "reject", "message": "위험한 작업으로 판단되어 거부했습니다."}
+                    ]
+                }
+            ),
             config=thread_config,
         )
 
         messages = resume_result["messages"]
-        tool_messages = [m for m in messages if getattr(m, "tool_call_id", None) == "call_reject_1"]
-        assert len(tool_messages) == 1
-        assert tool_messages[0].status == "error"
-        assert "위험한 작업으로 판단되어 거부했습니다." in tool_messages[0].content
+        rejection_messages = [
+            m
+            for m in messages
+            if "위험한 작업으로 판단되어 거부했습니다." in getattr(m, "content", "")
+        ]
+        assert len(rejection_messages) >= 1

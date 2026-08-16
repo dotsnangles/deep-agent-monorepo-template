@@ -4,7 +4,7 @@ from typing import Any
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph.state import CompiledStateGraph
 
-from src.graphs.chat import build_agent, build_hitl_agent_graph
+from src.graphs.chat import build_agent
 
 GraphFactory = Callable[..., CompiledStateGraph]
 
@@ -18,9 +18,9 @@ class GraphRegistry:
 
     def _register_defaults(self):
         """Registers default built-in graph factories."""
-        self.register("default", build_hitl_agent_graph)
-        self.register("chat", build_hitl_agent_graph)
-        self.register("hitl", build_hitl_agent_graph)
+        self.register("default", build_agent)
+        self.register("chat", build_agent)
+        self.register("hitl", build_agent)
         self.register("deep_agent", build_agent)
 
     def register(self, agent_type: str, factory: GraphFactory) -> None:
@@ -47,7 +47,7 @@ class GraphRegistry:
         key = agent_type.lower().strip()
         factory = self._factories.get(key)
         if not factory:
-            factory = self._factories.get("default", build_hitl_agent_graph)
+            factory = self._factories.get("default", build_agent)
 
         call_kwargs: dict[str, Any] = {
             "checkpointer": checkpointer,

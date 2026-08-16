@@ -4,7 +4,7 @@ from langgraph.checkpoint.memory import MemorySaver
 
 from src.api import create_app
 from src.core import AgentExecutionGateway, FakeChatModel
-from src.graphs.chat import build_hitl_agent_graph
+from src.graphs.chat.graph import build_agent
 from src.graphs.registry import GraphRegistry
 
 
@@ -91,7 +91,7 @@ async def test_chat_stream_api_endpoint_handles_hitl_interrupt_and_approval():
     )
     checkpointer = MemorySaver()
     registry = GraphRegistry()
-    registry.register("hitl_api", build_hitl_agent_graph)
+    registry.register("hitl_api", build_agent)
 
     app.state.gateway = AgentExecutionGateway(
         registry=registry,
@@ -148,7 +148,7 @@ async def test_chat_stream_api_endpoint_handles_hitl_rejection():
     )
     checkpointer = MemorySaver()
     registry = GraphRegistry()
-    registry.register("hitl_api", build_hitl_agent_graph)
+    registry.register("hitl_api", build_agent)
 
     app.state.gateway = AgentExecutionGateway(
         registry=registry,
