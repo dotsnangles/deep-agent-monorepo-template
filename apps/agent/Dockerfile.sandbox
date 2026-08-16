@@ -1,0 +1,24 @@
+FROM python:3.13-slim
+
+# Install system utilities and build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    git \
+    libpng-dev \
+    libfreetype6-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+# Install data analysis packages pre-baked for zero-latency execution
+RUN pip install --no-cache-dir \
+    pandas \
+    numpy \
+    matplotlib \
+    seaborn \
+    scipy \
+    openpyxl \
+    requests
+
+CMD ["tail", "-f", "/dev/null"]

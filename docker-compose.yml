@@ -221,6 +221,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    volumes:
+      - ./workspace/sessions:/workspace/sessions
     healthcheck:
       test:
         [
@@ -235,9 +237,20 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  sandbox-runner:
+    build:
+      context: .
+      dockerfile: apps/agent/Dockerfile.sandbox
+    container_name: hollow-echo-distant-signal-sandbox-runner
+    volumes:
+      - ./workspace/sessions:/workspace/sessions
+    command: tail -f /dev/null
+    restart: unless-stopped
+
 volumes:
   hollow-echo-distant-signal_postgres_data:
   hollow-echo-distant-signal_redis_data:
   hollow-echo-distant-signal_minio_data:
   hollow-echo-distant-signal_clickhouse_data:
+
 
