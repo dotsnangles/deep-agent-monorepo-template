@@ -13,6 +13,8 @@ import {
   Search,
 } from "lucide-react";
 import { Badge } from "@repo/ui/components/badge";
+import { Separator } from "@repo/ui/components/separator";
+import { cn } from "@repo/ui/lib/utils";
 import {
   Card,
   CardHeader,
@@ -28,43 +30,33 @@ interface SpecialistDelegationCardProps {
   className?: string;
 }
 
-function getSpecialistMeta(name: string) {
-  switch (name.toLowerCase()) {
-    case "data_analyst":
-    case "analyst":
-      return {
-        label: "데이터 분석가",
-        icon: BarChart3,
-      };
-    case "chart_generator":
-    case "visualizer":
-      return {
-        label: "시각화 / 차트 생성기",
-        icon: LineChart,
-      };
-    case "researcher":
-    case "research":
-      return {
-        label: "연구 / 조사 전문가",
-        icon: Search,
-      };
-    case "coder":
-    case "developer":
-      return {
-        label: "코드 작성기",
-        icon: FileCode,
-      };
-    default:
-      return {
-        label: name || "하위 에이전트",
-        icon: Bot,
-      };
-  }
+interface SpecialistMeta {
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
+const SPECIALIST_CONFIG: Record<string, SpecialistMeta> = {
+  data_analyst: { label: "데이터 분석가", icon: BarChart3 },
+  analyst: { label: "데이터 분석가", icon: BarChart3 },
+  chart_generator: { label: "시각화 / 차트 생성기", icon: LineChart },
+  visualizer: { label: "시각화 / 차트 생성기", icon: LineChart },
+  researcher: { label: "연구 / 조사 전문가", icon: Search },
+  research: { label: "연구 / 조사 전문가", icon: Search },
+  coder: { label: "코드 작성기", icon: FileCode },
+  developer: { label: "코드 작성기", icon: FileCode },
+};
+
+function getSpecialistMeta(name: string): SpecialistMeta {
+  const normalized = (name || "").toLowerCase();
+  return SPECIALIST_CONFIG[normalized] ?? {
+    label: name || "하위 에이전트",
+    icon: Bot,
+  };
 }
 
 export function SpecialistDelegationCard({
   subagents,
-  className = "",
+  className,
 }: SpecialistDelegationCardProps) {
   const [expandedIndices, setExpandedIndices] = useState<Record<number, boolean>>({});
 
@@ -82,7 +74,7 @@ export function SpecialistDelegationCard({
   return (
     <div
       data-testid="specialist-delegation-card"
-      className={`space-y-2 mb-3 ${className}`}
+      className={cn("flex flex-col gap-2 mb-3", className)}
     >
       {subagents.map((agent, idx) => {
         const meta = getSpecialistMeta(agent.subagent);
@@ -107,7 +99,7 @@ export function SpecialistDelegationCard({
               <CardHeader className="flex-row items-center justify-between pb-2">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="flex size-6 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <Icon data-icon="inline-start" />
+                    <Icon className="size-3.5" />
                   </div>
                   <div className="flex items-center gap-1.5">
                     <CardTitle className="text-xs font-semibold text-foreground">
@@ -121,12 +113,12 @@ export function SpecialistDelegationCard({
                   <div className="flex items-center gap-1">
                     {isRunning ? (
                       <Badge variant="secondary" className="gap-1 text-[10px] font-medium">
-                        <Loader2 data-icon="inline-start" className="animate-spin" />
+                        <Loader2 className="size-2.5 animate-spin" />
                         <span>실행 중</span>
                       </Badge>
                     ) : isCompleted ? (
                       <Badge variant="outline" className="gap-1 text-[10px] font-medium">
-                        <CheckCircle2 data-icon="inline-start" className="text-primary" />
+                        <CheckCircle2 className="size-2.5 text-primary" />
                         <span>완료</span>
                       </Badge>
                     ) : (
@@ -140,42 +132,45 @@ export function SpecialistDelegationCard({
                 <CardAction>
                   <div className="text-muted-foreground">
                     {isExpanded ? (
-                      <ChevronUp data-icon="inline-start" />
+                      <ChevronUp className="size-4" />
                     ) : (
-                      <ChevronDown data-icon="inline-start" />
+                      <ChevronDown className="size-4" />
                     )}
                   </div>
                 </CardAction>
               </CardHeader>
             </button>
 
-            {/* Content Details */}
+            {/* Content Details with Separator */}
             {isExpanded && (
-              <CardContent className="space-y-2 pt-1 border-t border-border/40 text-xs">
-                {agent.task && (
-                  <div>
-                    <span className="text-[11px] font-medium text-muted-foreground block mb-0.5">
-                      요청 과업
-                    </span>
-                    <p className="text-foreground leading-relaxed bg-muted/40 p-2 rounded-xl">
-                      {agent.task}
-                    </p>
-                  </div>
-                )}
-
-                {agent.output && (
-                  <div>
-                    <span className="text-[11px] font-medium text-muted-foreground block mb-0.5">
-                      수행 결과
-                    </span>
-                    <div className="text-muted-foreground font-mono text-[11px] bg-muted/50 p-2 rounded-xl overflow-x-auto max-h-40 whitespace-pre-wrap">
-                      {typeof agent.output === "string"
-                        ? agent.output
-                        : JSON.stringify(agent.output, null, 2)}
+              <>
+                <Separator />
+                <CardContent className="flex flex-col gap-2 pt-2.5 text-xs">
+                  {agent.task && (
+                    <div>
+                      <span className="text-[11px] font-medium text-muted-foreground block mb-0.5">
+                        요청 과업
+                      </span>
+                      <p className="text-foreground leading-relaxed bg-muted/40 p-2 rounded-xl">
+                        {agent.task}
+                      </p>
                     </div>
-                  </div>
-                )}
-              </CardContent>
+                  )}
+
+                  {agent.output && (
+                    <div>
+                      <span className="text-[11px] font-medium text-muted-foreground block mb-0.5">
+                        수행 결과
+                      </span>
+                      <div className="text-muted-foreground font-mono text-[11px] bg-muted/50 p-2 rounded-xl overflow-x-auto max-h-40 whitespace-pre-wrap">
+                        {typeof agent.output === "string"
+                          ? agent.output
+                          : JSON.stringify(agent.output, null, 2)}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </>
             )}
           </Card>
         );
