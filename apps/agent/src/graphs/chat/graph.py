@@ -14,6 +14,7 @@ def build_agent(
     checkpointer: Any = None,
     store: Any = None,
     subagents: list[dict[str, Any]] | None = None,
+    model: Any = None,
 ):
     """Build and compile the Deep Agent graph equipped with CopilotKitMiddleware.
 
@@ -21,8 +22,9 @@ def build_agent(
         checkpointer: Persistent checkpointer (e.g. AsyncPostgresSaver) or None.
         store: Long-term store (e.g. AsyncPostgresStore) or None.
         subagents: Optional list of subagent configuration dicts.
+        model: Custom or Fake LLM instance, or None to use default get_llm().
     """
-    llm = get_llm()
+    llm = model if model is not None else get_llm()
     tools = get_default_tools()
     effective_checkpointer = checkpointer if checkpointer is not None else MemorySaver()
 
