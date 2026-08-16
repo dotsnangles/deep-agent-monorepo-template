@@ -40,6 +40,7 @@ export interface ForkSessionResult {
 
 export interface StreamCallbacks {
   onToken?: (token: string) => void;
+  onReasoningChunk?: (chunk: string) => void;
   onApprovalRequest?: (approval: ToolApprovalRequest) => void;
   onTodoUpdate?: (todos: TodoItem[]) => void;
   onSubagentStart?: (subagent: string, task: string, runId?: string) => void;
@@ -164,6 +165,8 @@ export class HttpChatTransport implements ChatTransport {
           const parsed = JSON.parse(rawData);
           if (eventType === "token" && parsed.content) {
             cb.onToken?.(parsed.content);
+          } else if (eventType === "reasoning" || parsed.reasoning || parsed.thought) {
+            cb.onReasoningChunk?.(parsed.reasoning || parsed.thought || parsed.content || rawData);
           } else if (eventType === "todo_update") {
             cb.onTodoUpdate?.(parsed.todos || []);
           } else if (eventType === "subagent_start") {

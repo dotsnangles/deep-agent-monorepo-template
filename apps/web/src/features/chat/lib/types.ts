@@ -45,4 +45,6 @@ export interface MessageNode {
   todos?: TodoItem[];
   subagents?: SubagentExecution[];
   toolCalls?: ToolCallExecution[];
+  reasoning?: string;
+  reasoningDuration?: number;
 }

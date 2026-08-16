@@ -604,4 +604,28 @@ describe("ChatEngine (In-Process State Machine)", () => {
     expect(assistantNode?.subagents?.[0].status).toBe("completed");
     expect(assistantNode?.subagents?.[0].output).toEqual({ median: 42 });
   });
+
+  it("partitions <think>...</think> reasoning from final answer in assistant node", async () => {
+    transport.setMockStreamChunks([
+      "<think>\nLet me analyze the request step by step.\n1. Check inputs\n2. Compute result\n</think>\n",
+      "The result is ",
+      "42.",
+    ]);
+
+    const engine = new ChatEngine({
+      sessionId: "session-reasoning-test",
+      transport,
+    });
+
+    await engine.send("Calculate the ultimate answer");
+
+    const state = engine.getState();
+    const assistantNode = state.activePath.find((n) => n.role === "assistant");
+    expect(assistantNode).toBeDefined();
+    expect(assistantNode?.reasoning).toBe(
+      "Let me analyze the request step by step.\n1. Check inputs\n2. Compute result\n"
+    );
+    expect(assistantNode?.content).toBe("The result is 42.");
+    expect(assistantNode?.reasoningDuration).toBeDefined();
+  });
 });

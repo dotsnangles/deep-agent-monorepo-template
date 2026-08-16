@@ -22,6 +22,7 @@ import {
   type ChatTransport,
   type StreamMessageContext,
 } from "./transport";
+import { StreamReasoningPartitioner } from "../lib/stream-partitioner";
 
 export interface ChatEngineState {
   sessionId: string;
@@ -543,7 +544,11 @@ export class ChatEngine {
   }): Promise<void> {
     this.abortController = new AbortController();
     const existingNode = this.state.allNodes.find((n) => n.id === params.assistantMessageId);
-    let accumulatedContent = existingNode?.content || "";
+    const partitioner = new StreamReasoningPartitioner(
+      existingNode?.content || "",
+      existingNode?.reasoning,
+      existingNode?.reasoningDuration
+    );
     let capturedApproval: ToolApprovalRequest | null = existingNode?.toolApproval || null;
     let capturedTodos: TodoItem[] = existingNode?.todos ? [...existingNode.todos] : [];
     let capturedSubagents: SubagentExecution[] = existingNode?.subagents ? [...existingNode.subagents] : [];
@@ -560,12 +565,38 @@ export class ChatEngine {
         },
         {
           onToken: (chunk) => {
-            accumulatedContent += chunk;
+            partitioner.feedToken(chunk);
+            const pState = partitioner.getState();
             this.state = {
               ...this.state,
               allNodes: this.state.allNodes.map((n) =>
                 n.id === params.assistantMessageId
-                  ? { ...n, content: accumulatedContent, status: "streaming" }
+                  ? {
+                      ...n,
+                      content: pState.content,
+                      reasoning: pState.reasoning,
+                      reasoningDuration: pState.reasoningDuration,
+                      status: "streaming",
+                    }
+                  : n
+              ),
+            };
+            this.notify();
+          },
+          onReasoningChunk: (chunk) => {
+            partitioner.feedReasoning(chunk);
+            const pState = partitioner.getState();
+            this.state = {
+              ...this.state,
+              allNodes: this.state.allNodes.map((n) =>
+                n.id === params.assistantMessageId
+                  ? {
+                      ...n,
+                      content: pState.content,
+                      reasoning: pState.reasoning,
+                      reasoningDuration: pState.reasoningDuration,
+                      status: "streaming",
+                    }
                   : n
               ),
             };
@@ -693,13 +724,16 @@ export class ChatEngine {
       );
 
       // Successfully finished stream
+      const finalPState = partitioner.getState();
       this.state = {
         ...this.state,
         allNodes: this.state.allNodes.map((n) =>
           n.id === params.assistantMessageId
             ? {
                 ...n,
-                content: accumulatedContent,
+                content: finalPState.content,
+                reasoning: finalPState.reasoning,
+                reasoningDuration: finalPState.reasoningDuration,
                 status: "complete",
                 toolApproval: capturedApproval,
                 todos: capturedTodos.length > 0 ? capturedTodos : undefined,
@@ -716,7 +750,8 @@ export class ChatEngine {
       const isAborted = this.abortController.signal.aborted || err?.name === "AbortError";
       if (isAborted) {
         // User aborted: if no tokens received yet, remove empty ghost node and restore activeLeaf
-        if (accumulatedContent.length === 0) {
+        const currentPState = partitioner.getState();
+        if (currentPState.content.length === 0 && !currentPState.reasoning) {
           this.state = {
             ...this.state,
             allNodes: this.state.allNodes.filter((n) => n.id !== params.assistantMessageId),
@@ -729,7 +764,17 @@ export class ChatEngine {
             ...this.state,
             allNodes: this.state.allNodes.map((n) =>
               n.id === params.assistantMessageId
-                ? { ...n, content: accumulatedContent, status: "complete" }
+                ? {
+                    ...n,
+                    content: currentPState.content,
+                    reasoning: currentPState.reasoning,
+                    reasoningDuration: currentPState.reasoningDuration,
+                    status: "complete",
+                    toolApproval: capturedApproval,
+                    todos: capturedTodos.length > 0 ? capturedTodos : undefined,
+                    subagents: capturedSubagents.length > 0 ? capturedSubagents : undefined,
+                    toolCalls: capturedToolCalls.length > 0 ? capturedToolCalls : undefined,
+                  }
                 : n
             ),
             isGenerating: false,
@@ -756,13 +801,14 @@ export class ChatEngine {
       this.abortController = null;
 
       // Always persist the final assistant node with whatever content was accumulated
-      if (accumulatedContent.length > 0) {
+      const savedPState = partitioner.getState();
+      if (savedPState.content.length > 0 || savedPState.reasoning) {
         await this.transport.persistNode({
           id: params.assistantMessageId,
           sessionId: this.sessionId,
           parentId: params.userMessageId,
           role: "assistant",
-          content: accumulatedContent,
+          content: savedPState.content,
           attachments: [],
         });
       }
