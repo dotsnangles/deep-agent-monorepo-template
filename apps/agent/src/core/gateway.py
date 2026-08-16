@@ -112,6 +112,91 @@ def _normalize_messages(
     return normalized
 
 
+def _extract_user_prompt_info(
+    messages: list[BaseMessage | dict[str, Any]] | None,
+) -> tuple[str, bool, int]:
+    """Extracts latest user prompt snippet, multimodal attachment presence, and turn count."""
+    if not messages:
+        return "", False, 0
+
+    user_msgs: list[str] = []
+    has_attachments = False
+
+    for msg in messages:
+        content = ""
+        atts: list[Any] = []
+        is_user = False
+
+        if isinstance(msg, dict):
+            role = str(msg.get("role", "")).lower()
+            if role in ("user", "human"):
+                is_user = True
+                content = str(msg.get("content", ""))
+                atts = msg.get("attachments") or []
+        elif isinstance(msg, HumanMessage):
+            is_user = True
+            raw_content = msg.content
+            if isinstance(raw_content, str):
+                content = raw_content
+            elif isinstance(raw_content, list):
+                text_parts = [
+                    b.get("text", "")
+                    for b in raw_content
+                    if isinstance(b, dict) and b.get("type") == "text"
+                ]
+                content = " ".join(text_parts)
+                has_attachments = any(
+                    isinstance(b, dict) and b.get("type") == "image_url" for b in raw_content
+                )
+
+        if is_user:
+            user_msgs.append(content.strip())
+            if atts:
+                has_attachments = True
+
+    latest_prompt = user_msgs[-1] if user_msgs else ""
+    turn_index = len(user_msgs)
+    return latest_prompt, has_attachments, turn_index
+
+
+def _build_trace_metadata(
+    messages: list[BaseMessage | dict[str, Any]] | None,
+    agent_type: str = "default",
+    thread_id: str | None = None,
+) -> dict[str, Any]:
+    """Constructs enriched Langfuse trace metadata with turn names, active path stats, and tags."""
+    latest_prompt, has_attachments, turn_index = _extract_user_prompt_info(messages)
+    effective_thread_id = thread_id or "default"
+
+    # Truncate trace name if prompt is too long
+    if latest_prompt:
+        clean_snippet = latest_prompt.replace("\n", " ").strip()
+        if len(clean_snippet) > 35:
+            snippet = f"{clean_snippet[:35]}..."
+        else:
+            snippet = clean_snippet
+        trace_name = f"💬 {snippet}"
+    else:
+        trace_name = f"Hollow Echo Stream ({agent_type})"
+
+    tags = ["chat", "streaming", f"agent:{agent_type}"]
+    if has_attachments:
+        tags.append("multimodal")
+
+    metadata: dict[str, Any] = {
+        "langfuse_session_id": effective_thread_id,
+        "langfuse_trace_name": trace_name,
+        "langfuse_tags": tags,
+        "user_prompt": latest_prompt,
+        "active_path_length": len(messages) if messages else 0,
+        "turn_index": turn_index,
+    }
+    if has_attachments:
+        metadata["has_attachments"] = True
+
+    return metadata
+
+
 def _extract_interrupt_events(graph_state: Any) -> list[AgentStreamEvent]:
     """Encapsulates extraction of approval_request events from LangGraph state."""
     events: list[AgentStreamEvent] = []
@@ -184,12 +269,14 @@ class AgentExecutionGateway:
         effective_thread_id = thread_id or "default"
         callbacks = self._build_callbacks(thread_id)
 
+        trace_meta = _build_trace_metadata(
+            messages,
+            agent_type=agent_type,
+            thread_id=effective_thread_id,
+        )
         stream_config: dict[str, Any] = {
             "callbacks": callbacks,
-            "metadata": {
-                "langfuse_session_id": effective_thread_id,
-                "langfuse_trace_name": f"Hollow Echo Stream ({agent_type})",
-            },
+            "metadata": trace_meta,
             "configurable": {
                 "thread_id": effective_thread_id,
             },
