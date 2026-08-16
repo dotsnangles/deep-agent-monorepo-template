@@ -10,9 +10,9 @@ import {
   MessageScrollerViewport,
   MessageScrollerContent,
   MessageScrollerItem,
+  MessageScrollerButton,
 } from "@repo/ui/components/message-scroller";
 import { useChatEngine } from "../hooks/use-chat-engine";
-import { useSmartScroll } from "../hooks/use-smart-scroll";
 import { useDirectUpload } from "../hooks/use-direct-upload";
 import { MessageItem } from "./message-item";
 import { AttachmentStagingBar } from "./attachment-staging-bar";
@@ -67,44 +67,11 @@ export function MessageFeed({ sessionId }: MessageFeedProps) {
   const [inputPrompt, setInputPrompt] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const prevActiveLengthRef = useRef(activePath.length);
-  const prevGeneratingRef = useRef(isGenerating);
 
-  const {
-    scrollRef,
-    showScrollBottomButton,
-    isPinnedToBottomRef,
-    scrollToBottom,
-    handleScroll,
-  } = useSmartScroll();
-
-  // Smart Auto-Scroll: Handle new message insertion, generation start, and token streaming
+  // Focus textarea on session change
   useEffect(() => {
-    const isNewMessageAdded = activePath.length > prevActiveLengthRef.current;
-    const isGenerationStarted = !prevGeneratingRef.current && isGenerating;
-
-    prevActiveLengthRef.current = activePath.length;
-    prevGeneratingRef.current = isGenerating;
-
-    if (isNewMessageAdded || isGenerationStarted) {
-      isPinnedToBottomRef.current = true;
-      requestAnimationFrame(() => {
-        scrollToBottom("smooth");
-      });
-      const timer = setTimeout(() => {
-        scrollToBottom("smooth");
-      }, 60);
-      return () => clearTimeout(timer);
-    } else if (isGenerating && isPinnedToBottomRef.current) {
-      scrollToBottom("instant");
-    }
-  }, [activePath, isGenerating, scrollToBottom, isPinnedToBottomRef]);
-
-  // Focus textarea & reset scroll on session change
-  useEffect(() => {
-    scrollToBottom("auto");
     textareaRef.current?.focus();
-  }, [sessionId, scrollToBottom]);
+  }, [sessionId]);
 
   // Auto-adjust textarea height
   useEffect(() => {
@@ -128,7 +95,6 @@ export function MessageFeed({ sessionId }: MessageFeedProps) {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
-    isPinnedToBottomRef.current = true;
     send(content, attachments);
   };
 
@@ -155,11 +121,7 @@ export function MessageFeed({ sessionId }: MessageFeedProps) {
     <div className="flex flex-col h-full w-full max-w-4xl mx-auto min-h-0 relative">
       {/* Scrollable Message Feed Area with shadcn MessageScroller */}
       <MessageScroller className="flex-1 min-h-0">
-        <MessageScrollerViewport
-          ref={scrollRef as any}
-          onScroll={handleScroll}
-          className="px-3 sm:px-6 py-4"
-        >
+        <MessageScrollerViewport className="px-3 sm:px-6 py-4">
           {isLoading && activePath.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-muted-foreground gap-2">
               <span className="size-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
@@ -184,7 +146,6 @@ export function MessageFeed({ sessionId }: MessageFeedProps) {
                       key={idx}
                       type="button"
                       onClick={() => {
-                        isPinnedToBottomRef.current = true;
                         send(item.prompt);
                       }}
                       className="flex flex-col items-start p-3.5 rounded-2xl bg-card border border-border/70 hover:border-primary/50 hover:bg-muted/30 transition-all text-left group shadow-xs cursor-pointer"
@@ -217,12 +178,10 @@ export function MessageFeed({ sessionId }: MessageFeedProps) {
                       message={msg}
                       isGenerating={isStreamingThisMessage}
                       onRegenerate={() => {
-                        isPinnedToBottomRef.current = true;
                         regenerate(msg.id);
                       }}
                       onDelete={() => deleteNode(msg.id)}
                       onRetry={() => {
-                        isPinnedToBottomRef.current = true;
                         retry(msg.id);
                       }}
                       onFork={async () => {
@@ -232,11 +191,9 @@ export function MessageFeed({ sessionId }: MessageFeedProps) {
                         }
                       }}
                       onApprove={(toolCallId) => {
-                        isPinnedToBottomRef.current = true;
                         respondToApproval(toolCallId, true);
                       }}
                       onReject={(toolCallId, reason) => {
-                        isPinnedToBottomRef.current = true;
                         respondToApproval(toolCallId, false, reason);
                       }}
                     />
@@ -246,22 +203,13 @@ export function MessageFeed({ sessionId }: MessageFeedProps) {
             </MessageScrollerContent>
           )}
         </MessageScrollerViewport>
-      </MessageScroller>
 
-      {/* Floating 'Scroll to Bottom' Button when user scrolled up */}
-      {showScrollBottomButton && (
-        <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-20 animate-in fade-in zoom-in-95 duration-150">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => scrollToBottom("smooth")}
-            className="rounded-full shadow-lg border border-border/80 text-xs px-3.5 py-1.5 gap-1.5 bg-background/95 hover:bg-muted backdrop-blur-xs cursor-pointer text-foreground font-medium"
-          >
-            <ArrowDown className="size-3.5 text-primary animate-bounce" />
-            <span>최신 메시지 보기</span>
-          </Button>
-        </div>
-      )}
+        {/* Built-in shadcn MessageScroller Floating Jump to End Button */}
+        <MessageScrollerButton direction="end">
+          <ArrowDown data-icon="inline-start" />
+          <span>최신 메시지 보기</span>
+        </MessageScrollerButton>
+      </MessageScroller>
 
       {/* Bottom Floating Prompt Box with File Upload Staging & Dynamic Send/Stop Toggle Button */}
       <div className="shrink-0 px-3 sm:px-6 pb-4 pt-1 bg-gradient-to-t from-background via-background/95 to-transparent">
@@ -320,7 +268,7 @@ export function MessageFeed({ sessionId }: MessageFeedProps) {
                 disabled={isGenerating || isUploading}
                 title="파일 첨부 (이미지, PDF, TXT, CSV, JSON, MD)"
               >
-                <Paperclip className="size-4" />
+                <Paperclip data-icon="inline-start" />
               </Button>
               <span className="text-[11px] text-muted-foreground/80 select-none">
                 {isGenerating
@@ -339,7 +287,7 @@ export function MessageFeed({ sessionId }: MessageFeedProps) {
                 onClick={stop}
                 title="답변 생성 중단 (Stop)"
               >
-                <Square className="size-3.5 fill-current" />
+                <Square data-icon="inline-start" className="fill-current" />
               </Button>
             ) : (
               <Button
@@ -350,7 +298,7 @@ export function MessageFeed({ sessionId }: MessageFeedProps) {
                 disabled={isSendDisabled}
                 title="메시지 전송 (Enter)"
               >
-                <ArrowUp className="size-4" />
+                <ArrowUp data-icon="inline-start" />
               </Button>
             )}
           </div>

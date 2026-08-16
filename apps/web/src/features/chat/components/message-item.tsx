@@ -16,6 +16,24 @@ import {
 } from "lucide-react";
 import { Button } from "@repo/ui/components/button";
 import { Textarea } from "@repo/ui/components/textarea";
+import {
+  Message,
+  MessageAvatar,
+  MessageContent,
+  MessageHeader,
+  MessageFooter,
+} from "@repo/ui/components/message";
+import { Bubble, BubbleContent } from "@repo/ui/components/bubble";
+import {
+  Attachment,
+  AttachmentGroup,
+  AttachmentMedia,
+  AttachmentContent,
+  AttachmentTitle,
+  AttachmentDescription,
+  AttachmentAction,
+} from "@repo/ui/components/attachment";
+import { Alert, AlertDescription } from "@repo/ui/components/alert";
 import type { AttachmentEntity } from "@repo/validators";
 import type { MessageNode } from "../lib/types";
 import { MarkdownRenderer } from "./markdown-renderer";
@@ -39,10 +57,6 @@ interface MessageItemProps {
   onFork?: () => void;
   onApprove?: (toolCallId: string) => void;
   onReject?: (toolCallId: string, reason?: string) => void;
-  // Deprecated props kept optional for backward compatibility
-  branchInfo?: any;
-  affectedSubtreeCount?: number;
-  onNavigateSibling?: (direction: "prev" | "next") => void;
 }
 
 function MessageAttachmentsView({
@@ -81,33 +95,37 @@ function MessageAttachmentsView({
         </div>
       )}
 
-      {/* Documents List */}
+      {/* Documents Group using shadcn Attachment Primitives */}
       {docs.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 max-w-full">
+        <AttachmentGroup className="max-w-full">
           {docs.map((doc) => {
             const Icon = getAttachmentFileIcon(doc.mimeType);
             return (
-              <a
-                key={doc.id}
-                href={doc.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                download={doc.name}
-                className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-xs transition-all shadow-2xs hover:border-primary/50 group bg-card border-border/80 text-foreground hover:bg-muted"
-                title={`${doc.name} (${formatFileSize(doc.size)}) 다운로드`}
-              >
-                <Icon className="size-3.5 shrink-0 text-primary" />
-                <span className="truncate max-w-[140px] sm:max-w-[200px] text-[11px] font-medium">
-                  {doc.name}
-                </span>
-                <span className="text-[10px] text-muted-foreground">
-                  ({formatFileSize(doc.size)})
-                </span>
-                <Download className="size-3 opacity-60 group-hover:opacity-100 transition-opacity" />
-              </a>
+              <Attachment key={doc.id} size="sm">
+                <AttachmentMedia variant="icon">
+                  <Icon />
+                </AttachmentMedia>
+                <AttachmentContent>
+                  <AttachmentTitle>{doc.name}</AttachmentTitle>
+                  <AttachmentDescription>{formatFileSize(doc.size)}</AttachmentDescription>
+                </AttachmentContent>
+                <AttachmentAction
+                  render={
+                    <a
+                      href={doc.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      download={doc.name}
+                      title={`${doc.name} 다운로드`}
+                    >
+                      <Download data-icon="inline-start" />
+                    </a>
+                  }
+                />
+              </Attachment>
             );
           })}
-        </div>
+        </AttachmentGroup>
       )}
 
       {/* Image Lightbox Modal */}
@@ -156,10 +174,7 @@ function MessageAttachmentsView({
 
 export function MessageItem({
   message,
-  branchInfo,
-  affectedSubtreeCount = 1,
   isGenerating,
-  onNavigateSibling,
   onEdit,
   onRegenerate,
   onDelete,
@@ -168,13 +183,13 @@ export function MessageItem({
   onApprove,
   onReject,
 }: MessageItemProps) {
+  const isUser = message.role === "user";
+  const { copied, copy } = useCopyToClipboard();
   const [isEditing, setIsEditing] = useState(false);
   const [editDraft, setEditDraft] = useState(message.content);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const { copied, copy } = useCopyToClipboard("메시지가 클립보드에 복사되었습니다.");
 
-  const isUser = message.role === "user";
-  const hasAttachments = Boolean(message.attachments && message.attachments.length > 0);
+  const hasAttachments = message.attachments && message.attachments.length > 0;
 
   const handleCopy = () => {
     copy(message.content);
@@ -190,32 +205,18 @@ export function MessageItem({
   };
 
   return (
-    <div
-      className={`group relative flex w-full gap-3 py-2 px-1 transition-colors duration-150 ${
-        isUser ? "justify-end" : "justify-start"
-      }`}
-    >
+    <Message align={isUser ? "end" : "start"} className="group/message py-2 px-1">
       {/* AI Bot Avatar (Shown on left for assistant messages) */}
       {!isUser && (
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20 shadow-2xs mt-0.5">
+        <MessageAvatar className="size-8 rounded-xl bg-primary/10 text-primary border border-primary/20 shadow-2xs mt-0.5">
           <Bot className="size-4" />
-        </div>
+        </MessageAvatar>
       )}
 
       {/* Main Message Content Column */}
-      <div
-        className={`flex flex-col min-w-0 ${
-          isUser
-            ? "items-end max-w-[85%] sm:max-w-[78%]"
-            : "items-start max-w-[92%] sm:max-w-[88%] w-full"
-        }`}
-      >
+      <MessageContent className="min-w-0">
         {/* Header: Sender Label & Time */}
-        <div
-          className={`flex items-center gap-2 mb-1 px-1 text-[11px] font-medium text-muted-foreground ${
-            isUser ? "flex-row-reverse" : "flex-row"
-          }`}
-        >
+        <MessageHeader className="gap-2 mb-1 text-[11px] font-medium text-muted-foreground">
           <span>{isUser ? "나" : "Hollow Echo Agent"}</span>
           <span className="text-[10px] opacity-60">
             {new Date(message.createdAt).toLocaleTimeString([], {
@@ -223,7 +224,7 @@ export function MessageItem({
               minute: "2-digit",
             })}
           </span>
-        </div>
+        </MessageHeader>
 
         {/* Content Body: User bubble vs AI canvas markdown */}
         {isEditing ? (
@@ -244,7 +245,7 @@ export function MessageItem({
                   setIsEditing(false);
                 }}
               >
-                <X className="size-3 mr-1" />
+                <X data-icon="inline-start" />
                 취소
               </Button>
               <Button
@@ -253,21 +254,23 @@ export function MessageItem({
                 onClick={handleSaveEdit}
                 disabled={isGenerating || !editDraft.trim()}
               >
-                <Check className="size-3" />
+                <Check data-icon="inline-start" />
                 <span>저장 및 새 분기 생성</span>
               </Button>
             </div>
           </div>
         ) : isUser ? (
-          /* User Message: Clean rounded bubble with attachments */
+          /* User Message: Clean shadcn Bubble with attachments */
           <div className="flex flex-col items-end gap-1.5">
             {hasAttachments && (
               <MessageAttachmentsView attachments={message.attachments!} isUser={true} />
             )}
             {message.content && (
-              <div className="rounded-2xl rounded-tr-xs bg-primary px-4 py-2.5 text-sm leading-relaxed text-primary-foreground shadow-xs break-words whitespace-pre-wrap">
-                {message.content}
-              </div>
+              <Bubble variant="default" align="end">
+                <BubbleContent className="rounded-2xl rounded-tr-xs text-sm leading-relaxed px-4 py-2.5 break-words whitespace-pre-wrap">
+                  {message.content}
+                </BubbleContent>
+              </Bubble>
             )}
           </div>
         ) : (
@@ -292,7 +295,7 @@ export function MessageItem({
             ) : isGenerating && !message.toolApproval ? (
               <div className="flex items-center gap-2 py-1 text-sm text-muted-foreground">
                 <span className="flex size-2 rounded-full bg-primary animate-pulse" />
-                <span className="animate-pulse">답변을 생성하고 있습니다...</span>
+                <span className="shimmer">답변을 생성하고 있습니다...</span>
               </div>
             ) : message.status === "error" || message.error ? null : message.toolApproval ? null : (
               <span className="text-muted-foreground italic text-xs">(내용 없음)</span>
@@ -308,151 +311,136 @@ export function MessageItem({
               />
             )}
 
-            {/* Error Message & Retry Banner */}
+            {/* Error Message & Retry Alert */}
             {(message.status === "error" || message.error) && (
-              <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-destructive/10 border border-destructive/30 text-xs text-destructive w-full max-w-md animate-in fade-in-50 duration-150">
-                <div className="flex items-center gap-2 min-w-0">
-                  <AlertCircle className="size-4 shrink-0" />
-                  <span className="truncate">
+              <Alert variant="destructive" className="w-full max-w-md">
+                <AlertCircle className="size-4" />
+                <div className="flex items-center justify-between gap-3 w-full">
+                  <AlertDescription className="truncate">
                     {message.error || "답변 생성 중 오류가 발생했습니다."}
-                  </span>
+                  </AlertDescription>
+                  {onRetry && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 px-2 text-[11px] gap-1 shrink-0 cursor-pointer"
+                      onClick={onRetry}
+                      disabled={isGenerating}
+                    >
+                      <RotateCw data-icon="inline-start" />
+                      <span>재시도</span>
+                    </Button>
+                  )}
                 </div>
-                {onRetry && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-6 px-2.5 text-[11px] border-destructive/40 hover:bg-destructive/20 text-destructive gap-1 shrink-0 cursor-pointer"
-                    onClick={onRetry}
-                    disabled={isGenerating}
-                  >
-                    <RotateCw className="size-3" />
-                    <span>재시도</span>
-                  </Button>
-                )}
-              </div>
+              </Alert>
             )}
           </div>
         )}
 
         {/* Action Bar (Quick Actions) */}
         {!isEditing && (
-          <div
-            className={`flex items-center gap-2 mt-1 px-1 ${
-              isUser ? "flex-row-reverse" : "flex-row"
-            }`}
-          >
-            {/* Smart Action Buttons */}
-            <div className="flex items-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity duration-150">
+          <MessageFooter className="gap-2 mt-1">
+            <div className="flex items-center gap-0.5 opacity-60 group-hover/message:opacity-100 transition-opacity duration-150">
               {/* Copy */}
               <Button
                 variant="ghost"
-                size="icon"
-                className="size-6 text-muted-foreground hover:text-foreground"
+                size="icon-xs"
+                className="text-muted-foreground hover:text-foreground cursor-pointer"
                 onClick={handleCopy}
                 title="메시지 복사"
               >
                 {copied ? (
-                  <Check className="size-3 text-emerald-500" />
+                  <Check data-icon="inline-start" className="text-primary" />
                 ) : (
-                  <Copy className="size-3" />
+                  <Copy data-icon="inline-start" />
                 )}
               </Button>
 
-              {/* Edit (User Only) */}
-              {isUser && onEdit && (
+              {/* Edit (User only) */}
+              {isUser && onEdit && !isGenerating && (
                 <Button
                   variant="ghost"
-                  size="icon"
-                  className="size-6 text-muted-foreground hover:text-foreground"
-                  onClick={() => setIsEditing(true)}
-                  disabled={isGenerating}
-                  title="질문 수정"
+                  size="icon-xs"
+                  className="text-muted-foreground hover:text-foreground cursor-pointer"
+                  onClick={() => {
+                    setEditDraft(message.content);
+                    setIsEditing(true);
+                  }}
+                  title="메시지 수정 (새 분기)"
                 >
-                  <Edit2 className="size-3" />
+                  <Edit2 data-icon="inline-start" />
                 </Button>
               )}
 
-              {/* Regenerate (Assistant Only) */}
-              {!isUser && (
+              {/* Regenerate (Assistant only) */}
+              {!isUser && !isGenerating && (
                 <Button
                   variant="ghost"
-                  size="icon"
-                  className="size-6 text-muted-foreground hover:text-foreground"
+                  size="icon-xs"
+                  className="text-muted-foreground hover:text-foreground cursor-pointer"
                   onClick={onRegenerate}
-                  disabled={isGenerating}
                   title="답변 다시 생성"
                 >
-                  <RotateCw className={`size-3 ${isGenerating ? "animate-spin" : ""}`} />
+                  <RotateCw data-icon="inline-start" />
                 </Button>
               )}
 
-              {/* Fork to New Session */}
-              {onFork && (
+              {/* Fork Session (Assistant only) */}
+              {!isUser && onFork && !isGenerating && (
                 <Button
-                  data-testid="fork-session-button"
                   variant="ghost"
-                  size="icon"
-                  className="size-6 text-muted-foreground hover:text-primary transition-colors cursor-pointer"
+                  size="icon-xs"
+                  className="text-muted-foreground hover:text-foreground cursor-pointer"
                   onClick={onFork}
-                  disabled={isGenerating}
-                  title="이 메시지 시점부터 새 대화로 분기 (Fork)"
+                  title="이 답변부터 새 대화 세션으로 분기 (Fork)"
                 >
-                  <GitFork className="size-3" />
+                  <GitFork data-icon="inline-start" />
                 </Button>
               )}
 
-              {/* Delete */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-6 text-muted-foreground hover:text-destructive"
-                onClick={() => setShowDeleteConfirm(true)}
-                disabled={isGenerating}
-                title="메시지 삭제"
-              >
-                <Trash2 className="size-3" />
-              </Button>
+              {/* Delete Message */}
+              {!isGenerating && (
+                showDeleteConfirm ? (
+                  <div className="inline-flex items-center gap-1 bg-destructive/10 px-1.5 py-0.5 rounded-lg border border-destructive/30 animate-in fade-in-50 duration-150">
+                    <span className="text-[10px] text-destructive font-medium">삭제할까요?</span>
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      className="size-5 text-destructive hover:bg-destructive/20 cursor-pointer"
+                      onClick={() => {
+                        setShowDeleteConfirm(false);
+                        onDelete();
+                      }}
+                      title="확인"
+                    >
+                      <Check data-icon="inline-start" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      className="size-5 text-muted-foreground hover:bg-muted cursor-pointer"
+                      onClick={() => setShowDeleteConfirm(false)}
+                      title="취소"
+                    >
+                      <X data-icon="inline-start" />
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    className="text-muted-foreground hover:text-destructive cursor-pointer"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    title="메시지 삭제"
+                  >
+                    <Trash2 data-icon="inline-start" />
+                  </Button>
+                )
+              )}
             </div>
-          </div>
+          </MessageFooter>
         )}
-
-        {/* Delete Confirmation Alert Banner */}
-        {showDeleteConfirm && (
-          <div className="flex items-center justify-between gap-3 mt-2 p-2.5 rounded-xl bg-destructive/10 border border-destructive/30 text-xs text-destructive w-full max-w-md animate-in fade-in-50 duration-150">
-            <span className="text-[11px] font-medium">
-              이 메시지를 삭제하시겠습니까?
-            </span>
-            <div className="flex items-center gap-1.5 shrink-0">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 px-2 text-[11px]"
-                onClick={() => setShowDeleteConfirm(false)}
-              >
-                취소
-              </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                className="h-6 px-2.5 text-[11px]"
-                onClick={() => {
-                  setShowDeleteConfirm(false);
-                  onDelete();
-                }}
-              >
-                삭제 확인
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* User Avatar (Shown on right for user messages) */}
-      {isUser && (
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-2xs mt-0.5">
-          <User className="size-4" />
-        </div>
-      )}
-    </div>
+      </MessageContent>
+    </Message>
   );
 }
