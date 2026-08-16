@@ -111,6 +111,7 @@ function MessageAttachmentsView({
                   <AttachmentDescription>{formatFileSize(doc.size)}</AttachmentDescription>
                 </AttachmentContent>
                 <AttachmentAction
+                  nativeButton={false}
                   render={
                     <a
                       href={doc.url}
