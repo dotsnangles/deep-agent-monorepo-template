@@ -34,3 +34,5 @@ Domain glossary and architectural concepts for the Python Deep Agent service:
 | Rubric Quality Loop | Self-correction iterative evaluation middleware (`RubricMiddleware`) using LLM-as-a-judge for automated quality gates | `src/graphs/chat/factory.py` |
 | Fault Tolerance Package | Layered resilience suite (`ModelFallback`, `ToolRetry`, `ModelCallLimit`, `ToolCallLimit`) preventing runaway loops and outages | `src/graphs/chat/factory.py` |
 | Context Compaction Engine | Dual-action context management combining automatic 85% window summarization and on-demand `compact_conversation` tool | `src/graphs/chat/factory.py` |
+| Agent Config Loader | Multi-source configuration resolver (`agent.config.yaml` + `.env`) providing type-safe Pydantic settings with fail-fast validation | `src/core/settings.py` |
+| Prompt Catalog | File-based prompt management layer loading externalized Markdown templates (`prompts/*.md`) with safe variable interpolation | `src/graphs/chat/prompts.py` |
