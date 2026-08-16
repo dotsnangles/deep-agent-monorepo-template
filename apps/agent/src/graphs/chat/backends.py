@@ -19,7 +19,22 @@ from deepagents.backends.protocol import (
 logger = logging.getLogger(__name__)
 
 DEFAULT_CONTAINER_NAME = "hollow-echo-distant-signal-sandbox-runner"
-DEFAULT_WORKSPACE_DIR = Path("./workspace/sessions")
+
+
+def _get_default_workspace_dir() -> Path:
+    # Walk up to repo root containing docker-compose.yml or pnpm-workspace.yaml
+    current = Path(__file__).resolve().parent
+    for parent in [current, *current.parents]:
+        if (parent / "docker-compose.yml").exists() or (parent / "pnpm-workspace.yaml").exists():
+            root_sessions = parent / "workspace" / "sessions"
+            root_sessions.mkdir(parents=True, exist_ok=True)
+            return root_sessions
+    local_candidate = Path("./workspace/sessions").resolve()
+    local_candidate.mkdir(parents=True, exist_ok=True)
+    return local_candidate
+
+
+DEFAULT_WORKSPACE_DIR = _get_default_workspace_dir()
 DENIED_PATTERNS = (".env", ".git", "../", "..\\")
 
 
@@ -143,10 +158,47 @@ class DockerSandboxBackend(FilesystemBackend, SandboxBackendProtocol):
             except Exception as e:
                 logger.debug("Docker runner check failed: %s", e)
 
+        # Detect if command is raw Python code rather than shell command
+        cmd_stripped = command.strip()
+        is_python_code = False
+        if cmd_stripped.startswith(("import ", "from ", "def ", "class ", "with ", "for ", "if ")) or (
+            "\n" in cmd_stripped and any(kw in cmd_stripped for kw in ("import ", "plt.", "pd.", "np.", "print("))
+        ):
+            if not (
+                cmd_stripped.startswith("python")
+                or cmd_stripped.startswith("sh ")
+                or cmd_stripped.startswith("bash ")
+            ):
+                is_python_code = True
+
+        effective_command = command
+        if is_python_code:
+            script_file = self.root_dir / "_exec_tmp.py"
+            script_file.write_text(command, encoding="utf-8")
+            effective_command = "python3 _exec_tmp.py"
+
         try:
             if use_docker:
                 # Execute inside the container's mounted session folder
                 container_workdir = f"/workspace/sessions/{self.thread_id}"
+                try:
+                    mkdir_cmd = [
+                        "docker",
+                        "exec",
+                        self.container_name,
+                        "mkdir",
+                        "-p",
+                        container_workdir,
+                    ]
+                    mproc = await asyncio.create_subprocess_exec(
+                        *mkdir_cmd,
+                        stdout=asyncio.subprocess.DEVNULL,
+                        stderr=asyncio.subprocess.DEVNULL,
+                    )
+                    await mproc.communicate()
+                except Exception:
+                    pass
+
                 docker_cmd = [
                     "docker",
                     "exec",
@@ -155,7 +207,7 @@ class DockerSandboxBackend(FilesystemBackend, SandboxBackendProtocol):
                     self.container_name,
                     "/bin/sh",
                     "-c",
-                    command,
+                    effective_command,
                 ]
                 proc = await asyncio.create_subprocess_exec(
                     *docker_cmd,
@@ -165,7 +217,7 @@ class DockerSandboxBackend(FilesystemBackend, SandboxBackendProtocol):
             else:
                 # Fallback to local subprocess in isolated root_dir
                 proc = await asyncio.create_subprocess_shell(
-                    command,
+                    effective_command,
                     cwd=str(self.root_dir),
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,

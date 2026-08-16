@@ -51,33 +51,29 @@ def create_app() -> FastAPI:
             except Exception as e:
                 logger.warning("Redis connection failed: %s. Using memory fallback.", e)
 
-        # 2. Initialize PostgreSQL Checkpointer & Store
-        if DATABASE_URL and not DATABASE_URL.startswith("sqlite"):
+        # 2. Initialize PostgreSQL Checkpointer & Store via CheckpointerFactory
+        if DATABASE_URL and not DATABASE_URL.startswith("sqlite") and not CheckpointerFactory.is_test_environment():
             try:
-                pool = AsyncConnectionPool(
-                    conninfo=DATABASE_URL,
-                    max_size=20,
-                    kwargs={"autocommit": True},
-                    open=False,
-                )
-                await pool.open()
+                pool = await CheckpointerFactory.create_pool(DATABASE_URL)
+                if pool:
+                    checkpointer = CheckpointerFactory.create_checkpointer(pool=pool)
+                    if hasattr(checkpointer, "setup"):
+                        await checkpointer.setup()
 
-                checkpointer = AsyncPostgresSaver(pool)
-                await checkpointer.setup()
+                    store = CheckpointerFactory.create_store(pool=pool)
+                    if hasattr(store, "setup"):
+                        await store.setup()
 
-                store = AsyncPostgresStore(pool)
-                await store.setup()
+                    app.state.pg_pool = pool
+                    app.state.checkpointer = checkpointer
+                    app.state.store = store
 
-                app.state.pg_pool = pool
-                app.state.checkpointer = checkpointer
-                app.state.store = store
-
-                # Recompile agent graph with persistent checkpointer & store
-                if hasattr(app.state, "copilotkit_agent") and app.state.copilotkit_agent:
-                    app.state.copilotkit_agent.graph = build_agent(
-                        checkpointer=checkpointer, store=store
-                    )
-                logger.info("PostgreSQL checkpointer & store ready (%s).", DATABASE_URL)
+                    # Recompile agent graph with persistent checkpointer & store
+                    if hasattr(app.state, "copilotkit_agent") and app.state.copilotkit_agent:
+                        app.state.copilotkit_agent.graph = build_agent(
+                            checkpointer=checkpointer, store=store
+                        )
+                    logger.info("PostgreSQL checkpointer & store ready via CheckpointerFactory (%s).", DATABASE_URL)
             except Exception as e:
                 logger.warning("PostgreSQL connection failed: %s. Using in-memory fallback.", e)
 

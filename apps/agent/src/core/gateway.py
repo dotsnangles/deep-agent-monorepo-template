@@ -312,8 +312,16 @@ class AgentExecutionGateway:
         else:
             self.registry = registry
 
-        self.checkpointer = checkpointer
-        self.store = store
+        from src.core.checkpointer import CheckpointerFactory
+
+        self.checkpointer = (
+            checkpointer
+            if checkpointer is not None
+            else CheckpointerFactory.get_default_checkpointer()
+        )
+        self.store = (
+            store if store is not None else CheckpointerFactory.get_default_store()
+        )
         self.default_model = model
         self.event_broker = event_broker
 
@@ -374,13 +382,19 @@ class AgentExecutionGateway:
         try:
             # Check if a compilable LangGraph workflow is available in the registry
             if agent_type != "direct" and self.registry.has_graph(agent_type):
+                effective_backend = backend
+                if effective_backend is None:
+                    from src.graphs.chat.backends import get_session_backend
+
+                    effective_backend = get_session_backend(effective_thread_id)
+
                 graph = self.registry.get_graph(
                     agent_type,
                     checkpointer=self.checkpointer,
                     store=self.store,
                     model=effective_model,
                     system_prompt=system_prompt,
-                    backend=backend,
+                    backend=effective_backend,
                 )
 
                 # 1. State Summary Node Transition
