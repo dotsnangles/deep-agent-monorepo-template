@@ -1,0 +1,83 @@
+# ==============================================================================
+# LangChain Deep Agent Template Configuration Reference
+# ==============================================================================
+# Copy this file to `agent.config.yaml` to customize agent behavior without editing code.
+# Precedence Order:
+#   Explicit Code Arguments > Environment Variables (.env) > agent.config.yaml > Defaults
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Agent Group: Mode & Lifecycle
+# ------------------------------------------------------------------------------
+agent:
+  # Mode presets:
+  # - "local_slm": Optimized for local Ollama / SLMs (Single-Flight Inference lock, heuristic title)
+  # - "cloud_provider": Multi-LLM cloud scale (OpenAI, Anthropic, Gemini, parallel subagents)
+  mode: "local_slm"
+  
+  # Human-readable agent name displayed in UI and logs
+  name: "Deep Assistant"
+  
+  # When true, prompts/*.md files are dynamically re-read on every invocation (hot-reloading).
+  # When false (production), prompt files are loaded once into memory cache.
+  debug: true
+
+# ------------------------------------------------------------------------------
+# 2. Models Group: Primary, Fallback, and Rubric Graders
+# ------------------------------------------------------------------------------
+models:
+  # Primary LLM provider:model string
+  # Examples:
+  # - "ollama:gemma4" (Local SLM)
+  # - "openai:gpt-4o-mini" / "openai:gpt-5.5"
+  # - "anthropic:claude-3-5-haiku-20241022" / "anthropic:claude-sonnet-4-6"
+  # - "google_genai:gemini-2.5-flash"
+  primary: "ollama:gemma4"
+
+  # Optional fallback model used by ModelFallbackMiddleware if primary hits 5xx / outages
+  # Example: "openai:gpt-4o-mini"
+  fallback: null
+
+  # Optional grader model used by RubricMiddleware for LLM-as-a-judge evaluation
+  # If null, uses the primary model.
+  grader: null
+
+# ------------------------------------------------------------------------------
+# 3. Limits Group: Safety Caps & Circuit Breakers
+# ------------------------------------------------------------------------------
+limits:
+  # Max model calls per run (ModelCallLimitMiddleware) to prevent runaway token costs / infinite loops
+  model_calls: 30
+  
+  # Max tool executions per run (ToolCallLimitMiddleware)
+  tool_calls: 100
+  
+  # Maximum LangGraph node transitions / recursion depth before halting
+  recursion: 100
+
+# ------------------------------------------------------------------------------
+# 4. Features Group: Capabilities & Middlewares
+# ------------------------------------------------------------------------------
+features:
+  # Enables native `general-purpose` subagent delegation for context quarantine
+  enable_subagents: true
+
+  # Attaches SummarizationToolMiddleware exposing `compact_conversation` tool to agent
+  # Note: Automatic 85% context window summarization is always active in the bare stack.
+  enable_summarization_tool: true
+
+  # Enables RubricMiddleware iterative self-correction loop
+  rubric_enabled: false
+
+  # Max self-correction critique cycles before finalizing output
+  max_rubric_iterations: 3
+
+# ------------------------------------------------------------------------------
+# 5. Storage Group: Virtual Filesystem (VFS) & Session Persistence
+# ------------------------------------------------------------------------------
+storage:
+  # Virtual filesystem path prefix routed to cross-thread StoreBackend (PostgreSQL/Store)
+  memory_route: "/memories/"
+
+  # Base directory for local session files and Docker sandbox workspace mounts
+  sessions_dir: "workspace/sessions"

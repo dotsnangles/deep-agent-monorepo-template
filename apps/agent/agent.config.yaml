@@ -1,0 +1,28 @@
+# ==============================================================================
+# Deep Agent Default Configuration (Local SLM Zero-Cost Development)
+# ==============================================================================
+
+agent:
+  mode: "local_slm"               # Options: "local_slm" | "cloud_provider"
+  name: "Hollow Echo Deep Agent"
+  debug: true                     # In debug mode, prompt templates hot-reload on modification
+
+models:
+  primary: "ollama:gemma4"        # Primary LLM endpoint (e.g., ollama:gemma4, openai:gpt-4o-mini)
+  fallback: null                  # Optional fallback model if primary fails with 5xx
+  grader: null                    # Optional separate model for Rubric evaluation
+
+limits:
+  model_calls: 30                 # Max LLM invocations per agent run to prevent infinite loops
+  tool_calls: 100                 # Max tool executions per agent run
+  recursion: 100                  # LangGraph recursion depth limit
+
+features:
+  enable_subagents: true          # Enables native general-purpose context-quarantined subagent
+  enable_summarization_tool: true # Exposes compact_conversation on-demand tool
+  rubric_enabled: false           # Enables LLM-as-a-judge self-correction quality loop
+  max_rubric_iterations: 3        # Max self-correction critique iterations
+
+storage:
+  memory_route: "/memories/"      # Path prefix routed to durable cross-thread StoreBackend
+  sessions_dir: "workspace/sessions"
