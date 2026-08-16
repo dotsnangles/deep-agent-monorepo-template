@@ -569,4 +569,39 @@ describe("ChatEngine (In-Process State Machine)", () => {
     expect(result?.title).toBe("Forked Branch");
     expect(onSessionCreated).toHaveBeenCalledWith(result?.newSessionId, "Forked Branch");
   });
+
+  it("captures streaming todo_update and subagent execution in assistant message node", async () => {
+    transport.setMockTodos([
+      { id: "t1", content: "Plan data processing", status: "completed" },
+      { id: "t2", content: "Run analysis in sandbox", status: "in_progress" },
+    ]);
+
+    transport.setMockSubagents([
+      {
+        subagent: "data_analyst",
+        task: "Execute statistical aggregation",
+        output: { median: 42 },
+      },
+    ]);
+
+    transport.setMockStreamChunks(["Analysis complete."]);
+
+    const engine = new ChatEngine({
+      sessionId: "session-deep-agents",
+      transport,
+    });
+
+    await engine.send("Analyze my data");
+
+    const state = engine.getState();
+    const assistantNode = state.activePath.find((n) => n.role === "assistant");
+    expect(assistantNode).toBeDefined();
+    expect(assistantNode?.content).toBe("Analysis complete.");
+    expect(assistantNode?.todos).toHaveLength(2);
+    expect(assistantNode?.todos?.[0].status).toBe("completed");
+    expect(assistantNode?.subagents).toHaveLength(1);
+    expect(assistantNode?.subagents?.[0].subagent).toBe("data_analyst");
+    expect(assistantNode?.subagents?.[0].status).toBe("completed");
+    expect(assistantNode?.subagents?.[0].output).toEqual({ median: 42 });
+  });
 });

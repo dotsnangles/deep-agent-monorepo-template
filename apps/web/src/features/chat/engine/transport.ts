@@ -6,7 +6,7 @@ import type {
   ResumeActionDTO,
   AttachmentEntity,
 } from "@repo/validators";
-import type { MessageNode, ToolApprovalRequest } from "../lib/tree";
+import type { MessageNode, ToolApprovalRequest, TodoItem } from "../lib/tree";
 
 export interface StreamMessageContext {
   role: "user" | "assistant" | "system";
@@ -41,6 +41,11 @@ export interface ForkSessionResult {
 export interface StreamCallbacks {
   onToken?: (token: string) => void;
   onApprovalRequest?: (approval: ToolApprovalRequest) => void;
+  onTodoUpdate?: (todos: TodoItem[]) => void;
+  onSubagentStart?: (subagent: string, task: string, runId?: string) => void;
+  onSubagentEnd?: (subagent: string, output: any, runId?: string) => void;
+  onToolStart?: (tool: string, input: any, runId?: string) => void;
+  onToolEnd?: (tool: string, output: any, runId?: string) => void;
   onDone?: (finishReason: string) => void;
   onError?: (error: string) => void;
 }
@@ -158,6 +163,16 @@ export class HttpChatTransport implements ChatTransport {
           const parsed = JSON.parse(rawData);
           if (eventType === "token" && parsed.content) {
             cb.onToken?.(parsed.content);
+          } else if (eventType === "todo_update") {
+            cb.onTodoUpdate?.(parsed.todos || []);
+          } else if (eventType === "subagent_start") {
+            cb.onSubagentStart?.(parsed.subagent, parsed.task, parsed.runId || parsed.run_id);
+          } else if (eventType === "subagent_end") {
+            cb.onSubagentEnd?.(parsed.subagent, parsed.output, parsed.runId || parsed.run_id);
+          } else if (eventType === "tool_start") {
+            cb.onToolStart?.(parsed.tool, parsed.input, parsed.runId || parsed.run_id);
+          } else if (eventType === "tool_end") {
+            cb.onToolEnd?.(parsed.tool, parsed.output, parsed.runId || parsed.run_id);
           } else if (eventType === "approval_request") {
             cb.onApprovalRequest?.({
               toolCallId: parsed.toolCallId || parsed.tool_call_id || "",
@@ -278,6 +293,8 @@ export class FakeChatTransport implements ChatTransport {
   public mockStreamChunks: string[] = ["Mock response"];
   public mockApprovalRequest: ToolApprovalRequest | null = null;
   public mockResumeChunks: string[] = ["Resumed response"];
+  public mockTodos: TodoItem[] | null = null;
+  public mockSubagents: Array<{ subagent: string; task: string; output?: any }> | null = null;
   public mockStreamDelay: number = 0;
   public mockStreamError: Error | null = null;
 
@@ -291,6 +308,14 @@ export class FakeChatTransport implements ChatTransport {
 
   setMockApprovalRequest(req: ToolApprovalRequest | null) {
     this.mockApprovalRequest = req;
+  }
+
+  setMockTodos(todos: TodoItem[] | null) {
+    this.mockTodos = todos;
+  }
+
+  setMockSubagents(subagents: Array<{ subagent: string; task: string; output?: any }> | null) {
+    this.mockSubagents = subagents;
   }
 
   setMockResumeChunks(chunks: string[]) {
@@ -346,6 +371,19 @@ export class FakeChatTransport implements ChatTransport {
       cb.onApprovalRequest?.({ ...this.mockApprovalRequest });
       cb.onDone?.("interrupt");
       return;
+    }
+
+    if (this.mockTodos) {
+      cb.onTodoUpdate?.(this.mockTodos);
+    }
+
+    if (this.mockSubagents) {
+      for (const sub of this.mockSubagents) {
+        cb.onSubagentStart?.(sub.subagent, sub.task);
+        if (sub.output) {
+          cb.onSubagentEnd?.(sub.subagent, sub.output);
+        }
+      }
     }
 
     for (const chunk of this.mockStreamChunks) {

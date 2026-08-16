@@ -21,6 +21,8 @@ import type { MessageNode, BranchInfo } from "../lib/tree";
 import { MessageBranchSwitcher } from "./message-branch-switcher";
 import { MarkdownRenderer } from "./markdown-renderer";
 import { ToolActionCard } from "./tool-action-card";
+import { TodoPlanCard } from "./todo-plan-card";
+import { SpecialistDelegationCard } from "./specialist-delegation-card";
 import { useCopyToClipboard } from "../hooks/use-copy-to-clipboard";
 import {
   formatFileSize,
@@ -269,8 +271,18 @@ export function MessageItem({
             )}
           </div>
         ) : (
-          /* Assistant Message: Clean stream layout with Markdown, Tool Action Card & Attachments */
+          /* Assistant Message: Clean stream layout with Markdown, Tool Action Card, Todo Plan & Attachments */
           <div className="w-full text-sm leading-relaxed text-foreground py-0.5 space-y-2">
+            {/* Live Deep Agents Todo Plan Card */}
+            {message.todos && message.todos.length > 0 && (
+              <TodoPlanCard todos={message.todos} isGenerating={isGenerating} />
+            )}
+
+            {/* Live Specialist Worker Delegations */}
+            {message.subagents && message.subagents.length > 0 && (
+              <SpecialistDelegationCard subagents={message.subagents} />
+            )}
+
             {hasAttachments && (
               <MessageAttachmentsView attachments={message.attachments!} isUser={false} />
             )}

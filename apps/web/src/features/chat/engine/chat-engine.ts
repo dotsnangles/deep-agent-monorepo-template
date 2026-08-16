@@ -12,6 +12,9 @@ import {
   type BranchInfo,
   type MessageNode,
   type ToolApprovalRequest,
+  type TodoItem,
+  type SubagentExecution,
+  type ToolCallExecution,
 } from "../lib/tree";
 import { deriveSessionTitle } from "../lib/session-title";
 import {
@@ -534,6 +537,9 @@ export class ChatEngine {
     const existingNode = this.state.allNodes.find((n) => n.id === params.assistantMessageId);
     let accumulatedContent = existingNode?.content || "";
     let capturedApproval: ToolApprovalRequest | null = existingNode?.toolApproval || null;
+    let capturedTodos: TodoItem[] = existingNode?.todos ? [...existingNode.todos] : [];
+    let capturedSubagents: SubagentExecution[] = existingNode?.subagents ? [...existingNode.subagents] : [];
+    let capturedToolCalls: ToolCallExecution[] = existingNode?.toolCalls ? [...existingNode.toolCalls] : [];
 
     try {
       await this.transport.streamResponse(
@@ -569,6 +575,105 @@ export class ChatEngine {
             };
             this.notify();
           },
+          onTodoUpdate: (todos) => {
+            capturedTodos = todos;
+            this.state = {
+              ...this.state,
+              allNodes: this.state.allNodes.map((n) =>
+                n.id === params.assistantMessageId
+                  ? { ...n, todos: capturedTodos }
+                  : n
+              ),
+            };
+            this.notify();
+          },
+          onSubagentStart: (subagent, task, runId) => {
+            const existingIdx = capturedSubagents.findIndex(
+              (s) => (runId && s.runId === runId) || (s.subagent === subagent && s.status === "running")
+            );
+            const newEntry: SubagentExecution = {
+              subagent,
+              task,
+              status: "running",
+              runId,
+            };
+            if (existingIdx >= 0) {
+              capturedSubagents[existingIdx] = newEntry;
+            } else {
+              capturedSubagents.push(newEntry);
+            }
+            this.state = {
+              ...this.state,
+              allNodes: this.state.allNodes.map((n) =>
+                n.id === params.assistantMessageId
+                  ? { ...n, subagents: [...capturedSubagents] }
+                  : n
+              ),
+            };
+            this.notify();
+          },
+          onSubagentEnd: (subagent, output, runId) => {
+            const existingIdx = capturedSubagents.findIndex(
+              (s) => (runId && s.runId === runId) || (s.subagent === subagent && s.status === "running")
+            );
+            if (existingIdx >= 0) {
+              capturedSubagents[existingIdx] = {
+                ...capturedSubagents[existingIdx],
+                status: "completed",
+                output,
+              };
+            } else {
+              capturedSubagents.push({
+                subagent,
+                task: "",
+                status: "completed",
+                output,
+                runId,
+              });
+            }
+            this.state = {
+              ...this.state,
+              allNodes: this.state.allNodes.map((n) =>
+                n.id === params.assistantMessageId
+                  ? { ...n, subagents: [...capturedSubagents] }
+                  : n
+              ),
+            };
+            this.notify();
+          },
+          onToolStart: (tool, input, runId) => {
+            capturedToolCalls.push({ tool, input, status: "running", runId });
+            this.state = {
+              ...this.state,
+              allNodes: this.state.allNodes.map((n) =>
+                n.id === params.assistantMessageId
+                  ? { ...n, toolCalls: [...capturedToolCalls] }
+                  : n
+              ),
+            };
+            this.notify();
+          },
+          onToolEnd: (tool, output, runId) => {
+            const idx = capturedToolCalls.findIndex(
+              (t) => (runId && t.runId === runId) || (t.tool === tool && t.status === "running")
+            );
+            if (idx >= 0) {
+              capturedToolCalls[idx] = {
+                ...capturedToolCalls[idx],
+                status: "completed",
+                output,
+              };
+            }
+            this.state = {
+              ...this.state,
+              allNodes: this.state.allNodes.map((n) =>
+                n.id === params.assistantMessageId
+                  ? { ...n, toolCalls: [...capturedToolCalls] }
+                  : n
+              ),
+            };
+            this.notify();
+          },
           onDone: (finishReason) => {
             // Stream complete or interrupted
           },
@@ -589,6 +694,9 @@ export class ChatEngine {
                 content: accumulatedContent,
                 status: "complete",
                 toolApproval: capturedApproval,
+                todos: capturedTodos.length > 0 ? capturedTodos : undefined,
+                subagents: capturedSubagents.length > 0 ? capturedSubagents : undefined,
+                toolCalls: capturedToolCalls.length > 0 ? capturedToolCalls : undefined,
               }
             : n
         ),
