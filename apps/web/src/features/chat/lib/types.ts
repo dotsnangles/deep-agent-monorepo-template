@@ -47,4 +47,5 @@ export interface MessageNode {
   toolCalls?: ToolCallExecution[];
   reasoning?: string;
   reasoningDuration?: number;
+  isThinking?: boolean;
 }

@@ -576,6 +576,7 @@ export class ChatEngine {
                       content: pState.content,
                       reasoning: pState.reasoning,
                       reasoningDuration: pState.reasoningDuration,
+                      isThinking: pState.isThinking,
                       status: "streaming",
                     }
                   : n
@@ -595,6 +596,7 @@ export class ChatEngine {
                       content: pState.content,
                       reasoning: pState.reasoning,
                       reasoningDuration: pState.reasoningDuration,
+                      isThinking: pState.isThinking,
                       status: "streaming",
                     }
                   : n
@@ -734,6 +736,7 @@ export class ChatEngine {
                 content: finalPState.content,
                 reasoning: finalPState.reasoning,
                 reasoningDuration: finalPState.reasoningDuration,
+                isThinking: false,
                 status: "complete",
                 toolApproval: capturedApproval,
                 todos: capturedTodos.length > 0 ? capturedTodos : undefined,

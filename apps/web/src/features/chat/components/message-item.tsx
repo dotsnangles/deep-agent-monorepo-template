@@ -282,6 +282,7 @@ export function MessageItem({
               <ReasoningCard
                 reasoning={message.reasoning}
                 duration={message.reasoningDuration}
+                isThinking={message.isThinking ?? false}
                 isGenerating={isGenerating}
               />
             )}

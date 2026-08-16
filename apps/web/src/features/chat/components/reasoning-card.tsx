@@ -15,24 +15,24 @@ import {
 export interface ReasoningCardProps {
   reasoning?: string;
   duration?: number;
+  isThinking?: boolean;
   isGenerating?: boolean;
+  defaultOpen?: boolean;
   className?: string;
 }
 
 export function ReasoningCard({
   reasoning,
   duration,
+  isThinking,
   isGenerating = false,
+  defaultOpen = false,
   className,
 }: ReasoningCardProps) {
-  // During active generation, auto-expand to show streaming thoughts; once finished, auto-collapse
-  const [isOpen, setIsOpen] = useState(isGenerating);
+  // Collapsed by default; user can expand on demand
+  const [isOpen, setIsOpen] = useState(defaultOpen);
 
-  useEffect(() => {
-    if (isGenerating) {
-      setIsOpen(true);
-    }
-  }, [isGenerating]);
+  const activeThinking = isThinking !== undefined ? isThinking : isGenerating;
 
   if (!reasoning || !reasoning.trim()) {
     return null;
@@ -50,7 +50,7 @@ export function ReasoningCard({
       size="sm"
       className={cn(
         "mb-2.5 bg-muted/20 border-border/60 transition-colors shadow-2xs",
-        isGenerating && "border-primary/30",
+        activeThinking && "border-primary/30",
         className
       )}
     >
@@ -66,10 +66,10 @@ export function ReasoningCard({
             <div
               className={cn(
                 "flex size-5 items-center justify-center rounded-md text-muted-foreground",
-                isGenerating ? "bg-primary/10 text-primary animate-pulse" : "bg-muted text-muted-foreground"
+                activeThinking ? "bg-primary/10 text-primary animate-pulse" : "bg-muted text-muted-foreground"
               )}
             >
-              {isGenerating ? (
+              {activeThinking ? (
                 <Loader2 className="size-3 animate-spin text-primary" />
               ) : (
                 <Brain className="size-3" />
@@ -77,7 +77,7 @@ export function ReasoningCard({
             </div>
 
             <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-              {isGenerating ? (
+              {activeThinking ? (
                 <span className="text-foreground font-semibold flex items-center gap-1">
                   생각하는 중...
                 </span>
@@ -86,7 +86,7 @@ export function ReasoningCard({
               )}
             </CardTitle>
 
-            {!isGenerating && (
+            {!activeThinking && (
               <Badge variant="outline" className="text-[10px] font-normal py-0 px-1.5 h-4.5 text-muted-foreground">
                 <Sparkles className="size-2.5 mr-1 text-primary/70" />
                 {formatDuration(duration)}
