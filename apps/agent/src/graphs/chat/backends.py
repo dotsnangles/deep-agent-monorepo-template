@@ -66,6 +66,8 @@ class DockerSandboxBackend(FilesystemBackend, SandboxBackendProtocol):
     ):
         self.root_dir = Path(root_dir).resolve()
         self.root_dir.mkdir(parents=True, exist_ok=True)
+        self.artifacts_dir = self.root_dir / "artifacts"
+        self.artifacts_dir.mkdir(parents=True, exist_ok=True)
         self.thread_id = thread_id
         self.container_name = container_name
         self.default_timeout = timeout
@@ -191,7 +193,7 @@ class DockerSandboxBackend(FilesystemBackend, SandboxBackendProtocol):
                         self.container_name,
                         "mkdir",
                         "-p",
-                        container_workdir,
+                        f"{container_workdir}/artifacts",
                     ]
                     mproc = await asyncio.create_subprocess_exec(
                         *mkdir_cmd,
@@ -274,6 +276,8 @@ def get_session_backend(
     base = Path(base_dir) if base_dir is not None else DEFAULT_WORKSPACE_DIR
     session_dir = base / thread_id
     session_dir.mkdir(parents=True, exist_ok=True)
+    artifacts_dir = session_dir / "artifacts"
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
     return DockerSandboxBackend(
         root_dir=session_dir,
         thread_id=thread_id,

@@ -17,12 +17,17 @@ def setup_test_artifacts(test_session_id):
     # Setup test workspace
     workspace = (DEFAULT_WORKSPACE_DIR / test_session_id).resolve()
     workspace.mkdir(parents=True, exist_ok=True)
+    artifacts_dir = workspace / "artifacts"
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
 
-    # Create dummy artifact files
-    (workspace / "chart.png").write_bytes(b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR")
-    (workspace / "data.csv").write_text("id,val\n1,100\n2,200", encoding="utf-8")
-    (workspace / "report.json").write_text('{"summary": "ok"}', encoding="utf-8")
-    (workspace / "plot.html").write_text("<div>Chart Plot</div>", encoding="utf-8")
+    # Create dummy artifact files in artifacts/ subfolder
+    (artifacts_dir / "chart.png").write_bytes(b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR")
+    (artifacts_dir / "data.csv").write_text("id,val\n1,100\n2,200", encoding="utf-8")
+    (artifacts_dir / "report.json").write_text('{"summary": "ok"}', encoding="utf-8")
+    (artifacts_dir / "plot.html").write_text("<div>Chart Plot</div>", encoding="utf-8")
+
+    # Create legacy fallback file in workspace root
+    (workspace / "legacy.txt").write_text("legacy root content", encoding="utf-8")
 
     yield workspace
 
@@ -35,12 +40,18 @@ def setup_test_artifacts(test_session_id):
 async def test_get_session_artifact_success(test_session_id):
     app = create_app()
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-        # PNG
+        # PNG from artifacts subfolder
         res_png = await ac.get(f"/sessions/{test_session_id}/artifacts/chart.png")
         assert res_png.status_code == 200
         assert "image/png" in res_png.headers.get("content-type", "")
 
-        # CSV
+        # CSV from artifacts subfolder with explicit artifacts prefix in path
+        res_csv_prefix = await ac.get(f"/sessions/{test_session_id}/artifacts/artifacts/data.csv")
+        assert res_csv_prefix.status_code == 200
+        assert "text/csv" in res_csv_prefix.headers.get("content-type", "")
+        assert "1,100" in res_csv_prefix.text
+
+        # CSV from artifacts subfolder without prefix
         res_csv = await ac.get(f"/sessions/{test_session_id}/artifacts/data.csv")
         assert res_csv.status_code == 200
         assert "text/csv" in res_csv.headers.get("content-type", "")
@@ -55,6 +66,11 @@ async def test_get_session_artifact_success(test_session_id):
         res_html = await ac.get(f"/sessions/{test_session_id}/artifacts/plot.html")
         assert res_html.status_code == 200
         assert "text/html" in res_html.headers.get("content-type", "")
+
+        # Legacy root fallback
+        res_legacy = await ac.get(f"/sessions/{test_session_id}/artifacts/legacy.txt")
+        assert res_legacy.status_code == 200
+        assert "legacy root content" in res_legacy.text
 
 
 @pytest.mark.asyncio

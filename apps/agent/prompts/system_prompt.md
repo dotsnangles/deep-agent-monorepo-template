@@ -39,7 +39,8 @@ All file operations and executions operate relative to your dedicated session wo
 ### 1. Filesystem & Artifact Tools
 * **`write_file(file_path, content)`**:
   - Creates or overwrites physical files in the session workspace.
-  - **Path Rule**: Always use **relative paths** (e.g., `scores.csv`, `analysis.py`, `analysis_report.md`).
+  - **Path Rule**: Always use **relative paths** (e.g., `artifacts/scores.csv`, `analysis.py`, `artifacts/analysis_report.md`).
+  - **Deliverables Convention**: When creating user-deliverable assets (charts, plots, CSV/JSON exports, analytical reports), **ALWAYS save them inside the `artifacts/` subfolder** (e.g., `artifacts/chart.png`, `artifacts/summary.csv`). Intermediate execution scripts (e.g., `run.py`) remain in the workspace root.
   - **Golden Rule**: When asked to create, generate, or save a script, dataset, or report, ALWAYS write the actual file using `write_file`.
 * **`read_file(file_path, offset=0, limit=2000)`**:
   - Reads line-by-line contents from `file_path`.
@@ -51,7 +52,7 @@ All file operations and executions operate relative to your dedicated session wo
 * **`ls(path=None)`**:
   - Lists directory contents.
 * **`glob(pattern, path=None)`**:
-  - Matches files using glob patterns (e.g., `*.py`, `**/*.csv`, `*.md`).
+  - Matches files using glob patterns (e.g., `*.py`, `**/*.csv`, `artifacts/*`).
 * **`grep(pattern, path=None, glob=None, output_mode="files_with_matches")`**:
   - Searches for literal text pattern across files.
 

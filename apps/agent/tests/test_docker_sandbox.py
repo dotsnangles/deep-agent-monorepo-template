@@ -100,6 +100,32 @@ class TestDockerSandboxBackend:
         assert backend.thread_id == "thread-xyz-789"
         assert backend.root_dir.exists()
         assert "thread-xyz-789" in str(backend.root_dir)
+        # Verify artifacts subfolder is automatically provisioned
+        artifacts_dir = backend.root_dir / "artifacts"
+        assert artifacts_dir.exists()
+        assert artifacts_dir.is_dir()
+
+    @pytest.mark.asyncio
+    async def test_artifacts_isolation_from_root_temp_files(self, session_dir: Path):
+        backend = DockerSandboxBackend(root_dir=session_dir, thread_id="test-isolation-1")
+
+        # 1. Write internal scratch script in root
+        await backend.awrite("_exec_tmp.py", "print('internal script')")
+        # 2. Write deliverable text artifact and binary artifact in artifacts/ subfolder
+        await backend.awrite("artifacts/summary.csv", "id,val\n1,100")
+        await backend.awrite("artifacts/chart.png", "fake_png_data")
+
+        # Verify filesystem paths
+        assert (session_dir / "_exec_tmp.py").exists()
+        assert (session_dir / "artifacts" / "summary.csv").exists()
+        assert (session_dir / "artifacts" / "chart.png").exists()
+        assert not (session_dir / "summary.csv").exists()
+        assert not (session_dir / "chart.png").exists()
+
+        # Read back from backend
+        read_csv = await backend.aread("artifacts/summary.csv")
+        assert read_csv.error is None
+        assert "1,100" in read_csv.file_data["content"]
 
     @pytest.mark.asyncio
     async def test_deep_agent_integration_with_sandbox_backend(self, session_dir: Path):

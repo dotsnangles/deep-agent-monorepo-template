@@ -26,7 +26,10 @@ async def get_session_artifact(session_id: str, file_path: str):
         raise HTTPException(status_code=403, detail="Access denied")
 
     base_dir = DEFAULT_WORKSPACE_DIR.resolve() / session_id
-    target_file = (base_dir / file_path).resolve()
+    # Check artifacts subfolder first, then fall back to session base dir
+    target_file = (base_dir / "artifacts" / file_path).resolve()
+    if not target_file.is_file():
+        target_file = (base_dir / file_path).resolve()
 
     # 2. Strict path traversal verification
     try:
