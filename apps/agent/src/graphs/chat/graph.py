@@ -7,7 +7,7 @@ from langchain.agents.middleware import TodoListMiddleware
 from langchain_core.output_parsers import StrOutputParser
 from langgraph.checkpoint.memory import MemorySaver
 
-from src.core.config import get_llm
+from src.core.config import ENABLE_SUBAGENTS, get_llm
 from src.graphs.chat.prompts import MAIN_SYSTEM_PROMPT, TITLE_PROMPT
 from src.graphs.chat.subagents import get_default_subagents
 from src.tools.sensitive import get_sensitive_tools
@@ -26,6 +26,7 @@ def build_agent(
     checkpointer: Any = None,
     store: Any = None,
     subagents: list[dict[str, Any]] | None = None,
+    enable_subagents: bool | None = None,
     model: Any = None,
     tools: list[Any] | None = None,
     interrupt_on: dict[str, Any] | None = None,
@@ -40,6 +41,8 @@ def build_agent(
         checkpointer: Persistent checkpointer (e.g. AsyncPostgresSaver) or MemorySaver.
         store: Long-term store (e.g. AsyncPostgresStore) or None.
         subagents: Optional list of subagent configuration dicts.
+        enable_subagents: Boolean flag toggling subagents. If None, defaults to ENABLE_SUBAGENTS
+            config or True if subagents is explicitly provided.
         model: Custom or Fake LLM instance, or None to use default get_llm().
         tools: List of tools to provide, or None for default system + sensitive tools.
         interrupt_on: Tool gating map for HITL approval.
@@ -56,7 +59,20 @@ def build_agent(
     effective_middleware = list(
         middleware if middleware is not None else [TodoListMiddleware(), CopilotKitMiddleware()]
     )
-    effective_subagents = list(subagents) if subagents is not None else get_default_subagents()
+
+    # Determine whether subagents are active
+    if enable_subagents is not None:
+        subagents_active = enable_subagents
+    elif subagents is not None:
+        subagents_active = True
+    else:
+        subagents_active = ENABLE_SUBAGENTS
+
+    if subagents_active:
+        effective_subagents = list(subagents) if subagents is not None else get_default_subagents()
+    else:
+        effective_subagents = []
+
     effective_prompt = system_prompt or MAIN_SYSTEM_PROMPT
 
     agent_kwargs: dict[str, Any] = {
@@ -68,6 +84,7 @@ def build_agent(
         "interrupt_on": effective_interrupt_on,
         "checkpointer": effective_checkpointer,
         "store": store,
+        **kwargs,
     }
     if backend is not None:
         agent_kwargs["backend"] = backend
@@ -84,7 +101,10 @@ def build_agent(
 
     cp_name = type(effective_checkpointer).__name__
     st_name = type(store).__name__ if store is not None else "None"
-    print(f"[AGENT] Deep Agent graph compiled (checkpointer={cp_name}, store={st_name}).")
+    mode_str = f"subagents={len(effective_subagents)}" if subagents_active else "single-agent"
+    print(
+        f"[AGENT] Deep Agent graph compiled ({mode_str}, checkpointer={cp_name}, store={st_name})."
+    )
     return agent_graph
 
 

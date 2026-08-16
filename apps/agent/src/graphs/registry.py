@@ -21,8 +21,8 @@ class GraphRegistry:
         self.register("default", build_agent)
         self.register("chat", build_agent)
         self.register("hitl", build_agent)
-        self.register("deep_agent", build_agent)
-        self.register("data_analysis", build_agent)
+        self.register("deep_agent", lambda **kw: build_agent(enable_subagents=True, **kw))
+        self.register("data_analysis", lambda **kw: build_agent(enable_subagents=True, **kw))
 
     def register(self, agent_type: str, factory: GraphFactory) -> None:
         """Registers a graph factory function for the given agent_type."""

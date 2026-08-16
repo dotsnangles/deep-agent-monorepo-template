@@ -1,5 +1,4 @@
 import mimetypes
-from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
@@ -21,7 +20,7 @@ MIME_TYPE_OVERRIDES = {
 
 @artifacts_router.get("/{session_id}/artifacts/{file_path:path}")
 async def get_session_artifact(session_id: str, file_path: str):
-    """Securely serve generated artifacts (charts, reports, data) from the session sandbox workspace."""
+    """Securely serve generated artifacts from the session sandbox workspace."""
     # 1. Check for denied path patterns
     if _is_denied_path(file_path) or _is_denied_path(session_id):
         raise HTTPException(status_code=403, detail="Access denied")
