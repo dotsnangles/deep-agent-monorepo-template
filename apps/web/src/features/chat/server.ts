@@ -1,1 +1,1 @@
-export { generateSmartTitleInBackground } from "./lib/session-title";
+export { generateSmartTitleInBackground } from "./lib/session-title.server";

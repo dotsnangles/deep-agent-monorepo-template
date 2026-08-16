@@ -28,7 +28,9 @@ export {
   type FuzzySegment,
   type FuzzyMatchResult,
 } from "./lib/fuzzy-match";
+export {
+  deriveSessionTitle,
+  DEFAULT_SESSION_TITLE,
+  MAX_DERIVED_TITLE_LENGTH,
+} from "./lib/session-title";
 export * from "./engine";
-
-
-

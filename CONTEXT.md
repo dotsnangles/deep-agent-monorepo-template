@@ -23,6 +23,6 @@ Key terms and definitions used across `hollow-echo-distant-signal`:
 | Chat Repository | Deep domain repository interface encapsulating session/message CRUD, tree queries, and transactional mutations | Database (`@repo/db`) |
 | Drizzle Chat Repository | Concrete Drizzle ORM implementation providing atomic database transactions for subtree pruning and message insertion | Database (`@repo/db`) |
 | Fake Chat Repository | In-memory test double implementing ChatRepository with zero database dependencies for instant unit tests | Database (`@repo/db`) |
-
-
-
+| Derived Session Title | Pure in-memory client heuristic extracting a clean, concise title from the user's initial prompt with 0ms network latency | Web Client (`apps/web`) |
+| Title Lifecycle Pipeline | 3-tier progressive promotion pipeline (Optimistic Heuristic -> Async AI Summary -> Realtime Sync) | Fullstack (`apps/web`, `apps/agent`, `@repo/redis`) |
+| Redis Title Event Subscriber | Node.js background event subscriber listening to `events:session:title_updated` and syncing PostgreSQL via `ChatRepository` | Backend (`apps/server`, `@repo/redis`) |
