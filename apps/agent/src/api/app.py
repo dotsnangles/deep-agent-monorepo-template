@@ -101,9 +101,8 @@ def create_app() -> FastAPI:
         # Teardown
         if app.state.title_worker:
             await app.state.title_worker.stop()
-        if app.state.pg_pool:
-            await app.state.pg_pool.close()
-            logger.info("PostgreSQL connection pool closed.")
+        await CheckpointerFactory.close_pool()
+        logger.info("PostgreSQL connection pool closed.")
         if app.state.redis:
             await app.state.redis.aclose()
             logger.info("Redis client closed.")
