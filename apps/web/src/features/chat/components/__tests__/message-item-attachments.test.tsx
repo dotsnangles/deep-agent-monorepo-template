@@ -2,17 +2,9 @@ import { describe, it, expect, vi } from "vitest";
 import React from "react";
 import { renderToString } from "react-dom/server";
 import { MessageItem } from "../message-item";
-import type { MessageNode } from "../../lib/tree";
+import type { MessageNode } from "../../lib/types";
 
 describe("MessageItem Attachment Rendering", () => {
-  const baseBranchInfo = {
-    currentIndex: 1,
-    totalBranches: 1,
-    current: 1,
-    total: 1,
-    siblingIds: ["msg-1"],
-  };
-
   it("renders image thumbnails and lightbox elements", () => {
     const mockMessage: MessageNode = {
       id: "msg-img",
@@ -36,10 +28,7 @@ describe("MessageItem Attachment Rendering", () => {
     const html = renderToString(
       <MessageItem
         message={mockMessage}
-        branchInfo={baseBranchInfo}
         isGenerating={false}
-        onNavigateSibling={vi.fn()}
-        onEdit={vi.fn()}
         onRegenerate={vi.fn()}
         onDelete={vi.fn()}
       />
@@ -73,10 +62,7 @@ describe("MessageItem Attachment Rendering", () => {
     const html = renderToString(
       <MessageItem
         message={mockMessage}
-        branchInfo={baseBranchInfo}
         isGenerating={false}
-        onNavigateSibling={vi.fn()}
-        onEdit={vi.fn()}
         onRegenerate={vi.fn()}
         onDelete={vi.fn()}
       />

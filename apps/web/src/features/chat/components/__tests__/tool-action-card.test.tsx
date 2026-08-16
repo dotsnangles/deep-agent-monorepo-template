@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import React from "react";
 import { renderToString } from "react-dom/server";
 import { ToolActionCard, DEFAULT_REJECTION_REASON } from "../tool-action-card";
-import type { ToolApprovalRequest } from "../../lib/tree";
+import type { ToolApprovalRequest } from "../../lib/types";
 
 describe("ToolActionCard Component", () => {
   it("renders pending approval card with tool name, description, parameters, and action buttons", () => {

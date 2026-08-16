@@ -14,7 +14,7 @@ import {
   Sparkles,
   Users,
 } from "lucide-react";
-import type { SubagentExecution } from "../lib/tree";
+import type { SubagentExecution } from "../lib/types";
 
 interface SpecialistDelegationCardProps {
   subagents: SubagentExecution[];

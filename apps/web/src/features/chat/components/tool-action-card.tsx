@@ -2,7 +2,7 @@
 
 import { Check, ShieldAlert, X, Terminal, Wrench } from "lucide-react";
 import { Button } from "@repo/ui/components/button";
-import type { ToolApprovalRequest } from "../lib/tree";
+import type { ToolApprovalRequest } from "../lib/types";
 
 export const DEFAULT_REJECTION_REASON = "사용자에 의해 거절되었습니다.";
 

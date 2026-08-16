@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import React from "react";
 import { renderToString } from "react-dom/server";
 import { SpecialistDelegationCard } from "../specialist-delegation-card";
-import type { SubagentExecution } from "../../lib/tree";
+import type { SubagentExecution } from "../../lib/types";
 
 describe("SpecialistDelegationCard Unit Tests", () => {
   it("returns null when subagents list is empty", () => {

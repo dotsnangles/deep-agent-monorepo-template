@@ -10,7 +10,7 @@ import {
   ListChecks,
   Loader2,
 } from "lucide-react";
-import type { TodoItem } from "../lib/tree";
+import type { TodoItem } from "../lib/types";
 
 interface TodoPlanCardProps {
   todos: TodoItem[];

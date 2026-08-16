@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import React from "react";
 import { renderToString } from "react-dom/server";
 import { TodoPlanCard } from "../todo-plan-card";
-import type { TodoItem } from "../../lib/tree";
+import type { TodoItem } from "../../lib/types";
 
 describe("TodoPlanCard Unit Tests", () => {
   it("returns null when todos list is empty", () => {
@@ -23,6 +23,6 @@ describe("TodoPlanCard Unit Tests", () => {
     expect(html).toContain("1단계: 데이터 로드");
     expect(html).toContain("2단계: 통계 분석 수행");
     expect(html).toContain("3단계: 시각화 차트 렌더링");
-    expect(html).toContain("line-through"); // completed item has line-through
+    expect(html).toContain("line-through");
   });
 });

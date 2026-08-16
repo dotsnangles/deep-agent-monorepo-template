@@ -17,7 +17,7 @@ Domain glossary and architectural concepts for the Next.js 16 Web Application:
 | Virtual Session List | High-performance DOM virtualization engine maintaining fixed-window DOM elements for thousands of chat sessions | `src/features/chat/components/chat-search-dialog.tsx`, `src/features/sidebar/components/app-sidebar.tsx` |
 | Fuzzy Session Matcher | In-memory fuzzy search matcher supporting multi-token matching, scoring, and text highlight tokenization | `src/features/chat/lib/fuzzy-match.ts` |
 | Keyboard-Virtual Synchronizer | Bi-directional focus and viewport synchronizer aligning keyboard arrow navigation with virtualized scroll offsets | `src/features/chat/components/chat-search-dialog.tsx` |
-| Chat Engine | Pure in-process state machine coordinating message tree graph mutations, stream chunk buffers, and active leaf tracking | `src/features/chat/engine/` |
+| Chat Engine | Pure in-process state machine coordinating linear message sequences, stream chunk buffers, and active session mutations | `src/features/chat/engine/` |
 | Chat Engine Registry | Global singleton registry coordinating active session engine instances, route transition survival, and session event pub/sub | `src/features/chat/engine/` |
 | Chat Transport | Port interface and HTTP adapter isolating network fetch/streaming from state transitions and enabling zero-DOM tests | `src/features/chat/engine/` |
 | Derived Session Title | Pure in-memory client heuristic extracting a clean, concise title from the user's initial prompt with 0ms network latency | `src/features/chat/lib/session-title.ts` |
@@ -25,3 +25,7 @@ Domain glossary and architectural concepts for the Next.js 16 Web Application:
 | Redis Title Event Subscriber | Node.js background event subscriber listening to `events:session:title_updated` and syncing PostgreSQL via `ChatRepository` | `apps/server/src/`, `packages/redis/` |
 | Tool Action Card | Interactive React component rendering pending tool parameters, formatted diffs, and Approve/Reject buttons | `src/features/chat/components/tool-action-card.tsx` |
 | Approval Resume Action | Action dispatcher forwarding user approval/rejection decision through `ChatEngine` to resume active stream | `src/features/chat/engine/` |
+| Todo Plan Card | Live collapsible UI component displaying real-time task checklist and completion count | `src/features/chat/components/todo-plan-card.tsx` |
+| Specialist Delegation Card | Subagent activity card rendering specialist execution badges, prompts, and output summaries | `src/features/chat/components/specialist-delegation-card.tsx` |
+| Interactive Chart Image | Media lightbox modal providing full-screen zoom, pan, and download for sandbox charts | `src/features/chat/components/interactive-chart-image.tsx` |
+| Session Forking | Instant historical thread cloning allowing users to branch conversations into independent sessions | `src/features/chat/components/message-item.tsx` |

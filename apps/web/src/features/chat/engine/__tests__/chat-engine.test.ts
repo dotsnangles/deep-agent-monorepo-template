@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ChatEngine } from "../chat-engine";
 import { FakeChatTransport } from "../transport";
-import type { MessageNode, ToolApprovalRequest } from "../../lib/tree";
+import type { MessageNode, ToolApprovalRequest } from "../../lib/types";
 import type { AttachmentEntity } from "@repo/validators";
 
 describe("ChatTransport & FakeChatTransport", () => {

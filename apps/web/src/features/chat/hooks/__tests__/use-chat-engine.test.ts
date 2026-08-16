@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ChatEngineRegistry } from "../../engine/chat-engine-registry";
 import { FakeChatTransport } from "../../engine/transport";
-import type { ToolApprovalRequest } from "../../lib/tree";
+import type { ToolApprovalRequest } from "../../lib/types";
 import type { AttachmentEntity } from "@repo/validators";
 
 describe("useChatEngine and UI Integration State Flow", () => {
