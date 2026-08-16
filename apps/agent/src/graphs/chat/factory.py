@@ -19,7 +19,14 @@ from deepagents import (
     register_harness_profile,
 )
 from deepagents.backends import CompositeBackend, StoreBackend
-from langchain.agents.middleware import ModelRetryMiddleware, TodoListMiddleware
+from langchain.agents.middleware import (
+    ModelCallLimitMiddleware,
+    ModelFallbackMiddleware,
+    ModelRetryMiddleware,
+    TodoListMiddleware,
+    ToolCallLimitMiddleware,
+    ToolRetryMiddleware,
+)
 
 from src.core.checkpointer import CheckpointerFactory
 from src.core.config import (
@@ -68,6 +75,10 @@ class DeepAgentEnvironmentFactory:
         max_rubric_iterations: int = 3,
         on_rubric_evaluation: Any = None,
         rubric_tools: list[Any] | None = None,
+        fallback_model: Any = None,
+        model_call_limit: int | None = None,
+        tool_call_limit: int | None = None,
+        tool_retry_config: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> Any:
         effective_mode = mode or get_deep_agent_mode()
@@ -114,11 +125,24 @@ class DeepAgentEnvironmentFactory:
             except Exception as e:
                 logger.debug("Harness profile registration skipped: %s", e)
 
+            effective_model_limit = model_call_limit if model_call_limit is not None else 30
+            effective_tool_limit = tool_call_limit if tool_call_limit is not None else 100
+
             effective_middleware = list(
                 middleware
                 if middleware is not None
-                else [TodoListMiddleware(), CopilotKitMiddleware()]
+                else [
+                    TodoListMiddleware(),
+                    CopilotKitMiddleware(),
+                    ModelCallLimitMiddleware(run_limit=effective_model_limit),
+                    ToolCallLimitMiddleware(run_limit=effective_tool_limit),
+                ]
             )
+            if fallback_model is not None:
+                effective_middleware.append(ModelFallbackMiddleware(fallback_model))
+            if tool_retry_config is not None:
+                effective_middleware.append(ToolRetryMiddleware(**tool_retry_config))
+
             if rubric is not None or grader_model is not None:
                 target_grader = grader_model if grader_model is not None else llm
                 rubric_kwargs: dict[str, Any] = {
@@ -166,6 +190,9 @@ class DeepAgentEnvironmentFactory:
             except Exception as e:
                 logger.debug("Harness profile registration skipped: %s", e)
 
+            effective_model_limit = model_call_limit if model_call_limit is not None else 50
+            effective_tool_limit = tool_call_limit if tool_call_limit is not None else 200
+
             effective_middleware = list(
                 middleware
                 if middleware is not None
@@ -173,8 +200,15 @@ class DeepAgentEnvironmentFactory:
                     TodoListMiddleware(),
                     CopilotKitMiddleware(),
                     ModelRetryMiddleware(max_retries=3),
+                    ModelCallLimitMiddleware(run_limit=effective_model_limit),
+                    ToolCallLimitMiddleware(run_limit=effective_tool_limit),
                 ]
             )
+            if fallback_model is not None:
+                effective_middleware.append(ModelFallbackMiddleware(fallback_model))
+            if tool_retry_config is not None:
+                effective_middleware.append(ToolRetryMiddleware(**tool_retry_config))
+
             if rubric is not None or grader_model is not None:
                 target_grader = grader_model if grader_model is not None else llm
                 rubric_kwargs = {

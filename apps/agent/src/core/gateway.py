@@ -418,6 +418,7 @@ class AgentExecutionGateway:
             },
             "callbacks": callbacks,
             "metadata": trace_meta,
+            "recursion_limit": 100,
         }
         if config:
             stream_config.update(config)
