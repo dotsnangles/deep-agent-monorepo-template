@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Brain, ChevronDown, ChevronUp, Loader2, Sparkles } from "lucide-react";
 import { Badge } from "@repo/ui/components/badge";
 import { cn } from "@repo/ui/lib/utils";
@@ -43,6 +43,8 @@ export function ReasoningCard({
     if (sec < 0.5) return "< 1초 동안 생각함";
     return `${sec.toFixed(1)}초 동안 생각함`;
   };
+
+  const sections = reasoning.split(/\n\n---\n\n/);
 
   return (
     <Card
@@ -109,9 +111,37 @@ export function ReasoningCard({
       {/* Accordion Content Body */}
       {isOpen && (
         <CardContent className="pt-0 pb-3 px-3.5">
-          <div className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap rounded-md bg-background/50 p-2.5 border border-border/40 font-mono text-[11px] max-h-80 overflow-y-auto">
-            {reasoning}
-          </div>
+          {sections.length > 1 ? (
+            <div className="space-y-2.5 max-h-80 overflow-y-auto">
+              {sections.map((section, idx) => (
+                <div
+                  key={idx}
+                  className={cn(
+                    "space-y-1",
+                    idx > 0 && "pt-2 mt-2 border-t border-border/40"
+                  )}
+                >
+                  <div className="flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground/80">
+                    <span className="flex size-3.5 items-center justify-center rounded-full bg-primary/10 text-primary text-[9px]">
+                      {idx + 1}
+                    </span>
+                    <span>
+                      {idx === 0
+                        ? "초기 계획 및 문제 분석"
+                        : `도구 실행 후 중간 추론 (${idx + 1}단계)`}
+                    </span>
+                  </div>
+                  <div className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap rounded-md bg-background/50 p-2.5 border border-border/40 font-mono text-[11px]">
+                    {section.trim()}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap rounded-md bg-background/50 p-2.5 border border-border/40 font-mono text-[11px] max-h-80 overflow-y-auto">
+              {reasoning}
+            </div>
+          )}
         </CardContent>
       )}
     </Card>

@@ -51,4 +51,24 @@ describe("ReasoningCard Unit Tests", () => {
     expect(html).toContain('aria-expanded="true"');
     expect(html).toContain("상세한 사고 과정 텍스트");
   });
+
+  it("renders structured multi-step sections when reasoning contains multiple partitioned steps", () => {
+    const multiStepReasoning =
+      "1단계: mock 데이터 생성\n\n---\n\n2단계: 데이터 생성 완료 후 분석 스크립트 실행 계획";
+    const html = renderToString(
+      <ReasoningCard
+        reasoning={multiStepReasoning}
+        duration={5.2}
+        isThinking={false}
+        defaultOpen={true}
+      />
+    );
+
+    expect(html).toContain('aria-expanded="true"');
+    expect(html).toContain("1단계: mock 데이터 생성");
+    expect(html).toContain("2단계: 데이터 생성 완료 후 분석 스크립트 실행 계획");
+    expect(html).toContain("초기 계획 및 문제 분석");
+    expect(html).toContain("도구 실행 후 중간 추론");
+  });
 });
+

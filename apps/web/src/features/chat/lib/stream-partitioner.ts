@@ -40,25 +40,17 @@ export class StreamReasoningPartitioner {
   public feedToken(chunk: string): void {
     this.rawTokens += chunk;
 
-    // If explicit reasoning was active and a normal token arrives, mark reasoning complete
-    if (this.hasExplicitReasoning && this.isThinking) {
-      this.isThinking = false;
-      this.reasoningEndTime = Date.now();
-    }
-
-    // Process inline <think> tags if present
     const lower = this.rawTokens.toLowerCase();
-    const startIndex = lower.indexOf(THINK_START);
+    const lastStartIndex = lower.lastIndexOf(THINK_START);
+    const lastEndIndex = lower.lastIndexOf(THINK_END);
 
-    if (startIndex >= 0) {
+    if (lastStartIndex >= 0) {
       if (!this.reasoningStartTime) {
         this.reasoningStartTime = Date.now();
       }
 
-      const endIndex = lower.indexOf(THINK_END, startIndex + THINK_START.length);
-
-      if (endIndex >= 0) {
-        // Tag is closed
+      if (lastEndIndex >= 0 && lastEndIndex > lastStartIndex) {
+        // Tag has completed
         this.isThinking = false;
         if (!this.reasoningEndTime) {
           this.reasoningEndTime = Date.now();
@@ -67,91 +59,123 @@ export class StreamReasoningPartitioner {
         // Tag is currently open and streaming
         this.isThinking = true;
       }
+    } else if (this.hasExplicitReasoning && this.isThinking) {
+      // Normal token arrived while explicit reasoning was active
+      this.isThinking = false;
+      this.reasoningEndTime = Date.now();
     }
   }
 
   public getState(): PartitionedStreamState {
-    // 1. Explicit reasoning flow
-    if (this.hasExplicitReasoning) {
-      const durationSec =
-        this.reasoningStartTime !== null
-          ? ((this.reasoningEndTime ?? Date.now()) - this.reasoningStartTime) / 1000
-          : undefined;
-
-      return {
-        content: this.rawTokens,
-        reasoning: this.explicitReasoning.trim() || undefined,
-        reasoningDuration: durationSec,
-        isThinking: this.isThinking,
-      };
-    }
-
-    // 2. Inline <think> tag parsing flow
+    const contentSegments: string[] = [];
+    const reasoningSegments: string[] = [];
+    let cursor = 0;
+    let isCurrentlyOpen = false;
     const lower = this.rawTokens.toLowerCase();
-    const startIndex = lower.indexOf(THINK_START);
 
-    if (startIndex === -1) {
-      // Check if rawTokens ends with a partial prefix of <think> (e.g. "<", "<th", "<think")
-      // to avoid momentary flickering of partial tags into content
-      let cleanContent = this.rawTokens;
-      for (let i = 1; i < THINK_START.length; i++) {
-        if (cleanContent.toLowerCase().endsWith(THINK_START.slice(0, i))) {
-          cleanContent = cleanContent.slice(0, -i);
-          break;
+    while (cursor < this.rawTokens.length) {
+      const nextStart = lower.indexOf(THINK_START, cursor);
+
+      if (nextStart === -1) {
+        // No more <think> tags.
+        // Check if the remainder ends with a partial prefix of <think> (e.g. "<", "<th")
+        let remainder = this.rawTokens.slice(cursor);
+        for (let i = 1; i < THINK_START.length; i++) {
+          if (remainder.toLowerCase().endsWith(THINK_START.slice(0, i))) {
+            remainder = remainder.slice(0, -i);
+            break;
+          }
         }
+        if (remainder) {
+          contentSegments.push(remainder);
+        }
+        break;
       }
 
-      return {
-        content: cleanContent,
-        reasoning: undefined,
-        reasoningDuration: undefined,
-        isThinking: false,
-      };
-    }
-
-    const beforeThink = this.rawTokens.slice(0, startIndex);
-    const afterStart = this.rawTokens.slice(startIndex + THINK_START.length);
-    const endIndex = afterStart.toLowerCase().indexOf(THINK_END);
-
-    if (endIndex === -1) {
-      // Inside active <think> block
-      // Filter out partial ending tag if buffering (e.g. "</thi")
-      let cleanReasoning = afterStart;
-      for (let i = 1; i < THINK_END.length; i++) {
-        if (cleanReasoning.toLowerCase().endsWith(THINK_END.slice(0, i))) {
-          cleanReasoning = cleanReasoning.slice(0, -i);
-          break;
-        }
+      // There is normal content before the next <think>
+      if (nextStart > cursor) {
+        contentSegments.push(this.rawTokens.slice(cursor, nextStart));
       }
 
-      const durationSec =
-        this.reasoningStartTime !== null
-          ? (Date.now() - this.reasoningStartTime) / 1000
-          : undefined;
+      // Find the closing </think> after nextStart
+      const afterStart = nextStart + THINK_START.length;
+      const nextEnd = lower.indexOf(THINK_END, afterStart);
 
-      return {
-        content: beforeThink,
-        reasoning: cleanReasoning.replace(/^\n/, ""),
-        reasoningDuration: durationSec,
-        isThinking: true,
-      };
+      if (nextEnd === -1) {
+        // Unclosed <think> block extending to end of string (actively streaming thought)
+        let ongoingReasoning = this.rawTokens.slice(afterStart);
+        // Strip partial closing tag prefix at the end (e.g. "</thi")
+        for (let i = 1; i < THINK_END.length; i++) {
+          if (ongoingReasoning.toLowerCase().endsWith(THINK_END.slice(0, i))) {
+            ongoingReasoning = ongoingReasoning.slice(0, -i);
+            break;
+          }
+        }
+        ongoingReasoning = ongoingReasoning.replace(/^\n/, "");
+        if (ongoingReasoning) {
+          reasoningSegments.push(ongoingReasoning);
+        }
+        isCurrentlyOpen = true;
+        break;
+      }
+
+      // Closed <think> block
+      const closedReasoning = this.rawTokens.slice(afterStart, nextEnd).replace(/^\n/, "");
+      if (closedReasoning) {
+        reasoningSegments.push(closedReasoning);
+      }
+      cursor = nextEnd + THINK_END.length;
     }
 
-    // Closed <think> block
-    const reasoningText = afterStart.slice(0, endIndex).replace(/^\n/, "");
-    const afterThink = afterStart.slice(endIndex + THINK_END.length);
-    const combinedContent = `${beforeThink}${afterThink}`.replace(/^\s*\n/, "");
+    // Merge explicit reasoning and inline reasoning segments
+    const allReasoning: string[] = [];
+    if (this.explicitReasoning.trim()) {
+      allReasoning.push(this.explicitReasoning.trim());
+    }
+    for (const r of reasoningSegments) {
+      if (r && !allReasoning.includes(r.trim())) {
+        allReasoning.push(
+          reasoningSegments.length === 1 && !this.explicitReasoning
+            ? r
+            : r.trim()
+        );
+      }
+    }
+
+    const finalReasoning =
+      allReasoning.length > 0
+        ? allReasoning.length === 1
+          ? allReasoning[0]
+          : allReasoning.join("\n\n---\n\n")
+        : undefined;
+
+    // Format content cleanly across multi-turn segments
+    const filteredContentSegments = contentSegments
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+
+    const cleanContent =
+      filteredContentSegments.length > 0
+        ? filteredContentSegments.join("\n\n")
+        : "";
+
+    const currentlyThinking = isCurrentlyOpen || (this.hasExplicitReasoning && this.isThinking);
 
     const durationSec =
-      this.reasoningStartTime !== null && this.reasoningEndTime !== null
-        ? Math.max(0.1, (this.reasoningEndTime - this.reasoningStartTime) / 1000)
+      this.reasoningStartTime !== null
+        ? Math.max(
+            0.1,
+            ((currentlyThinking ? Date.now() : (this.reasoningEndTime ?? Date.now())) -
+              this.reasoningStartTime) /
+              1000
+          )
         : undefined;
 
     return {
-      content: combinedContent,
-      reasoning: reasoningText,
+      content: cleanContent,
+      reasoning: finalReasoning,
       reasoningDuration: durationSec,
-      isThinking: false,
+      isThinking: currentlyThinking,
     };
   }
 }

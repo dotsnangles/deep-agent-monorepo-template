@@ -73,4 +73,65 @@ describe("StreamReasoningPartitioner", () => {
     expect(state.reasoningDuration).toBeCloseTo(2.5, 1);
     vi.useRealTimers();
   });
+
+  it("handles multi-turn reasoning with multiple <think>...</think> blocks across tool loops", () => {
+    // Turn 1: Initial plan
+    partitioner.feedToken("<think>1단계: orders.csv 생성 계획</think>");
+    partitioner.feedToken("작업을 시작하겠습니다.\n");
+
+    let state = partitioner.getState();
+    expect(state.content).toBe("작업을 시작하겠습니다.");
+    expect(state.reasoning).toBe("1단계: orders.csv 생성 계획");
+
+    // Turn 2: Second thought after tool execution (like in the user screenshot)
+    partitioner.feedToken(
+      "<think>The first step, generating mock data is done. Now executing analysis script.</think>"
+    );
+    partitioner.feedToken("분석 결과 요약입니다.");
+
+    state = partitioner.getState();
+    expect(state.content).not.toContain("<think>");
+    expect(state.content).not.toContain("</think>");
+    expect(state.content).not.toContain("The first step");
+    expect(state.content).toBe("작업을 시작하겠습니다.\n\n분석 결과 요약입니다.");
+    expect(state.reasoning).toContain("1단계: orders.csv 생성 계획");
+    expect(state.reasoning).toContain("The first step, generating mock data is done");
+  });
+
+  it("handles mixed mode: explicit reasoning chunk in turn 1 followed by <think> tag in turn 2", () => {
+    // Turn 1: explicit reasoning SSE event
+    partitioner.feedReasoning("초기 분석 추론 내용입니다.");
+    partitioner.feedToken("분석을 시작합니다.");
+
+    let state = partitioner.getState();
+    expect(state.reasoning).toBe("초기 분석 추론 내용입니다.");
+    expect(state.content).toBe("분석을 시작합니다.");
+
+    // Turn 2: tool execution finished, LLM emits raw <think> tags in token stream
+    partitioner.feedToken(
+      "<think>데이터 분석 완료. 이제 결과 테이블을 마크다운으로 구성하자.</think>"
+    );
+    partitioner.feedToken("\n최종 보고서입니다.");
+
+    state = partitioner.getState();
+    expect(state.content).not.toContain("<think>");
+    expect(state.content).not.toContain("</think>");
+    expect(state.content).not.toContain("데이터 분석 완료");
+    expect(state.content).toBe("분석을 시작합니다.\n\n최종 보고서입니다.");
+    expect(state.reasoning).toContain("초기 분석 추론 내용입니다.");
+    expect(state.reasoning).toContain("데이터 분석 완료");
+  });
+
+  it("sets isThinking to true when a second <think> block is actively streaming", () => {
+    partitioner.feedToken("<think>1차 생각 완료</think>1차 답변 완료.");
+    expect(partitioner.getState().isThinking).toBe(false);
+
+    // 2nd turn starts streaming think
+    partitioner.feedToken("<think>2차 도구 실행 후 중간 생각 중...");
+    expect(partitioner.getState().isThinking).toBe(true);
+    expect(partitioner.getState().reasoning).toContain("1차 생각 완료");
+    expect(partitioner.getState().reasoning).toContain("2차 도구 실행 후 중간 생각 중...");
+    expect(partitioner.getState().content).toBe("1차 답변 완료.");
+  });
 });
+
