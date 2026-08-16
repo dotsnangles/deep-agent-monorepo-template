@@ -23,3 +23,5 @@ Domain glossary and architectural concepts for the Next.js 16 Web Application:
 | Derived Session Title | Pure in-memory client heuristic extracting a clean, concise title from the user's initial prompt with 0ms network latency | `src/features/chat/lib/session-title.ts` |
 | Title Lifecycle Pipeline | 3-tier progressive promotion pipeline (Optimistic Heuristic -> Async AI Summary -> Realtime Sync) | `src/features/chat/` |
 | Redis Title Event Subscriber | Node.js background event subscriber listening to `events:session:title_updated` and syncing PostgreSQL via `ChatRepository` | `apps/server/src/`, `packages/redis/` |
+| Tool Action Card | Interactive React component rendering pending tool parameters, formatted diffs, and Approve/Reject buttons | `src/features/chat/components/tool-action-card.tsx` |
+| Approval Resume Action | Action dispatcher forwarding user approval/rejection decision through `ChatEngine` to resume active stream | `src/features/chat/engine/` |

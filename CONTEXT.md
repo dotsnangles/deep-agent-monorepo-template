@@ -26,3 +26,8 @@ Key terms and definitions used across `hollow-echo-distant-signal`:
 | Derived Session Title | Pure in-memory client heuristic extracting a clean, concise title from the user's initial prompt with 0ms network latency | Web Client (`apps/web`) |
 | Title Lifecycle Pipeline | 3-tier progressive promotion pipeline (Optimistic Heuristic -> Async AI Summary -> Realtime Sync) | Fullstack (`apps/web`, `apps/agent`, `@repo/redis`) |
 | Redis Title Event Subscriber | Node.js background event subscriber listening to `events:session:title_updated` and syncing PostgreSQL via `ChatRepository` | Backend (`apps/server`, `@repo/redis`) |
+| Sensitive Tool | An agent tool with mutations or side effects requiring explicit human authorization before execution | Agent (`apps/agent`) |
+| HITL Breakpoint | A LangGraph interrupt suspended state halting execution before sensitive tool invocation until user decision | Agent (`apps/agent`) |
+| Approval Request Event | SSE stream event (`approval_request`) emitted when an agent encounters an approval-required tool breakpoint | Agent & Web (`apps/agent`, `apps/web`) |
+| Tool Action Card | Interactive React component rendering pending tool parameters, formatted diffs, and Approve/Reject buttons | Web Client (`apps/web`) |
+| Resume Command | LangGraph `Command(resume=...)` payload sent over `/chat/stream` delivering human approval or rejection to continue execution | Agent & Web (`apps/agent`, `apps/web`) |
