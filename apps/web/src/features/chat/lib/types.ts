@@ -1,4 +1,4 @@
-import type { AttachmentEntity } from "@repo/validators";
+import type { AttachmentEntity, ChatArtifactEntity } from "@repo/validators";
 
 export interface ToolApprovalRequest {
   toolCallId: string;
@@ -38,6 +38,7 @@ export interface MessageNode {
   role: "user" | "assistant" | "system";
   content: string;
   attachments?: AttachmentEntity[];
+  artifacts?: (ChatArtifactEntity & { url?: string })[];
   createdAt: Date | string;
   status?: "sending" | "streaming" | "complete" | "error";
   error?: string | null;

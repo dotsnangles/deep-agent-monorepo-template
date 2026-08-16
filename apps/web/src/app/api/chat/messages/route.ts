@@ -36,6 +36,42 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    try {
+      const artifacts = await chatRepository.getArtifactsBySession(sessionId);
+      if (artifacts && artifacts.length > 0) {
+        const artifactByMessage = new Map<string, typeof artifacts>();
+        for (const art of artifacts) {
+          if (art.messageId) {
+            const list = artifactByMessage.get(art.messageId) || [];
+            list.push(art);
+            artifactByMessage.set(art.messageId, list);
+          }
+        }
+
+        for (const msg of tree.messages) {
+          const msgArtifacts = artifactByMessage.get(msg.id);
+          if (msgArtifacts) {
+            const existingAtts = msg.attachments || [];
+            for (const art of msgArtifacts) {
+              if (!existingAtts.some((a) => a.id === art.id || a.name === art.name)) {
+                existingAtts.push({
+                  id: art.id,
+                  name: art.name,
+                  url: `/api/storage/presigned-url?key=${encodeURIComponent(art.storageKey)}`,
+                  mimeType: art.mimeType,
+                  size: art.sizeBytes ?? 0,
+                  s3Key: art.storageKey,
+                });
+              }
+            }
+            msg.attachments = existingAtts;
+          }
+        }
+      }
+    } catch (artErr) {
+      console.warn("[API GET /api/chat/messages] Artifact enrichment skipped:", artErr);
+    }
+
     return NextResponse.json({
       sessionId: tree.sessionId,
       activeLeafId: tree.activeLeafId,

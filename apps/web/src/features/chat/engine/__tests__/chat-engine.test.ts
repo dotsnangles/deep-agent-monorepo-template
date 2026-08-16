@@ -628,4 +628,60 @@ describe("ChatEngine (In-Process State Machine)", () => {
     expect(assistantNode?.content).toBe("The result is 42.");
     expect(assistantNode?.reasoningDuration).toBeDefined();
   });
+
+  it("handles artifact_created stream event and binds artifacts to assistant node and persistence", async () => {
+    transport.setMockArtifacts([
+      {
+        id: "art-chart-1",
+        sessionId: "session-artifact-test",
+        messageId: "asst-msg-1",
+        name: "revenue_trend.png",
+        storageKey: "artifacts/sessions/session-artifact-test/asst-msg-1/revenue_trend.png",
+        url: "https://cdn.example.com/artifacts/revenue_trend.png",
+        mimeType: "image/png",
+        sizeBytes: 8192,
+        metadata: { format: "png" },
+        createdAt: new Date(),
+      },
+      {
+        id: "art-csv-2",
+        sessionId: "session-artifact-test",
+        messageId: "asst-msg-1",
+        name: "summary.csv",
+        storageKey: "artifacts/sessions/session-artifact-test/asst-msg-1/summary.csv",
+        url: "https://cdn.example.com/artifacts/summary.csv",
+        mimeType: "text/csv",
+        sizeBytes: 1024,
+        metadata: {},
+        createdAt: new Date(),
+      },
+    ]);
+
+    transport.setMockStreamChunks(["Here is the revenue chart and data summary."]);
+
+    const engine = new ChatEngine({
+      sessionId: "session-artifact-test",
+      transport,
+    });
+
+    await engine.send("Show me the revenue report");
+
+    const state = engine.getState();
+    const assistantNode = state.activePath.find((n) => n.role === "assistant");
+    expect(assistantNode).toBeDefined();
+    expect(assistantNode?.artifacts).toHaveLength(2);
+    expect(assistantNode?.artifacts?.[0].name).toBe("revenue_trend.png");
+    expect(assistantNode?.artifacts?.[0].url).toBe("https://cdn.example.com/artifacts/revenue_trend.png");
+
+    expect(assistantNode?.attachments).toHaveLength(2);
+    expect(assistantNode?.attachments?.[0].name).toBe("revenue_trend.png");
+    expect(assistantNode?.attachments?.[0].url).toBe("https://cdn.example.com/artifacts/revenue_trend.png");
+    expect(assistantNode?.attachments?.[1].name).toBe("summary.csv");
+
+    // Verify persisted node contains the attachments
+    const persistedAsst = transport.persistedNodes.find((n) => n.role === "assistant");
+    expect(persistedAsst).toBeDefined();
+    expect(persistedAsst?.attachments).toHaveLength(2);
+    expect(persistedAsst?.attachments?.[0].name).toBe("revenue_trend.png");
+  });
 });

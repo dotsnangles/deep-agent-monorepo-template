@@ -5,6 +5,7 @@ import type {
   DeleteChatMessageDTO,
   ResumeActionDTO,
   AttachmentEntity,
+  ChatArtifactEntity,
 } from "@repo/validators";
 import type { MessageNode, ToolApprovalRequest, TodoItem } from "../lib/types";
 
@@ -47,6 +48,7 @@ export interface StreamCallbacks {
   onSubagentEnd?: (subagent: string, output: any, runId?: string) => void;
   onToolStart?: (tool: string, input: any, runId?: string) => void;
   onToolEnd?: (tool: string, output: any, runId?: string) => void;
+  onArtifactCreated?: (artifact: ChatArtifactEntity & { url: string }) => void;
   onDone?: (finishReason: string) => void;
   onError?: (error: string) => void;
 }
@@ -185,6 +187,19 @@ export class HttpChatTransport implements ChatTransport {
               description: parsed.description,
               status: "pending",
             });
+          } else if (eventType === "artifact_created") {
+            cb.onArtifactCreated?.({
+              id: parsed.id,
+              sessionId: parsed.sessionId || parsed.session_id,
+              messageId: parsed.messageId || parsed.message_id || null,
+              name: parsed.name,
+              url: parsed.url,
+              storageKey: parsed.storageKey || parsed.storage_key,
+              mimeType: parsed.mimeType || parsed.mime_type,
+              sizeBytes: parsed.sizeBytes ?? parsed.size_bytes ?? null,
+              metadata: parsed.metadata || {},
+              createdAt: parsed.createdAt ? new Date(parsed.createdAt) : new Date(),
+            });
           } else if (eventType === "done") {
             cb.onDone?.(parsed.finish_reason || "stop");
           } else if (eventType === "error") {
@@ -299,6 +314,7 @@ export class FakeChatTransport implements ChatTransport {
   public mockResumeChunks: string[] = ["Resumed response"];
   public mockTodos: TodoItem[] | null = null;
   public mockSubagents: Array<{ subagent: string; task: string; output?: any }> | null = null;
+  public mockArtifacts: Array<ChatArtifactEntity & { url: string }> | null = null;
   public mockStreamDelay: number = 0;
   public mockStreamError: Error | null = null;
 
@@ -320,6 +336,10 @@ export class FakeChatTransport implements ChatTransport {
 
   setMockSubagents(subagents: Array<{ subagent: string; task: string; output?: any }> | null) {
     this.mockSubagents = subagents;
+  }
+
+  setMockArtifacts(artifacts: Array<ChatArtifactEntity & { url: string }> | null) {
+    this.mockArtifacts = artifacts;
   }
 
   setMockResumeChunks(chunks: string[]) {
@@ -398,6 +418,13 @@ export class FakeChatTransport implements ChatTransport {
       if (signal.aborted) break;
       cb.onToken?.(chunk);
     }
+
+    if (this.mockArtifacts) {
+      for (const art of this.mockArtifacts) {
+        cb.onArtifactCreated?.(art);
+      }
+    }
+
     cb.onDone?.("stop");
   }
 

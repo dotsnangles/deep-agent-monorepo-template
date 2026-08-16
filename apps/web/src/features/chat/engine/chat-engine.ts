@@ -2,6 +2,7 @@ import type {
   CreateChatMessageDTO,
   ResumeActionDTO,
   AttachmentEntity,
+  ChatArtifactEntity,
 } from "@repo/validators";
 import {
   findNewActiveLeafAfterPrune,
@@ -553,6 +554,12 @@ export class ChatEngine {
     let capturedTodos: TodoItem[] = existingNode?.todos ? [...existingNode.todos] : [];
     let capturedSubagents: SubagentExecution[] = existingNode?.subagents ? [...existingNode.subagents] : [];
     let capturedToolCalls: ToolCallExecution[] = existingNode?.toolCalls ? [...existingNode.toolCalls] : [];
+    let capturedArtifacts: (ChatArtifactEntity & { url: string })[] = existingNode?.artifacts
+      ? [...(existingNode.artifacts as (ChatArtifactEntity & { url: string })[])]
+      : [];
+    let capturedAttachments: AttachmentEntity[] = existingNode?.attachments
+      ? [...existingNode.attachments]
+      : [];
 
     try {
       await this.transport.streamResponse(
@@ -715,6 +722,46 @@ export class ChatEngine {
             };
             this.notify();
           },
+          onArtifactCreated: (artifact) => {
+            const existingArtIdx = capturedArtifacts.findIndex((a) => a.id === artifact.id);
+            if (existingArtIdx >= 0) {
+              capturedArtifacts[existingArtIdx] = artifact;
+            } else {
+              capturedArtifacts.push(artifact);
+            }
+
+            const newAttachment: AttachmentEntity = {
+              id: artifact.id,
+              name: artifact.name,
+              url: artifact.url,
+              mimeType: artifact.mimeType,
+              size: artifact.sizeBytes ?? 0,
+              s3Key: artifact.storageKey,
+            };
+
+            const existingAttIdx = capturedAttachments.findIndex(
+              (a) => a.id === artifact.id || a.name === artifact.name
+            );
+            if (existingAttIdx >= 0) {
+              capturedAttachments[existingAttIdx] = newAttachment;
+            } else {
+              capturedAttachments.push(newAttachment);
+            }
+
+            this.state = {
+              ...this.state,
+              allNodes: this.state.allNodes.map((n) =>
+                n.id === params.assistantMessageId
+                  ? {
+                      ...n,
+                      attachments: [...capturedAttachments],
+                      artifacts: [...capturedArtifacts],
+                    }
+                  : n
+              ),
+            };
+            this.notify();
+          },
           onDone: (finishReason) => {
             // Stream complete or interrupted
           },
@@ -742,6 +789,8 @@ export class ChatEngine {
                 todos: capturedTodos.length > 0 ? capturedTodos : undefined,
                 subagents: capturedSubagents.length > 0 ? capturedSubagents : undefined,
                 toolCalls: capturedToolCalls.length > 0 ? capturedToolCalls : undefined,
+                attachments: capturedAttachments.length > 0 ? capturedAttachments : undefined,
+                artifacts: capturedArtifacts.length > 0 ? capturedArtifacts : undefined,
               }
             : n
         ),
@@ -777,6 +826,8 @@ export class ChatEngine {
                     todos: capturedTodos.length > 0 ? capturedTodos : undefined,
                     subagents: capturedSubagents.length > 0 ? capturedSubagents : undefined,
                     toolCalls: capturedToolCalls.length > 0 ? capturedToolCalls : undefined,
+                    attachments: capturedAttachments.length > 0 ? capturedAttachments : undefined,
+                    artifacts: capturedArtifacts.length > 0 ? capturedArtifacts : undefined,
                   }
                 : n
             ),
@@ -812,7 +863,7 @@ export class ChatEngine {
           parentId: params.userMessageId,
           role: "assistant",
           content: savedPState.content,
-          attachments: [],
+          attachments: capturedAttachments,
         });
       }
 
