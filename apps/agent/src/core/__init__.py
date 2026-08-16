@@ -15,9 +15,16 @@ from src.core.redis import (
     RedisStreamingCallbackHandler,
     StandardRedisCache,
 )
+from src.core.settings import (
+    AgentConfig,
+    AgentConfigLoader,
+    get_agent_config,
+)
 from src.core.testing import FakeChatModel
 
 __all__ = [
+    "AgentConfig",
+    "AgentConfigLoader",
     "AgentExecutionGateway",
     "CheckpointerFactory",
     "DATABASE_URL",
@@ -27,6 +34,7 @@ __all__ = [
     "SERVER_HOST",
     "SERVER_PORT",
     "TITLE_WORKER_CONCURRENCY",
+    "get_agent_config",
     "get_llm",
     "get_langfuse_callback",
     "RedisEventBroker",

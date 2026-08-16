@@ -4,7 +4,7 @@ from langchain_core.output_parsers import StrOutputParser
 
 from src.core.config import get_llm
 from src.graphs.chat.factory import DeepAgentEnvironmentFactory
-from src.graphs.chat.prompts import TITLE_PROMPT
+from src.graphs.chat.prompts import get_prompt_catalog
 
 # Default interrupt policy: empty by default so sandboxed tools run autonomously.
 DEFAULT_INTERRUPT_TOOLS: dict[str, Any] = {}
@@ -44,7 +44,8 @@ def build_agent(
 
 def get_title_chain():
     """Builds a LangChain LCEL runnable for session title summarization using configured LLM."""
-    return TITLE_PROMPT | get_llm() | StrOutputParser()
+    title_prompt = get_prompt_catalog().get_title_prompt()
+    return title_prompt | get_llm() | StrOutputParser()
 
 
 async def generate_title(user_prompt: str) -> str:

@@ -54,13 +54,11 @@ class PromptCatalog:
     def _resolve_file(self, filename: str) -> Path | None:
         if self.prompts_dir is not None:
             direct_file = self.prompts_dir / filename
-            if direct_file.is_file():
-                return direct_file
+            return direct_file if direct_file.is_file() else None
 
         candidates = [
             Path("prompts") / filename,
             Path("apps/agent/prompts") / filename,
-            Path(__file__).parent.parent.parent.parent / "prompts" / filename,
             Path(__file__).parent.parent.parent / "prompts" / filename,
         ]
         for c in candidates:

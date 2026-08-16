@@ -136,12 +136,12 @@ class DeepAgentEnvironmentFactory:
             effective_model_limit = (
                 model_call_limit
                 if model_call_limit is not None
-                else (cfg.limits.model_calls if cfg is not None else 30)
+                else (cfg.limits.model_calls if cfg.limits.model_calls is not None else 30)
             )
             effective_tool_limit = (
                 tool_call_limit
                 if tool_call_limit is not None
-                else (cfg.limits.tool_calls if cfg is not None else 100)
+                else (cfg.limits.tool_calls if cfg.limits.tool_calls is not None else 100)
             )
 
             effective_middleware = list(
@@ -174,12 +174,12 @@ class DeepAgentEnvironmentFactory:
             effective_model_limit = (
                 model_call_limit
                 if model_call_limit is not None
-                else (cfg.limits.model_calls if cfg is not None else 50)
+                else (cfg.limits.model_calls if cfg.limits.model_calls is not None else 50)
             )
             effective_tool_limit = (
                 tool_call_limit
                 if tool_call_limit is not None
-                else (cfg.limits.tool_calls if cfg is not None else 200)
+                else (cfg.limits.tool_calls if cfg.limits.tool_calls is not None else 200)
             )
 
             effective_middleware = list(
@@ -201,7 +201,9 @@ class DeepAgentEnvironmentFactory:
                 effective_backend = CompositeBackend(
                     default=session_sb,
                     routes={
-                        "/memories/": StoreBackend(store=effective_store, namespace=("memories",)),
+                        cfg.storage.memory_route: StoreBackend(
+                            store=effective_store, namespace=("memories",)
+                        ),
                     },
                 )
 
@@ -253,6 +255,8 @@ class DeepAgentEnvironmentFactory:
                 "model": target_grader,
                 "max_iterations": effective_rubric_iters,
             }
+            if effective_rubric is not None:
+                rubric_kwargs["system_prompt"] = effective_rubric
             if on_rubric_evaluation is not None:
                 rubric_kwargs["on_evaluation"] = on_rubric_evaluation
             if rubric_tools is not None:

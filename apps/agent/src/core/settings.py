@@ -38,8 +38,8 @@ class ModelsGroup(BaseModel):
 class LimitsGroup(BaseModel):
     """Protective limits for call capping and recursion safety."""
 
-    model_calls: int = 30
-    tool_calls: int = 100
+    model_calls: int | None = None
+    tool_calls: int | None = None
     recursion: int = 100
 
 
@@ -113,11 +113,7 @@ class AgentConfigLoader:
         # Environment Variable Overrides (Precedence: ENV > YAML > Defaults)
         # -----------------------------------------------------------------
         if "DEEP_AGENT_MODE" in os.environ:
-            raw_mode = os.environ["DEEP_AGENT_MODE"].strip().lower()
-            if raw_mode in ("local_slm", "local"):
-                raw_dict["agent"]["mode"] = EnvironmentMode.LOCAL_SLM
-            elif raw_mode in ("cloud_provider", "cloud", "production_cloud"):
-                raw_dict["agent"]["mode"] = EnvironmentMode.CLOUD_PROVIDER
+            raw_dict["agent"]["mode"] = get_deep_agent_mode()
 
         if "PRIMARY_MODEL" in os.environ:
             raw_dict["models"]["primary"] = os.environ["PRIMARY_MODEL"]

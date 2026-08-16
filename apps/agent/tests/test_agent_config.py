@@ -14,8 +14,6 @@ def test_default_agent_config():
     config = AgentConfig()
     assert config.agent.mode in (EnvironmentMode.LOCAL_SLM, EnvironmentMode.CLOUD_PROVIDER)
     assert config.models.primary != ""
-    assert config.limits.model_calls > 0
-    assert config.limits.tool_calls > 0
     assert config.limits.recursion > 0
     assert config.features.enable_subagents is True
 
