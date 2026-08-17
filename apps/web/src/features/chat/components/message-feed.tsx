@@ -14,7 +14,7 @@ import {
 } from "@repo/ui/components/message-scroller";
 import { cn } from "@repo/ui/lib/utils";
 import { authClient } from "../../../lib/auth-client";
-import { ChatSessionContext } from "../context/chat-session-context";
+import { ChatSessionContext, isKnownSavedSession } from "../context/chat-session-context";
 import { useChatEngine } from "../hooks/use-chat-engine";
 import { useDirectUpload } from "../hooks/use-direct-upload";
 import { getRandomGreeting, getSessionGreeting } from "../lib/greetings";
@@ -144,14 +144,15 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
   const greetingText = getRandomGreeting(userName, greetingIndex);
 
   const chatSessionsContext = useContext(ChatSessionContext);
-  const isSessionsLoading = chatSessionsContext?.isLoading ?? false;
   const isExistingSession = chatSessionsContext
     ? chatSessionsContext.sessions.some((s) => s.id === sessionId)
     : false;
 
-  // When sessions list is loaded, immediately know if this is a draft (isEmpty = true, 0ms instant mount in center)
-  // When sessions list is still loading (initial refresh only), don't flash hero on existing sessions
-  const isEmpty = !isExistingSession && (isSessionsLoading ? false : activePath.length === 0);
+  // Synchronous cache check ensures 0ms instant identification on refresh:
+  // - If it's a draft on refresh: isEmpty is synchronously true (center hero mounts instantly).
+  // - If it's an existing chat on refresh: isEmpty is synchronously false (bottom input mounts instantly).
+  const isKnownExisting = isExistingSession || isKnownSavedSession(sessionId);
+  const isEmpty = !isKnownExisting && activePath.length === 0;
 
   return (
     <div className="flex flex-col h-full w-full min-h-0 relative overflow-hidden">

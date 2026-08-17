@@ -36,7 +36,20 @@ export interface ChatSessionContextType {
 
 export const ChatSessionContext = createContext<ChatSessionContextType | null>(null);
 
-const STORAGE_KEY = "hollow_echo_active_thread_id";
+export const STORAGE_KEY = "hollow_echo_active_thread_id";
+export const SAVED_SESSION_IDS_KEY = "hollow_echo_saved_session_ids";
+
+export function isKnownSavedSession(sessionId: string): boolean {
+  if (typeof window === "undefined" || !sessionId) return false;
+  try {
+    const raw = localStorage.getItem(SAVED_SESSION_IDS_KEY);
+    if (!raw) return false;
+    const ids = JSON.parse(raw);
+    return Array.isArray(ids) && ids.includes(sessionId);
+  } catch {
+    return false;
+  }
+}
 
 function createDraftSession(id: string, title = DEFAULT_SESSION_TITLE, userId = "guest"): ChatSession {
   return {
@@ -131,6 +144,14 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
   useEffect(() => {
     fetchSessions();
   }, [fetchSessions]);
+
+  // Synchronously cache saved session IDs in localStorage for instantaneous refresh detection
+  useEffect(() => {
+    if (typeof window !== "undefined" && !isLoading) {
+      const ids = sessions.map((s) => s.id);
+      localStorage.setItem(SAVED_SESSION_IDS_KEY, JSON.stringify(ids));
+    }
+  }, [sessions, isLoading]);
 
   // Event-driven revalidation on window focus (replaces 4s polling timer)
   useEffect(() => {
