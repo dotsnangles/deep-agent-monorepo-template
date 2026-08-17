@@ -40,7 +40,7 @@ class TestActivePathSyncAndLiveInference:
         registry = GraphRegistry()
         registry.register("default", build_agent)
 
-        gateway = AgentRuntime.create_in_memory(
+        runtime = AgentRuntime.create_in_memory(
             registry=registry,
             checkpointer=checkpointer,
             model=fake_llm,
@@ -50,7 +50,7 @@ class TestActivePathSyncAndLiveInference:
 
         # Turn 1: Client sends [User 1]
         events_1 = []
-        async for ev in gateway.stream_execution(
+        async for ev in runtime.stream_execution(
             messages=[{"role": "user", "content": "Question 1"}],
             thread_id=thread_id,
             agent_type="default",
@@ -61,7 +61,7 @@ class TestActivePathSyncAndLiveInference:
 
         # Turn 2: Client sends full active path [User 1, Asst 1, User 2]
         events_2 = []
-        async for ev in gateway.stream_execution(
+        async for ev in runtime.stream_execution(
             messages=[
                 {"role": "user", "content": "Question 1"},
                 {"role": "assistant", "content": "Answer 1"},
@@ -76,7 +76,7 @@ class TestActivePathSyncAndLiveInference:
 
         # Turn 3: Client regenerates Question 2 (same active path [User 1, Asst 1, User 2])
         events_3 = []
-        async for ev in gateway.stream_execution(
+        async for ev in runtime.stream_execution(
             messages=[
                 {"role": "user", "content": "Question 1"},
                 {"role": "assistant", "content": "Answer 1"},
@@ -120,13 +120,13 @@ class TestActivePathSyncAndLiveInference:
         Consecutive identical prompts must invoke model freshly.
         """
         fake_llm = FakeChatModel(tokens=["Token A", "Token B"])
-        gateway = AgentRuntime.create_in_memory(model=fake_llm)
+        runtime = AgentRuntime.create_in_memory(model=fake_llm)
 
         prompt = "파이썬으로 최적화된 피보나치 수열 생성 함수를 작성하고 시간 복잡도를 설명해줘."
 
         # First send
         tokens_1 = []
-        async for ev in gateway.stream_execution(
+        async for ev in runtime.stream_execution(
             messages=[{"role": "user", "content": prompt}],
             thread_id="session-fresh-1",
             agent_type="direct",
@@ -136,7 +136,7 @@ class TestActivePathSyncAndLiveInference:
 
         # Second send with identical prompt
         tokens_2 = []
-        async for ev in gateway.stream_execution(
+        async for ev in runtime.stream_execution(
             messages=[{"role": "user", "content": prompt}],
             thread_id="session-fresh-2",
             agent_type="direct",

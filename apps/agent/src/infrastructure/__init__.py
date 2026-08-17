@@ -51,7 +51,7 @@ from src.infrastructure.storage.adapter import (
     InMemoryStorageAdapter,
     S3StorageAdapter,
 )
-from src.infrastructure.storage.legacy_processor import (
+from src.infrastructure.storage.processor import (
     ArtifactSyncProcessor,
     S3StorageService,
     compute_file_sha256,

@@ -9,7 +9,7 @@ from src.runtime.runtime import _build_trace_metadata
 
 
 @pytest.mark.asyncio
-class TestGatewayObservability:
+class TestRuntimeObservability:
     async def test_build_trace_metadata_extracts_user_prompt_snippet_and_tags(self):
         """Metadata builder generates a readable trace name without emojis, user_id, and tags."""
         messages = [
@@ -87,21 +87,21 @@ class TestGatewayObservability:
         assert len(metadata["langfuse_trace_name"]) <= 45
         assert metadata["langfuse_trace_name"].endswith("...")
 
-    async def test_stream_execution_injects_enriched_metadata_into_run_config(self):
-        """Gateway stream execution should pass the rich trace metadata into stream config."""
+    async def test_trace_metadata_injection(self):
+        """Runtime stream execution should pass the rich trace metadata into stream config."""
         fake_llm = FakeChatModel(responses=["테스트 답변입니다."])
         registry = GraphRegistry()
         checkpointer = MemorySaver()
         registry.register("default", build_agent)
 
-        gateway = AgentRuntime.create_in_memory(
+        runtime = AgentRuntime.create_in_memory(
             registry=registry,
             checkpointer=checkpointer,
             model=fake_llm,
         )
 
         events = []
-        async for ev in gateway.stream_execution(
+        async for ev in runtime.stream_execution(
             messages=[{"role": "user", "content": "안녕하세요!"}],
             thread_id="test-observability-stream",
             agent_type="default",

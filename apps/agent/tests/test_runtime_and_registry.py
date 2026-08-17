@@ -68,10 +68,10 @@ class TestAgentRuntime:
     @pytest.mark.asyncio
     async def test_stream_execution_with_dictionary_messages(self):
         fake_llm = FakeChatModel(tokens=["Response"])
-        gateway = AgentRuntime.create_in_memory(model=fake_llm)
+        runtime = AgentRuntime.create_in_memory(model=fake_llm)
 
         events: list[AgentStreamEvent] = []
-        async for event in gateway.stream_execution(
+        async for event in runtime.stream_execution(
             messages=[{"role": "user", "content": "Hello"}],
             thread_id="thread_dict",
             agent_type="direct",
@@ -84,10 +84,10 @@ class TestAgentRuntime:
     @pytest.mark.asyncio
     async def test_stream_execution_with_custom_system_prompt(self):
         fake_llm = FakeChatModel(tokens=["Custom prompt response"])
-        gateway = AgentRuntime.create_in_memory(model=fake_llm)
+        runtime = AgentRuntime.create_in_memory(model=fake_llm)
 
         events: list[AgentStreamEvent] = []
-        async for event in gateway.stream_execution(
+        async for event in runtime.stream_execution(
             messages=[
                 SystemMessage(content="Original prompt"),
                 HumanMessage(content="Hi"),
@@ -103,10 +103,10 @@ class TestAgentRuntime:
     async def test_stream_execution_yields_token_and_done_events(self):
         fake_llm = FakeChatModel(tokens=["Streamed", " ", "response", " ", "content"])
         checkpointer = MemorySaver()
-        gateway = AgentRuntime.create_in_memory(model=fake_llm, checkpointer=checkpointer)
+        runtime = AgentRuntime.create_in_memory(model=fake_llm, checkpointer=checkpointer)
 
         events: list[AgentStreamEvent] = []
-        async for event in gateway.stream_execution(
+        async for event in runtime.stream_execution(
             messages=[{"role": "user", "content": "Test prompt"}],
             thread_id="sess_123",
             agent_type="direct",
@@ -131,14 +131,14 @@ class TestAgentRuntime:
 
         fake_llm = FakeChatModel(tokens=["Graph", " ", "output"])
         checkpointer = MemorySaver()
-        gateway = AgentRuntime.create_in_memory(
+        runtime = AgentRuntime.create_in_memory(
             registry=registry,
             checkpointer=checkpointer,
             model=fake_llm,
         )
 
         events: list[AgentStreamEvent] = []
-        async for event in gateway.stream_execution(
+        async for event in runtime.stream_execution(
             messages=[HumanMessage(content="Hello graph")],
             thread_id="test_thread_cp",
             agent_type="test_graph",
@@ -159,10 +159,10 @@ class TestAgentRuntime:
     async def test_stream_execution_yields_tool_start_events(self):
         tool_call_def = {"name": "search_docs", "args": {"query": "python"}, "id": "call_999"}
         fake_llm = FakeChatModel(tool_calls=[tool_call_def])
-        gateway = AgentRuntime.create_in_memory(model=fake_llm)
+        runtime = AgentRuntime.create_in_memory(model=fake_llm)
 
         events: list[AgentStreamEvent] = []
-        async for event in gateway.stream_execution(
+        async for event in runtime.stream_execution(
             messages=[HumanMessage(content="Search docs")],
             agent_type="direct",
         ):
@@ -186,10 +186,10 @@ class TestAgentRuntime:
                 raise RuntimeError("Simulated LLM Provider Outage")
                 yield  # pragma: no cover
 
-        gateway = AgentRuntime.create_in_memory(model=BrokenChatModel())
+        runtime = AgentRuntime.create_in_memory(model=BrokenChatModel())
 
         events: list[AgentStreamEvent] = []
-        async for event in gateway.stream_execution(
+        async for event in runtime.stream_execution(
             messages=[{"role": "user", "content": "Hi"}],
             agent_type="direct",
         ):

@@ -159,14 +159,14 @@ class TestDataAnalysisFlowAndSubagents:
             ),
         )
         checkpointer = MemorySaver()
-        gateway = AgentRuntime.create_in_memory(
+        runtime = AgentRuntime.create_in_memory(
             registry=registry,
             checkpointer=checkpointer,
             model=fake_llm,
         )
 
         events: list[AgentStreamEvent] = []
-        async for ev in gateway.stream_execution(
+        async for ev in runtime.stream_execution(
             messages=[{"role": "user", "content": "sales_2026.csv 파일 분석하고 차트 그려줘"}],
             thread_id="test-e2e-data-1",
             agent_type="data_analysis",
@@ -223,14 +223,14 @@ class TestDataAnalysisFlowAndSubagents:
             lambda **kw: build_agent(interrupt_on={"execute": True}, **kw),
         )
         checkpointer = MemorySaver()
-        gateway = AgentRuntime.create_in_memory(
+        runtime = AgentRuntime.create_in_memory(
             registry=registry,
             checkpointer=checkpointer,
             model=fake_llm,
         )
 
         phase1_events: list[AgentStreamEvent] = []
-        async for ev in gateway.stream_execution(
+        async for ev in runtime.stream_execution(
             messages=[{"role": "user", "content": "approved.txt 생성해줘"}],
             thread_id="test-e2e-hitl-1",
             agent_type="data_analysis",
@@ -245,7 +245,7 @@ class TestDataAnalysisFlowAndSubagents:
 
         # Phase 2: Resume with approved decision
         phase2_events: list[AgentStreamEvent] = []
-        async for ev in gateway.stream_execution(
+        async for ev in runtime.stream_execution(
             messages=[],
             thread_id="test-e2e-hitl-1",
             agent_type="data_analysis",

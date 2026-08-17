@@ -16,7 +16,7 @@ def execute_command(command: str) -> str:
 
 
 @pytest.fixture
-def hitl_gateway_fixture():
+def hitl_runtime_fixture():
     checkpointer = MemorySaver()
     registry = GraphRegistry()
     registry.register(
@@ -28,13 +28,13 @@ def hitl_gateway_fixture():
         ),
     )
     fake_llm = FakeChatModel()
-    gateway = AgentRuntime.create_in_memory(
+    runtime = AgentRuntime.create_in_memory(
         registry=registry,
         checkpointer=checkpointer,
         model=fake_llm,
     )
     return {
-        "gateway": gateway,
+        "runtime": runtime,
         "model": fake_llm,
         "checkpointer": checkpointer,
     }
@@ -42,20 +42,20 @@ def hitl_gateway_fixture():
 
 class TestRuntimeHITL:
     @pytest.mark.asyncio
-    async def test_stream_execution_emits_approval_request_on_interrupt(self, hitl_gateway_fixture):
+    async def test_stream_execution_emits_approval_request_on_interrupt(self, hitl_runtime_fixture):
         tool_call = {
             "name": "execute_command",
             "args": {"command": "npm install"},
             "id": "call_hitl_stream_1",
         }
-        fake_llm: FakeChatModel = hitl_gateway_fixture["model"]
+        fake_llm: FakeChatModel = hitl_runtime_fixture["model"]
         fake_llm.tool_calls = [tool_call]
         fake_llm.responses = ["명령어가 실행되었습니다."]
 
-        gateway: AgentRuntime = hitl_gateway_fixture["gateway"]
+        runtime: AgentRuntime = hitl_runtime_fixture["runtime"]
 
         events: list[AgentStreamEvent] = []
-        async for event in gateway.stream_execution(
+        async for event in runtime.stream_execution(
             messages=[{"role": "user", "content": "패키지 설치해줘"}],
             thread_id="thread_hitl_stream",
             agent_type="hitl_test",
@@ -76,22 +76,22 @@ class TestRuntimeHITL:
 
     @pytest.mark.asyncio
     async def test_stream_execution_resumes_with_approval_and_streams_response(
-        self, hitl_gateway_fixture
+        self, hitl_runtime_fixture
     ):
         tool_call = {
             "name": "execute_command",
             "args": {"command": "echo 'ok'"},
             "id": "call_hitl_resume_1",
         }
-        fake_llm: FakeChatModel = hitl_gateway_fixture["model"]
+        fake_llm: FakeChatModel = hitl_runtime_fixture["model"]
         fake_llm.tool_calls = [tool_call]
         fake_llm.tokens = ["명령어", " ", "실행", " ", "완료"]
 
-        gateway: AgentRuntime = hitl_gateway_fixture["gateway"]
+        runtime: AgentRuntime = hitl_runtime_fixture["runtime"]
 
         # 1. Initial invocation halts at interrupt
         initial_events: list[AgentStreamEvent] = []
-        async for event in gateway.stream_execution(
+        async for event in runtime.stream_execution(
             messages=[{"role": "user", "content": "실행"}],
             thread_id="thread_resume_stream",
             agent_type="hitl_test",
@@ -105,7 +105,7 @@ class TestRuntimeHITL:
 
         # 3. Resume invocation
         resume_events: list[AgentStreamEvent] = []
-        async for event in gateway.stream_execution(
+        async for event in runtime.stream_execution(
             messages=[],
             thread_id="thread_resume_stream",
             agent_type="hitl_test",
@@ -125,20 +125,20 @@ class TestRuntimeHITL:
         assert done_event.data.finish_reason == "stop"
 
     @pytest.mark.asyncio
-    async def test_stream_execution_resumes_with_rejection(self, hitl_gateway_fixture):
+    async def test_stream_execution_resumes_with_rejection(self, hitl_runtime_fixture):
         tool_call = {
             "name": "execute_command",
             "args": {"command": "delete resource res_123"},
             "id": "call_reject_stream_1",
         }
-        fake_llm: FakeChatModel = hitl_gateway_fixture["model"]
+        fake_llm: FakeChatModel = hitl_runtime_fixture["model"]
         fake_llm.tool_calls = [tool_call]
         fake_llm.tokens = ["삭제", " ", "취소됨"]
 
-        gateway: AgentRuntime = hitl_gateway_fixture["gateway"]
+        runtime: AgentRuntime = hitl_runtime_fixture["runtime"]
 
         # 1. Trigger interrupt
-        async for _ in gateway.stream_execution(
+        async for _ in runtime.stream_execution(
             messages=[{"role": "user", "content": "삭제해줘"}],
             thread_id="thread_reject_stream",
             agent_type="hitl_test",
@@ -149,7 +149,7 @@ class TestRuntimeHITL:
         fake_llm.tool_calls = None
 
         resume_events: list[AgentStreamEvent] = []
-        async for event in gateway.stream_execution(
+        async for event in runtime.stream_execution(
             messages=[],
             thread_id="thread_reject_stream",
             agent_type="hitl_test",

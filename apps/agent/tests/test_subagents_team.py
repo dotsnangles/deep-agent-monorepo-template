@@ -67,9 +67,9 @@ async def test_subagent_delegation_stream_events():
         ]
     )
 
-    gateway = AgentRuntime.create_in_memory(model=model)
+    runtime = AgentRuntime.create_in_memory(model=model)
     events = []
-    async for event in gateway.stream_execution(
+    async for event in runtime.stream_execution(
         messages=[{"role": "user", "content": "Please analyze this"}],
         thread_id="test_subagent_thread",
         agent_type="direct",

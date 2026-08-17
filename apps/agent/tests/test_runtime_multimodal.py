@@ -122,9 +122,9 @@ def test_normalize_messages_with_mixed_multimodal_and_documents():
 
 
 @pytest.mark.asyncio
-async def test_gateway_stream_execution_with_multimodal_payload():
+async def test_runtime_stream_execution_with_multimodal_payload():
     fake_model = FakeChatModel(tokens=["Image", " ", "analyzed", "."])
-    gateway = AgentRuntime.create_in_memory(model=fake_model)
+    runtime = AgentRuntime.create_in_memory(model=fake_model)
 
     messages = [
         {
@@ -144,7 +144,7 @@ async def test_gateway_stream_execution_with_multimodal_payload():
     ]
 
     events = [
-        event async for event in gateway.stream_execution(messages=messages, agent_type="direct")
+        event async for event in runtime.stream_execution(messages=messages, agent_type="direct")
     ]
     assert len(events) >= 2
     token_events = [e for e in events if e.event == "token"]

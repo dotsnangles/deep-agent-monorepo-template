@@ -49,7 +49,7 @@ class TestTodoListMiddlewareAndStreaming:
         assert "write_todos" in tool_names
 
     @pytest.mark.asyncio
-    async def test_gateway_streams_todo_update_events(self):
+    async def test_runtime_streams_todo_update_events(self):
         tool_call_1 = {
             "name": "write_todos",
             "args": {
@@ -70,14 +70,14 @@ class TestTodoListMiddlewareAndStreaming:
         registry = GraphRegistry()
         registry.register("todo_test", build_agent)
         checkpointer = MemorySaver()
-        gateway = AgentRuntime.create_in_memory(
+        runtime = AgentRuntime.create_in_memory(
             registry=registry,
             checkpointer=checkpointer,
             model=fake_llm,
         )
 
         events: list[AgentStreamEvent] = []
-        async for event in gateway.stream_execution(
+        async for event in runtime.stream_execution(
             messages=[{"role": "user", "content": "매출 데이터 분석해줘"}],
             thread_id="thread_todo_stream_1",
             agent_type="todo_test",
@@ -149,14 +149,14 @@ class TestTodoListMiddlewareAndStreaming:
         registry = GraphRegistry()
         registry.register("todo_multistep", build_agent)
         checkpointer = MemorySaver()
-        gateway = AgentRuntime.create_in_memory(
+        runtime = AgentRuntime.create_in_memory(
             registry=registry,
             checkpointer=checkpointer,
             model=fake_llm,
         )
 
         events: list[AgentStreamEvent] = []
-        async for event in gateway.stream_execution(
+        async for event in runtime.stream_execution(
             messages=[{"role": "user", "content": "전체 분석 파이프라인 수행"}],
             thread_id="thread_todo_multistep_1",
             agent_type="todo_multistep",

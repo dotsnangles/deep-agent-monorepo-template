@@ -26,14 +26,14 @@ class TestSubagentsToggle:
             lambda **kw: build_agent(model=fake_llm, **kw),
         )
 
-        gateway = AgentRuntime.create_in_memory(
+        runtime = AgentRuntime.create_in_memory(
             registry=registry,
             checkpointer=checkpointer,
             model=fake_llm,
         )
 
         events = []
-        async for ev in gateway.stream_execution(
+        async for ev in runtime.stream_execution(
             messages=[{"role": "user", "content": "Hello single agent"}],
             thread_id="test-single-agent-thread",
             agent_type="default",

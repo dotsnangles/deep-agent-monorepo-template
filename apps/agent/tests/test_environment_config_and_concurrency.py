@@ -40,7 +40,7 @@ def test_environment_mode_defaults_and_resolution():
 
 
 @pytest.mark.asyncio
-async def test_inference_serialization_gateway_serializes_local_slm():
+async def test_inference_serialization_runtime_serializes_local_slm():
     """Verify that multiple concurrent streams are serialized under local_slm mode."""
     execution_order = []
     active_concurrent_count = 0
@@ -61,11 +61,11 @@ async def test_inference_serialization_gateway_serializes_local_slm():
     # Set local_slm mode with concurrency_limit = 1
     with patch.dict(os.environ, {"DEEP_AGENT_MODE": "local_slm", "LLM_PROVIDER": "ollama"}):
         model = DelayedFakeChatModel()
-        gateway = AgentRuntime.create_in_memory(model=model, concurrency_limit=1)
+        runtime = AgentRuntime.create_in_memory(model=model, concurrency_limit=1)
 
         async def run_stream(thread_id: str):
             events = []
-            async for ev in gateway.stream_execution(
+            async for ev in runtime.stream_execution(
                 messages=[{"role": "user", "content": f"Hello from {thread_id}"}],
                 thread_id=thread_id,
                 agent_type="direct",

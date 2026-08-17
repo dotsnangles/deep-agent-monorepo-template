@@ -210,9 +210,9 @@ class TestArtifactSyncAndStreamPipeline:
         assert len(storage.uploaded) == 0
 
     @pytest.mark.asyncio
-    async def test_gateway_stream_chat_emits_artifact_created_events(self, tmp_path: Path):
+    async def test_runtime_stream_chat_emits_artifact_created_events(self, tmp_path: Path):
         workspace_dir = tmp_path / "sessions"
-        sess_id = "test-gateway-artifact-sess"
+        sess_id = "test-runtime-artifact-sess"
         sess_dir = workspace_dir / sess_id
         artifacts_dir = sess_dir / "artifacts"
         artifacts_dir.mkdir(parents=True, exist_ok=True)
@@ -232,7 +232,7 @@ class TestArtifactSyncAndStreamPipeline:
         registry = GraphRegistry()
         registry.register("default", build_agent)
 
-        gateway = AgentRuntime.create_in_memory(
+        runtime = AgentRuntime.create_in_memory(
             workspace_dir=workspace_dir,
             registry=registry,
             model=fake_llm,
@@ -240,7 +240,7 @@ class TestArtifactSyncAndStreamPipeline:
         )
 
         events = []
-        async for ev in gateway.stream_execution(
+        async for ev in runtime.stream_execution(
             messages=[HumanMessage(content="Generate chart")],
             thread_id=sess_id,
             backend=backend,

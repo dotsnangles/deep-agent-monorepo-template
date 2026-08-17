@@ -26,8 +26,8 @@ def setup_test_artifacts(test_session_id):
     (artifacts_dir / "report.json").write_text('{"summary": "ok"}', encoding="utf-8")
     (artifacts_dir / "plot.html").write_text("<div>Chart Plot</div>", encoding="utf-8")
 
-    # Create legacy fallback file in workspace root
-    (workspace / "legacy.txt").write_text("legacy root content", encoding="utf-8")
+    # Create root fallback file in workspace root
+    (workspace / "root_fallback.txt").write_text("root fallback content", encoding="utf-8")
 
     yield workspace
 
@@ -67,10 +67,10 @@ async def test_get_session_artifact_success(test_session_id):
         assert res_html.status_code == 200
         assert "text/html" in res_html.headers.get("content-type", "")
 
-        # Legacy root fallback
-        res_legacy = await ac.get(f"/sessions/{test_session_id}/artifacts/legacy.txt")
-        assert res_legacy.status_code == 200
-        assert "legacy root content" in res_legacy.text
+        # Root fallback
+        res_fallback = await ac.get(f"/sessions/{test_session_id}/artifacts/root_fallback.txt")
+        assert res_fallback.status_code == 200
+        assert "root fallback content" in res_fallback.text
 
 
 @pytest.mark.asyncio
