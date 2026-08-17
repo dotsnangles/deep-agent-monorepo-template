@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import {
   Bot,
   Check,
-  MessageSquare,
   MoreHorizontal,
   PanelLeft,
   Pencil,
@@ -29,7 +28,6 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarGroupAction,
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
@@ -89,7 +87,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-sidebar-border" {...props}>
+    <Sidebar collapsible="icon" className="border-r border-sidebar-border/35" {...props}>
       {/* Workspace / Brand Header (Only Brand Identity & Sidebar Toggle) */}
       <SidebarHeader className="shrink-0 pt-4 pb-1 px-3 group-data-[collapsible=icon]:pt-3 group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:pb-1">
         {/* App Identity / Brand Row & Sidebar Toggle */}
@@ -158,18 +156,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
 
       {/* Pinned Primary Action Tools (New Chat & Search) - Stays fixed at top */}
-      <div className="shrink-0 px-2 py-1.5 group-data-[collapsible=icon]:px-1">
+      <div className="shrink-0 px-2 pt-2 pb-1 group-data-[collapsible=icon]:px-1">
         <SidebarGroup className="p-0">
-          <SidebarMenu className="gap-1.5 group-data-[collapsible=icon]:items-center">
+          <SidebarMenu className="gap-1 group-data-[collapsible=icon]:items-center">
             {/* New Chat Action */}
             <SidebarMenuItem className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
               <SidebarMenuButton
                 onClick={() => createNewSession()}
                 tooltip="새 대화 시작"
-                className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground font-medium rounded-lg h-9 gap-2.5 justify-start group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:size-8 shadow-xs"
+                className="text-foreground/90 hover:text-foreground font-normal rounded-lg h-9 gap-2.5 justify-start group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:size-8 hover:bg-sidebar-accent transition-colors"
               >
-                <Plus className="size-4 shrink-0" />
-                <span className="group-data-[collapsible=icon]:hidden">새 대화 시작</span>
+                <Plus className="size-4 shrink-0 text-muted-foreground" />
+                <span className="group-data-[collapsible=icon]:hidden text-sm">새 대화 시작</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
 
@@ -178,11 +176,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               <SidebarMenuButton
                 onClick={() => openSearch()}
                 tooltip="대화 검색 (⌘K)"
-                className="rounded-lg h-9 text-muted-foreground hover:text-foreground justify-start group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:size-8 hover:bg-sidebar-accent border border-sidebar-border/40 bg-muted/20"
+                className="rounded-lg h-9 text-muted-foreground hover:text-foreground font-normal justify-start group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:size-8 hover:bg-sidebar-accent transition-colors gap-2.5"
               >
-                <Search className="size-4 shrink-0" />
-                <span className="flex-1 text-left truncate group-data-[collapsible=icon]:hidden">대화 검색</span>
-                <kbd className="hidden group-data-[collapsible=icon]:hidden sm:inline-flex h-4.5 select-none items-center gap-0.5 rounded-sm border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
+                <Search className="size-4 shrink-0 text-muted-foreground" />
+                <span className="flex-1 text-left truncate group-data-[collapsible=icon]:hidden text-sm">대화 검색</span>
+                <kbd className="hidden group-data-[collapsible=icon]:hidden sm:inline-flex h-4.5 select-none items-center gap-0.5 rounded-sm border border-sidebar-border/40 bg-muted/40 px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-80">
                   ⌘K
                 </kbd>
               </SidebarMenuButton>
@@ -197,25 +195,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         className="flex-1 min-h-0 overflow-y-auto no-scrollbar scrollbar-none px-2 py-1 group-data-[collapsible=icon]:hidden overscroll-contain"
       >
         {/* User Chat Sessions Section */}
-        <SidebarGroup className="p-0 pt-1">
-          <div className="flex items-center justify-between px-2 pb-1.5">
-            <div className="flex items-center gap-1.5">
-              <SidebarGroupLabel className="p-0 text-[11px] font-medium text-muted-foreground tracking-normal">
-                최근 대화
-              </SidebarGroupLabel>
-              {sessions.length > 0 && (
-                <span className="text-[10px] text-muted-foreground font-mono">
-                  ({sessions.length})
-                </span>
-              )}
-            </div>
-            <SidebarGroupAction
-              title="새 대화 만들기"
-              onClick={() => createNewSession()}
-            >
-              <Plus className="size-3.5" />
-              <span className="sr-only">새 대화 만들기</span>
-            </SidebarGroupAction>
+        <SidebarGroup className="p-0 pt-4">
+          <div className="flex items-center justify-between px-2.5 pb-2">
+            <SidebarGroupLabel className="p-0 text-xs font-medium text-muted-foreground/70 tracking-normal">
+              최근 대화
+            </SidebarGroupLabel>
+            {sessions.length > 0 && (
+              <span className="text-[10px] text-muted-foreground/60 font-mono">
+                {sessions.length}
+              </span>
+            )}
           </div>
 
           <SidebarGroupContent>
@@ -290,16 +279,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                               isActive={isActive}
                               onClick={() => switchSession(session.id)}
                               tooltip={session.title}
-                              className="font-normal text-xs justify-between group/btn"
+                              className="font-normal text-xs md:text-[13px] h-8.5 rounded-lg justify-between group/btn text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/60 data-[active=true]:bg-sidebar-accent data-[active=true]:text-foreground data-[active=true]:font-medium px-2.5 transition-colors"
                             >
-                              <div className="flex items-center gap-2 truncate">
-                                <MessageSquare
-                                  className={`size-3.5 shrink-0 ${
-                                    isActive ? "text-primary font-medium" : "text-muted-foreground"
-                                  }`}
-                                />
-                                <span className="truncate">{session.title}</span>
-                              </div>
+                              <span className="truncate flex-1 text-left">{session.title}</span>
                               {isSessionGenerating(session.id) && (
                                 <span className="relative flex size-2 shrink-0 ml-1.5" title="답변 생성 중...">
                                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
@@ -313,7 +295,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                 render={
                                   <SidebarMenuAction
                                     showOnHover
-                                    className="text-muted-foreground hover:text-foreground"
+                                    className="text-muted-foreground/60 hover:text-foreground"
                                   />
                                 }
                               >
