@@ -14,13 +14,18 @@ def get_langfuse_callback() -> Any:
         return None
 
     try:
-        from langfuse.callback import CallbackHandler
+        try:
+            from langfuse.langchain import CallbackHandler
 
-        return CallbackHandler(
-            public_key=langfuse_public_key,
-            secret_key=langfuse_secret_key,
-            host=langfuse_host,
-        )
+            return CallbackHandler(public_key=langfuse_public_key)
+        except (ImportError, TypeError):
+            from langfuse.callback import CallbackHandler  # type: ignore
+
+            return CallbackHandler(
+                public_key=langfuse_public_key,
+                secret_key=langfuse_secret_key,
+                host=langfuse_host,
+            )
     except Exception as e:
         logger.warning("Failed to initialize Langfuse callback: %s", e)
         return None

@@ -110,3 +110,16 @@ class TestRuntimeObservability:
             events.append(ev)
 
         assert any(e.event == "token" for e in events)
+
+    async def test_get_langfuse_callback_initializes_successfully_when_keys_present(
+        self, monkeypatch
+    ):
+        """get_langfuse_callback should successfully import CallbackHandler from langfuse.langchain."""
+        from src.infrastructure.observability import get_langfuse_callback
+
+        monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-test")
+        monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-lf-test")
+        monkeypatch.setenv("LANGFUSE_HOST", "http://localhost:3000")
+
+        handler = get_langfuse_callback()
+        assert handler is not None
