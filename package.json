@@ -1,5 +1,5 @@
 {
-  "name": "hollow-echo-distant-signal",
+  "name": "starter-monorepo",
   "private": true,
   "workspaces": [
     "apps/*",

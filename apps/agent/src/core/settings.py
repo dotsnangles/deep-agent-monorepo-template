@@ -23,7 +23,7 @@ class AgentGroup(BaseModel):
     """Core agent identification and execution environment."""
 
     mode: EnvironmentMode = Field(default_factory=get_deep_agent_mode)
-    name: str = "Deep Assistant"
+    name: str = "Deep Agent"
     debug: bool = True
 
 

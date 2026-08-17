@@ -19,7 +19,7 @@ class SessionTrackingLangGraphAGUIAgent(LangGraphAGUIAgent):
         if thread_id:
             config_meta = config.setdefault("metadata", {})
             config_meta.setdefault("langfuse_session_id", str(thread_id))
-            config_meta.setdefault("langfuse_trace_name", "Hollow Echo Deep Agent")
+            config_meta.setdefault("langfuse_trace_name", "Deep Agent")
 
             # Attach Redis streaming callback handler to broadcast events across workers
             if self.broker and self.broker.is_connected():
@@ -38,7 +38,7 @@ def register_copilotkit_agent(app: FastAPI) -> SessionTrackingLangGraphAGUIAgent
 
     default_agent = SessionTrackingLangGraphAGUIAgent(
         name="default",
-        description="Hollow Echo Deep Agent (LangChain deepagents)",
+        description="Deep Agent (LangChain deepagents)",
         graph=build_agent(),
         config=agent_config,
     )

@@ -16,7 +16,7 @@ agent:
   mode: "local_slm"
   
   # Human-readable agent name displayed in UI and logs
-  name: "Deep Assistant"
+  name: "Deep Agent"
   
   # When true, prompts/*.md files are dynamically re-read on every invocation (hot-reloading).
   # When false (production), prompt files are loaded once into memory cache.

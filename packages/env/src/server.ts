@@ -16,7 +16,7 @@ export const env = createEnv({
     MINIO_USE_SSL: z.enum(["true", "false"]).default("false"),
     MINIO_ACCESS_KEY: z.string().default("minioadmin"),
     MINIO_SECRET_KEY: z.string().default("minioadmin"),
-    MINIO_BUCKET_NAME: z.string().default("hollow-echo-bucket"),
+    MINIO_BUCKET_NAME: z.string().default("app-storage"),
     REDIS_URL: z.string().default("redis://localhost:6379"),
     AGENT_SERVER_URL: z.string().default("http://127.0.0.1:8000"),
   },

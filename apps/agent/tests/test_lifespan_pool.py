@@ -39,7 +39,7 @@ async def test_lifespan_manages_postgres_pool_lifecycle_and_injections():
     with (
         patch(
             "src.api.app.DATABASE_URL",
-            "postgresql://postgres:password@localhost:5432/hollow_echo_test",
+            "postgresql://postgres:password@localhost:5432/app_test_db",
         ),
         patch("src.api.app.REDIS_URL", "redis://localhost:6379/0"),
         patch("src.api.app.ENABLE_TITLE_WORKER", True),
@@ -68,7 +68,7 @@ async def test_lifespan_manages_postgres_pool_lifecycle_and_injections():
         async with app.router.lifespan_context(app):
             # 1. Verify pool creation & setup called
             mock_create_pool.assert_awaited_once_with(
-                "postgresql://postgres:password@localhost:5432/hollow_echo_test"
+                "postgresql://postgres:password@localhost:5432/app_test_db"
             )
             mock_create_cp.assert_called()
             mock_checkpointer.setup.assert_awaited_once()

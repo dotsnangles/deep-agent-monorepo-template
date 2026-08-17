@@ -189,7 +189,7 @@ def _build_trace_metadata(
             snippet = clean_snippet
         trace_name = f"{turn_prefix}{snippet}"
     else:
-        trace_name = f"Hollow Echo Stream ({agent_type})"
+        trace_name = f"Agent Stream ({agent_type})"
 
     tags = ["chat", "streaming", f"agent:{agent_type}", f"env:{effective_env}"]
     if has_attachments:

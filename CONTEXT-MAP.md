@@ -1,6 +1,6 @@
 # Context Map
 
-Overview of bounded contexts and package documentation in `hollow-echo-distant-signal`:
+Overview of bounded contexts and package documentation in `starter-monorepo`:
 
 | Context / Package | Location / Context Doc | Description |
 | --- | --- | --- |

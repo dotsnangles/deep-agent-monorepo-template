@@ -1,6 +1,6 @@
 # Core Context Glossary
 
-Key terms and definitions used across `hollow-echo-distant-signal`:
+Key terms and definitions used across `starter-monorepo`:
 
 | Term | Definition | Context |
 | --- | --- | --- |

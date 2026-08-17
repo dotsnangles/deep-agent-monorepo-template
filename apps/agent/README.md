@@ -1,4 +1,4 @@
-# Hollow Echo Deep Agent
+# Agent Service
 
 This service builds a LangChain Deep Agent and exposes it as an AG-UI endpoint for the
 CopilotKit Runtime in `apps/web`.
@@ -45,7 +45,7 @@ SERVER_HOST=0.0.0.0
 SERVER_PORT=8000
 
 # Persistence, Caching & Pub/Sub
-DATABASE_URL=postgresql://postgres:password@localhost:5432/hollow-echo-distant-signal
+DATABASE_URL=postgresql://postgres:password@localhost:5432/app_db
 REDIS_URL=redis://localhost:6379/0
 ```
 

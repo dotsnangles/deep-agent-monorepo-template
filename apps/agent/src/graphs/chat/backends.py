@@ -18,7 +18,7 @@ from deepagents.backends.protocol import (
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CONTAINER_NAME = "hollow-echo-distant-signal-sandbox-runner"
+DEFAULT_CONTAINER_NAME = "agent-sandbox-runner"
 
 
 def _get_default_workspace_dir() -> Path:

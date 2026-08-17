@@ -61,7 +61,7 @@ class S3StorageService:
             bucket_name
             or os.getenv("MINIO_BUCKET_NAME")
             or os.getenv("S3_BUCKET_NAME")
-            or "hollow-echo-bucket"
+            or "app-storage"
         )
         if s3_client is not None:
             self.client = s3_client

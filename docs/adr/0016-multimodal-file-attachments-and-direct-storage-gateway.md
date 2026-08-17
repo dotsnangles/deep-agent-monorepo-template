@@ -8,7 +8,7 @@ Accepted (Decision 3 superseded by [ADR-0025](0025-native-uuid-domain-schema-and
 
 Users need the ability to attach diverse files (images, PDF, CSV, Markdown, text) to chat messages for multimodal analysis and document question-answering.
 
-Prior to this decision, the chat system only accepted plain text messages (`content: string`). Passing file uploads through server memory or proxying file streams through Next.js/FastAPI introduces severe CPU/RAM overhead, network saturation, and complex multipart parsing bottlenecks. Furthermore, because conversation messages in `hollow-echo-distant-signal` support immutable tree branching (fork & edit), attachment metadata must be efficiently inherited or cloned across conversation branches without heavy relational join queries.
+Prior to this decision, the chat system only accepted plain text messages (`content: string`). Passing file uploads through server memory or proxying file streams through Next.js/FastAPI introduces severe CPU/RAM overhead, network saturation, and complex multipart parsing bottlenecks. Furthermore, because conversation messages in the system support immutable tree branching (fork & edit), attachment metadata must be efficiently inherited or cloned across conversation branches without heavy relational join queries.
 
 ## Decisions
 

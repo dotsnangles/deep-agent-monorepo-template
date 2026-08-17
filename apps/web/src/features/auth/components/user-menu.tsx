@@ -13,6 +13,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { authClient } from "@/lib/auth-client";
+import {
+  SAVED_SESSION_IDS_KEY,
+  STORAGE_KEY,
+} from "@/features/chat/context/chat-session-context";
 
 export default function UserMenu() {
   const router = useRouter();
@@ -44,8 +48,8 @@ export default function UserMenu() {
             variant="destructive"
             onClick={() => {
               if (typeof window !== "undefined") {
-                localStorage.removeItem("hollow_echo_active_thread_id");
-                localStorage.removeItem("hollow_echo_saved_session_ids");
+                localStorage.removeItem(STORAGE_KEY);
+                localStorage.removeItem(SAVED_SESSION_IDS_KEY);
               }
               authClient.signOut({
                 fetchOptions: {

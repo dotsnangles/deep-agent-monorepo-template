@@ -132,7 +132,7 @@ def create_app() -> FastAPI:
             logger.info("Redis client closed.")
 
     app = FastAPI(
-        title="Hollow Echo Deep Agent Server",
+        title="Agent Server",
         description=(
             "Production Python Deep Agent Server with LangChain deepagents, PostgreSQL & Redis"
         ),

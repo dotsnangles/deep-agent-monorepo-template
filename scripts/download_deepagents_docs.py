@@ -123,7 +123,7 @@ DOC_GROUPS = {
 
 def download_all():
     DOCS_ROOT.mkdir(parents=True, exist_ok=True)
-    headers = {"User-Agent": "Mozilla/5.0 (compatible; HollowEchoDocDownloader/1.0)"}
+    headers = {"User-Agent": "Mozilla/5.0 (compatible; AppDocDownloader/1.0)"}
     total_downloaded = 0
 
     for group_name, files in DOC_GROUPS.items():

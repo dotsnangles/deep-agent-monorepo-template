@@ -1,7 +1,7 @@
 [project]
 name = "agent"
 version = "0.1.0"
-description = "Hollow Echo Deep Agent Server"
+description = "Deep Agent Server"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

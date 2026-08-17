@@ -8,7 +8,7 @@ health_router = APIRouter(tags=["Health & Status"])
 @health_router.get("/")
 def root():
     return {
-        "service": "Hollow Echo Deep Agent Server",
+        "service": "Agent Server",
         "framework": "LangChain deepagents + AG-UI",
         "status": "running",
         "llm_provider": LLM_PROVIDER,

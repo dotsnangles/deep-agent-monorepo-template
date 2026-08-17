@@ -34,8 +34,8 @@ def test_prompt_catalog_load_custom_markdown(tmp_path: Path):
     catalog = PromptCatalog(prompts_dir=prompts_dir, debug=False)
 
     # 1. System Prompt with variable substitution
-    sys_prompt = catalog.get_system_prompt(name="HollowEcho")
-    assert sys_prompt == "Custom Persona for HollowEcho. Always assist with precision."
+    sys_prompt = catalog.get_system_prompt(name="MockPersona")
+    assert sys_prompt == "Custom Persona for MockPersona. Always assist with precision."
 
     # 2. Title Prompt
     title_prompt = catalog.get_title_prompt()

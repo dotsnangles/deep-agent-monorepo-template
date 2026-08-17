@@ -36,8 +36,8 @@ export interface ChatSessionContextType {
 
 export const ChatSessionContext = createContext<ChatSessionContextType | null>(null);
 
-export const STORAGE_KEY = "hollow_echo_active_thread_id";
-export const SAVED_SESSION_IDS_KEY = "hollow_echo_saved_session_ids";
+export const STORAGE_KEY = "chat_active_thread_id";
+export const SAVED_SESSION_IDS_KEY = "chat_saved_session_ids";
 
 export function isKnownSavedSession(sessionId: string): boolean {
   if (typeof window === "undefined" || !sessionId) return false;

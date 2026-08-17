@@ -21,7 +21,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Hollow Echo | AI Deep Agent Platform",
+  title: "Deep Agent | Chat App",
   description: "LangChain create_deep_agent 및 CopilotKit 기반 AI 에이전트 SaaS 플랫폼",
 };
 
@@ -40,7 +40,7 @@ export default function RootLayout({
               {/* Mobile-only compact header */}
               <div className="flex md:hidden items-center justify-between p-3 border-b border-border/50 bg-background/80 backdrop-blur-xs shrink-0">
                 <SidebarTrigger />
-                <span className="font-semibold text-xs text-foreground">Hollow Echo</span>
+                <span className="font-semibold text-xs text-foreground">Deep Agent</span>
                 <div className="size-7" />
               </div>
 

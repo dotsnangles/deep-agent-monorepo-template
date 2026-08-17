@@ -1,4 +1,4 @@
-# hollow-echo-distant-signal
+# starter-monorepo
 
 This project was created with [Better-T-Stack](https://github.com/AmanVarshney01/create-better-t-stack), a modern TypeScript stack that combines Next.js, Express, and more.
 
@@ -89,7 +89,7 @@ For more details, see the guide on [Deploying with Docker Compose](https://www.b
 ## Project Structure
 
 ```
-hollow-echo-distant-signal/
+starter-monorepo/
 ├── apps/
 │   ├── web/         # Frontend application (Next.js)
 │   └── server/      # Backend API (Express)

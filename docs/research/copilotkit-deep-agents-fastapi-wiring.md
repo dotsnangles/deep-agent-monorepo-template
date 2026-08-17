@@ -75,7 +75,7 @@ add_langgraph_fastapi_endpoint(
     app=app,
     agent=LangGraphAGUIAgent(
         name="default",
-        description="Hollow Echo Deep Agent",
+        description="Deep Agent",
         graph=graph,
     ),
     path="/copilotkit",
@@ -128,7 +128,7 @@ add_langgraph_fastapi_endpoint(
     app=app,
     agent=LangGraphAGUIAgent(
         name="default",
-        description="Hollow Echo Deep Agent (LangChain deepagents)",
+        description="Deep Agent (LangChain deepagents)",
         graph=agent_graph,
     ),
     path="/copilotkit",

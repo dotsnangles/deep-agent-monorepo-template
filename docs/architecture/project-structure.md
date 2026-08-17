@@ -1,6 +1,6 @@
 # Project Structure & Architecture Guide
 
-This document defines the official directory layout, module boundaries, and architectural standards for the `hollow-echo-distant-signal` monorepo.
+This document defines the official directory layout, module boundaries, and architectural standards for the `starter-monorepo` monorepo.
 
 ---
 

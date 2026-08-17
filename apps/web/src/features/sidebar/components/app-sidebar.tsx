@@ -104,7 +104,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               <Bot className="size-4.5" />
             </div>
             <span className="text-sm font-semibold text-foreground tracking-tight truncate">
-              Hollow Echo
+              Deep Agent
             </span>
           </Link>
 
