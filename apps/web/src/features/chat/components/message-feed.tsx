@@ -155,7 +155,7 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
   const isEmpty = !isKnownExisting && activePath.length === 0;
 
   return (
-    <div className="flex flex-col h-full w-full min-h-0 relative overflow-hidden">
+    <div suppressHydrationWarning className="flex flex-col h-full w-full min-h-0 relative overflow-hidden">
       {/* 1. Ambient Gemini Radial Glow / Aura (어스름) - Centered & continuous organic movement */}
       <div
         className={cn(

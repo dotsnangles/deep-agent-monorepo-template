@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { FolderArchive, Layers, MoreVertical, Share2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@repo/ui/components/badge";
@@ -13,11 +14,15 @@ import {
   DropdownMenuTrigger,
 } from "@repo/ui/components/dropdown-menu";
 import {
-  MessageFeed,
   useChatSessions,
   useChatEngine,
   ArtifactSidebar,
 } from "@/features/chat";
+
+const MessageFeed = dynamic(
+  () => import("@/features/chat").then((m) => m.MessageFeed),
+  { ssr: false }
+);
 
 export default function Home() {
   const { activeSessionId, deleteSession } = useChatSessions();
