@@ -88,6 +88,14 @@ export class HttpChatTransport implements ChatTransport {
       `/api/chat/messages?sessionId=${encodeURIComponent(sessionId)}`
     );
     if (!res.ok) {
+      if (res.status === 401 || res.status === 403 || res.status === 404) {
+        return {
+          messages: [],
+          activeLeafId: null,
+          title: undefined,
+          artifacts: [],
+        };
+      }
       throw new Error(
         `Failed to fetch message tree for session ${sessionId}: HTTP ${res.status}`
       );

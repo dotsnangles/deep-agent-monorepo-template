@@ -43,10 +43,14 @@ export default function UserMenu() {
           <DropdownMenuItem
             variant="destructive"
             onClick={() => {
+              if (typeof window !== "undefined") {
+                localStorage.removeItem("hollow_echo_active_thread_id");
+                localStorage.removeItem("hollow_echo_saved_session_ids");
+              }
               authClient.signOut({
                 fetchOptions: {
                   onSuccess: () => {
-                    router.push("/");
+                    router.push("/login");
                   },
                 },
               });

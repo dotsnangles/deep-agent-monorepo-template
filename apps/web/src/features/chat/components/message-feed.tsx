@@ -2,7 +2,7 @@
 
 import { useContext, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUp, Paperclip, Square } from "lucide-react";
+import { ArrowUp, LogIn, Paperclip, Square } from "lucide-react";
 import { Button } from "@repo/ui/components/button";
 import { Textarea } from "@repo/ui/components/textarea";
 import {
@@ -276,93 +276,114 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
             : "pb-4 pt-1 bg-gradient-to-t from-background via-background/95 to-transparent flex-none"
         )}
       >
-        <div
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={handleDrop}
-          className={cn(
-            "relative w-full flex flex-col rounded-2xl bg-card border border-border/70 shadow-md transition-all duration-300",
-            stagedFiles.length > 0 ? "p-2.5" : "px-3 py-2",
-            isEmpty ? "max-w-3xl shadow-lg" : "max-w-4xl mx-auto"
-          )}
-        >
-          {/* File Attachment Staging Bar */}
-          {stagedFiles.length > 0 && (
-            <AttachmentStagingBar
-              stagedFiles={stagedFiles}
-              onRemove={removeFile}
-              disabled={isUploading}
-            />
-          )}
-
-          {/* Single Row Horizontal Bar */}
-          <div className="flex items-center w-full min-h-[40px] gap-2">
-            {/* File Attachment Trigger */}
+        {!authSession?.user && !isAuthPending ? (
+          <div
+            className={cn(
+              "relative w-full flex items-center justify-between rounded-2xl bg-card border border-border/70 shadow-md px-4 py-3 transition-all duration-300",
+              isEmpty ? "max-w-xl shadow-lg" : "max-w-2xl mx-auto"
+            )}
+          >
+            <div className="flex items-center gap-2.5 text-xs text-muted-foreground select-none">
+              <LogIn className="size-4 text-primary" />
+              <span>대화를 시작하려면 로그인이 필요합니다.</span>
+            </div>
             <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="size-8 rounded-xl text-muted-foreground hover:text-foreground cursor-pointer shrink-0"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-              title="파일 첨부 (이미지, PDF, TXT, CSV, JSON, MD)"
+              size="sm"
+              className="h-8 px-3.5 text-xs font-medium cursor-pointer"
+              onClick={() => router.push("/login")}
             >
-              <Paperclip className="size-4" />
+              로그인 / 회원가입
             </Button>
+          </div>
+        ) : (
+          <div
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={handleDrop}
+            className={cn(
+              "relative w-full flex flex-col rounded-2xl bg-card border border-border/70 shadow-md transition-all duration-300",
+              stagedFiles.length > 0 ? "p-2.5" : "px-3 py-2",
+              isEmpty ? "max-w-3xl shadow-lg" : "max-w-4xl mx-auto"
+            )}
+          >
+            {/* File Attachment Staging Bar */}
+            {stagedFiles.length > 0 && (
+              <AttachmentStagingBar
+                stagedFiles={stagedFiles}
+                onRemove={removeFile}
+                disabled={isUploading}
+              />
+            )}
 
-            {/* Input Textarea */}
-            <Textarea
-              ref={textareaRef}
-              autoFocus
-              value={inputPrompt}
-              onChange={(e) => setInputPrompt(e.target.value)}
-              onKeyDown={handleKeyDown}
-              className="flex-1 min-h-[38px] max-h-[160px] resize-none border-none shadow-none focus-visible:ring-0 focus:ring-0 focus:outline-none text-sm px-2 py-2 bg-transparent dark:bg-transparent leading-relaxed"
-              rows={1}
-            />
+            {/* Single Row Horizontal Bar */}
+            <div className="flex items-center w-full min-h-[40px] gap-2">
+              {/* File Attachment Trigger */}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-8 rounded-xl text-muted-foreground hover:text-foreground cursor-pointer shrink-0"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                title="파일 첨부 (이미지, PDF, TXT, CSV, JSON, MD)"
+              >
+                <Paperclip className="size-4" />
+              </Button>
 
-            {/* Hidden File Input */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,text/markdown,text/csv,application/json"
-              className="hidden"
-              onChange={(e) => {
-                if (e.target.files && e.target.files.length > 0) {
-                  addFiles(e.target.files);
-                }
-                e.target.value = "";
-              }}
-            />
+              {/* Input Textarea */}
+              <Textarea
+                ref={textareaRef}
+                autoFocus
+                value={inputPrompt}
+                onChange={(e) => setInputPrompt(e.target.value)}
+                onKeyDown={handleKeyDown}
+                className="flex-1 min-h-[38px] max-h-[160px] resize-none border-none shadow-none focus-visible:ring-0 focus:ring-0 focus:outline-none text-sm px-2 py-2 bg-transparent dark:bg-transparent leading-relaxed"
+                rows={1}
+              />
 
-            {/* Right Action Button (Send / Stop) */}
-            <div className="flex items-center shrink-0">
-              {isGenerating ? (
-                <Button
-                  type="button"
-                  tabIndex={-1}
-                  size="icon"
-                  className="size-8 rounded-xl shadow-xs bg-foreground text-background hover:bg-foreground/90 transition-all cursor-pointer animate-in zoom-in-90 duration-150"
-                  onClick={stop}
-                  title="답변 생성 중단 (Stop)"
-                >
-                  <Square className="size-3.5 fill-current" />
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  size="icon"
-                  disabled={isSendDisabled}
-                  className="size-8 rounded-xl shadow-xs cursor-pointer"
-                  onClick={handleSend}
-                  title="메시지 전송 (Enter)"
-                >
-                  <ArrowUp className="size-4" />
-                </Button>
-              )}
+              {/* Hidden File Input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,text/markdown,text/csv,application/json"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files.length > 0) {
+                    addFiles(e.target.files);
+                  }
+                  e.target.value = "";
+                }}
+              />
+
+              {/* Right Action Button (Send / Stop) */}
+              <div className="flex items-center shrink-0">
+                {isGenerating ? (
+                  <Button
+                    type="button"
+                    tabIndex={-1}
+                    size="icon"
+                    className="size-8 rounded-xl shadow-xs bg-foreground text-background hover:bg-foreground/90 transition-all cursor-pointer animate-in zoom-in-90 duration-150"
+                    onClick={stop}
+                    title="답변 생성 중단 (Stop)"
+                  >
+                    <Square className="size-3.5 fill-current" />
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    size="icon"
+                    disabled={isSendDisabled}
+                    className="size-8 rounded-xl shadow-xs cursor-pointer"
+                    onClick={handleSend}
+                    title="메시지 전송 (Enter)"
+                  >
+                    <ArrowUp className="size-4" />
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
