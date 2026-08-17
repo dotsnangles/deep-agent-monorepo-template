@@ -146,10 +146,9 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
     ? chatSessionsContext.sessions.some((s) => s.id === sessionId)
     : false;
 
-  // During initial mount, while sessions or the message tree are being fetched from DB,
-  // do not prematurely treat it as an empty draft to prevent the center hero flash on refresh.
-  const isCheckingExisting = isSessionsLoading || isEngineLoading;
-  const isEmpty = !isCheckingExisting && !isExistingSession && activePath.length === 0;
+  // When sessions list is loaded, immediately know if this is a draft (isEmpty = true, 0ms instant mount in center)
+  // When sessions list is still loading (initial refresh only), don't flash hero on existing sessions
+  const isEmpty = !isExistingSession && (isSessionsLoading ? false : activePath.length === 0);
 
   return (
     <div className="flex flex-col h-full w-full min-h-0 relative overflow-hidden">
