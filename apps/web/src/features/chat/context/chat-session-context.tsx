@@ -109,6 +109,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
         return;
       }
       if (!sessionData?.user) {
+        setSessions([]);
         setIsSessionsLoading(false);
         return;
       }
@@ -145,13 +146,28 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
     fetchSessions();
   }, [fetchSessions]);
 
+  // Wipe sessions and clear storage cache whenever user logs out
+  useEffect(() => {
+    if (!isAuthPending && !sessionData?.user) {
+      setSessions([]);
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(SAVED_SESSION_IDS_KEY);
+      }
+    }
+  }, [isAuthPending, sessionData?.user]);
+
   // Synchronously cache saved session IDs in localStorage for instantaneous refresh detection
   useEffect(() => {
     if (typeof window !== "undefined" && !isLoading) {
-      const ids = sessions.map((s) => s.id);
-      localStorage.setItem(SAVED_SESSION_IDS_KEY, JSON.stringify(ids));
+      if (sessionData?.user) {
+        const ids = sessions.map((s) => s.id);
+        localStorage.setItem(SAVED_SESSION_IDS_KEY, JSON.stringify(ids));
+      } else {
+        localStorage.removeItem(SAVED_SESSION_IDS_KEY);
+      }
     }
-  }, [sessions, isLoading]);
+  }, [sessions, isLoading, sessionData?.user]);
 
   // Event-driven revalidation on window focus (replaces 4s polling timer)
   useEffect(() => {

@@ -45,10 +45,12 @@ import {
 } from "@repo/ui/components/tooltip";
 import { NavUser } from "@/features/auth";
 import { useChatSessions } from "@/features/chat";
+import { authClient } from "../../../lib/auth-client";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
   const { state, toggleSidebar } = useSidebar();
+  const { data: authSession, isPending: isAuthPending } = authClient.useSession();
   const [editingSessionId, setEditingSessionId] = React.useState<string | null>(null);
   const [editTitle, setEditTitle] = React.useState("");
   const scrollRef = React.useRef<HTMLDivElement>(null);
@@ -214,7 +216,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               </div>
             ) : sessions.length === 0 ? (
               <div className="px-2.5 py-4 text-xs text-muted-foreground/50 select-none">
-                최근 대화가 없습니다.
+                {!authSession?.user && !isAuthPending
+                  ? "로그인하면 대화 기록이 저장됩니다."
+                  : "최근 대화가 없습니다."}
               </div>
             ) : (
               <div
