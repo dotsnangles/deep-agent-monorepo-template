@@ -199,8 +199,14 @@ class ModelProviderPort(Protocol):
 class AgentExecutionPort(Protocol):
     """Inbound Driving Port for initiating or resuming streaming agent workflows."""
 
-    def stream_execution(
-        self, request: AgentTurn
+    def stream(
+        self, turn: AgentTurn
     ) -> AsyncIterator[AgentStreamEvent]:
         """Execute the agent workflow and yield real-time execution events."""
+        ...
+
+    async def inspect(
+        self, thread_id: str
+    ) -> AgentStateSnapshot:
+        """Inspect current agent thread state, pending approvals, and artifacts."""
         ...

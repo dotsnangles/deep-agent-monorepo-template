@@ -2,9 +2,12 @@ from ag_ui_langgraph import add_langgraph_fastapi_endpoint
 from copilotkit import LangGraphAGUIAgent
 from fastapi import FastAPI
 
-from src.infrastructure.observability import get_langfuse_callback
-from src.infrastructure.redis import RedisEventBroker, RedisStreamingCallbackHandler
-from src.graphs.chat.graph import build_agent
+from src.infrastructure import (
+    RedisEventBroker,
+    RedisStreamingCallbackHandler,
+    get_langfuse_callback,
+)
+from src.graphs import build_agent
 
 
 class SessionTrackingLangGraphAGUIAgent(LangGraphAGUIAgent):

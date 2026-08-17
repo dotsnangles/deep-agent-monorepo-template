@@ -745,7 +745,7 @@ class AgentRuntime(AgentExecutionPort):
     async def _emit_artifact_events(
         self, thread_id: str, message_id: str | None = None, backend: Any = None
     ) -> AsyncIterator[AgentStreamEvent]:
-        from src.infrastructure.sandbox.adapter import guess_mime_type, is_denied_path
+        from src.infrastructure import guess_mime_type, is_denied_path
 
         try:
             workspace_files: list[FileDescriptor] = []

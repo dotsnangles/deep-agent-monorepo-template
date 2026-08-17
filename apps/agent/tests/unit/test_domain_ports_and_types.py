@@ -258,8 +258,11 @@ class TestDomainPortProtocols:
 
     def test_agent_execution_port_conformance(self):
         class MockAgentEngine:
-            async def stream_execution(self, request) -> AsyncIterator[AgentStreamEvent]:
+            async def stream(self, turn: AgentTurn) -> AsyncIterator[AgentStreamEvent]:
                 yield AgentStreamEvent.done()
+
+            async def inspect(self, thread_id: str) -> AgentStateSnapshot:
+                return AgentStateSnapshot(thread_id=thread_id)
 
         engine = MockAgentEngine()
         assert isinstance(engine, AgentExecutionPort)
