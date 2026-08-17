@@ -136,7 +136,7 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
     }
   }, [sessionId]);
 
-  const { data: authSession } = authClient.useSession();
+  const { data: authSession, isPending: isAuthPending } = authClient.useSession();
   const userName = authSession?.user?.name
     ? authSession.user.name.split(" ")[0] || authSession.user.name
     : null;
@@ -183,7 +183,12 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
         >
           <h1
             suppressHydrationWarning
-            className="text-3xl sm:text-4xl font-normal tracking-tight text-foreground/90 text-center select-none animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"
+            className={cn(
+              "text-3xl sm:text-4xl font-normal tracking-tight text-foreground/90 text-center select-none transition-opacity duration-300",
+              isAuthPending
+                ? "opacity-0 invisible"
+                : "opacity-100 visible animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out"
+            )}
           >
             {greetingText}
           </h1>
