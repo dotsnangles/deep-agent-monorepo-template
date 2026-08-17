@@ -53,8 +53,11 @@ export function MessageFeed({ sessionId }: MessageFeedProps) {
     deleteNode,
     retry,
     forkSession,
+    forkAndEdit,
     stop,
   } = useChatEngine(sessionId);
+
+  const lastUserIndex = activePath.map((m) => m.role).lastIndexOf("user");
 
   const {
     stagedFiles,
@@ -169,6 +172,7 @@ export function MessageFeed({ sessionId }: MessageFeedProps) {
               <MessageScrollerContent className="gap-4">
                 {activePath.map((msg, index) => {
                   const isLast = index === activePath.length - 1;
+                  const isLastUser = msg.role === "user" && index === lastUserIndex;
                   const isStreamingThisMessage =
                     isGenerating &&
                     ((generatingAssistantId && msg.id === generatingAssistantId) ||
@@ -179,6 +183,13 @@ export function MessageFeed({ sessionId }: MessageFeedProps) {
                       <MessageItem
                         message={msg}
                         isGenerating={isStreamingThisMessage}
+                        onEdit={
+                          isLastUser && !isGenerating
+                            ? (newContent) => {
+                                forkAndEdit(msg.id, newContent);
+                              }
+                            : undefined
+                        }
                         onRegenerate={() => {
                           regenerate(msg.id);
                         }}

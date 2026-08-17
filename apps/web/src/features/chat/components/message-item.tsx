@@ -257,7 +257,7 @@ export function MessageItem({
                 disabled={isGenerating || !editDraft.trim()}
               >
                 <Check data-icon="inline-start" />
-                <span>저장 및 새 분기 생성</span>
+                <span>저장 및 재전송</span>
               </Button>
             </div>
           </div>
@@ -381,7 +381,7 @@ export function MessageItem({
                     setEditDraft(message.content);
                     setIsEditing(true);
                   }}
-                  title="메시지 수정 (새 분기)"
+                  title="메시지 수정"
                 >
                   <Edit2 data-icon="inline-start" />
                 </Button>

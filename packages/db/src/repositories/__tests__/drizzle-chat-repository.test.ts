@@ -383,33 +383,34 @@ describe("DrizzleChatRepository Unit & Transaction Tests", () => {
         from: vi.fn().mockReturnThis(),
         where: vi.fn().mockReturnThis(),
         orderBy: vi.fn().mockResolvedValue([
-          { id: "m1", sessionId: "s-source", role: "user", content: "Q1", createdAt: new Date() },
-          { id: "m2", sessionId: "s-source", role: "assistant", content: "A1", createdAt: new Date() },
-          { id: "m3", sessionId: "s-source", role: "user", content: "Q2", createdAt: new Date() },
+          { id: "m1", sessionId: "s-source", parentId: null, role: "user", content: "Q1", createdAt: new Date() },
+          { id: "m2", sessionId: "s-source", parentId: "m1", role: "assistant", content: "A1", createdAt: new Date() },
+          { id: "m3", sessionId: "s-source", parentId: "m2", role: "user", content: "Q2", createdAt: new Date() },
         ]),
       };
-      mockDb.select.mockReturnValueOnce(sourceSessionSelect).mockReturnValueOnce(messagesSelect);
+      const artifactsSelect = {
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockResolvedValue([]),
+      };
+      mockDb.select
+        .mockReturnValueOnce(sourceSessionSelect)
+        .mockReturnValueOnce(messagesSelect)
+        .mockReturnValueOnce(artifactsSelect);
 
       const sessionInsert = {
         values: vi.fn().mockReturnThis(),
         returning: vi.fn().mockResolvedValue([
-          { id: "s-new", userId: USER_ID, title: "Forked", activeLeafId: null, createdAt: new Date(), updatedAt: new Date() },
+          { id: "s-new", userId: USER_ID, title: "Forked", activeLeafId: "cloned-2", createdAt: new Date(), updatedAt: new Date() },
         ]),
       };
       const messageInsert = {
         values: vi.fn().mockReturnThis(),
         returning: vi.fn().mockResolvedValue([
-          { id: "cloned-1", sessionId: "s-new", role: "user", content: "Q1", createdAt: new Date() },
-          { id: "cloned-2", sessionId: "s-new", role: "assistant", content: "A1", createdAt: new Date() },
+          { id: "cloned-1", sessionId: "s-new", parentId: null, role: "user", content: "Q1", createdAt: new Date() },
+          { id: "cloned-2", sessionId: "s-new", parentId: "cloned-1", role: "assistant", content: "A1", createdAt: new Date() },
         ]),
       };
       mockDb.insert.mockReturnValueOnce(sessionInsert).mockReturnValueOnce(messageInsert);
-
-      const updateChain = {
-        set: vi.fn().mockReturnThis(),
-        where: vi.fn().mockResolvedValue([]),
-      };
-      mockDb.update.mockReturnValue(updateChain);
 
       const forkResult = await repo.forkSession("s-source", "m2", USER_ID, "Forked");
       expect(mockDb.transaction).toHaveBeenCalledTimes(1);
@@ -419,6 +420,8 @@ describe("DrizzleChatRepository Unit & Transaction Tests", () => {
       expect(forkResult?.messages).toHaveLength(2);
       expect(forkResult?.messages[0].content).toBe("Q1");
       expect(forkResult?.messages[1].content).toBe("A1");
+      expect(forkResult?.messages[0].parentId).toBeNull();
+      expect(forkResult?.messages[1].parentId).toBe("cloned-1");
     });
   });
 });

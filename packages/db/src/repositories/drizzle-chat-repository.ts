@@ -205,21 +205,41 @@ export class DrizzleChatRepository implements ChatRepository {
         return null;
       }
 
-      // 2. Fetch all messages ordered by createdAt
+      // 2. Fetch all messages for source session
       const records = await tx
         .select()
         .from(chatMessage)
         .where(eq(chatMessage.sessionId, sourceSessionId))
         .orderBy(asc(chatMessage.createdAt));
 
-      const targetIdx = records.findIndex((r) => r.id === fromMessageId);
-      if (targetIdx === -1) {
+      const msgMap = new Map(records.map((r) => [r.id, r]));
+      const targetMsg = msgMap.get(fromMessageId);
+      if (!targetMsg) {
         return null;
       }
 
-      const slicedRecords = records.slice(0, targetIdx + 1);
+      // Extract ancestral lineage from fromMessageId back to root
+      const lineage: typeof records = [];
+      const visited = new Set<string>();
+      let curr: typeof targetMsg | undefined = targetMsg;
+
+      while (curr && !visited.has(curr.id)) {
+        visited.add(curr.id);
+        lineage.push(curr);
+        curr = curr.parentId ? msgMap.get(curr.parentId) : undefined;
+      }
+      lineage.reverse(); // [root, ..., targetMsg]
+
       const newSessionId = crypto.randomUUID();
       const title = newTitle || `${sourceSession.title} (분기)`;
+
+      // Map old message IDs to new UUIDs
+      const idMap = new Map<string, string>();
+      lineage.forEach((m) => {
+        idMap.set(m.id, crypto.randomUUID());
+      });
+
+      const lastClonedId = idMap.get(fromMessageId) || null;
 
       // 3. Create new session record
       const [newSession] = await tx
@@ -228,7 +248,7 @@ export class DrizzleChatRepository implements ChatRepository {
           id: newSessionId,
           userId,
           title,
-          activeLeafId: null,
+          activeLeafId: lastClonedId,
         })
         .returning();
 
@@ -236,15 +256,13 @@ export class DrizzleChatRepository implements ChatRepository {
         throw new Error("Failed to create forked session record");
       }
 
-      // 4. Clone messages
-      let lastClonedId: string | null = null;
-      const clonedToInsert = slicedRecords.map((r, idx) => {
-        const clonedId = crypto.randomUUID();
-        lastClonedId = clonedId;
+      // 4. Clone messages with remapped parentId
+      const clonedToInsert = lineage.map((r, idx) => {
+        const clonedId = idMap.get(r.id)!;
         return {
           id: clonedId,
           sessionId: newSessionId,
-          parentId: r.parentId,
+          parentId: r.parentId ? idMap.get(r.parentId) ?? null : null,
           role: r.role,
           content: r.content,
           attachments: r.attachments ?? [],
@@ -252,31 +270,43 @@ export class DrizzleChatRepository implements ChatRepository {
         };
       });
 
+      let insertedMessages: (typeof chatMessage.$inferSelect)[] = [];
       if (clonedToInsert.length > 0) {
-        const insertedMessages = await tx
+        insertedMessages = await tx
           .insert(chatMessage)
           .values(clonedToInsert)
           .returning();
+      }
 
-        if (lastClonedId) {
-          await tx
-            .update(chatSession)
-            .set({ activeLeafId: lastClonedId })
-            .where(eq(chatSession.id, newSessionId));
-        }
+      // 5. Replicate associated artifacts
+      const sourceArtifacts = await tx
+        .select()
+        .from(chatArtifact)
+        .where(eq(chatArtifact.sessionId, sourceSessionId));
 
-        return {
-          session: {
-            ...toSessionEntity(newSession),
-            activeLeafId: lastClonedId,
-          },
-          messages: insertedMessages.map(toMessageNode),
-        };
+      const artifactsToInsert = sourceArtifacts
+        .filter((art) => art.messageId && idMap.has(art.messageId))
+        .map((art) => ({
+          id: crypto.randomUUID(),
+          sessionId: newSessionId,
+          messageId: idMap.get(art.messageId!)!,
+          name: art.name,
+          storageKey: art.storageKey,
+          mimeType: art.mimeType,
+          sizeBytes: art.sizeBytes,
+          metadata: art.metadata ?? {},
+        }));
+
+      if (artifactsToInsert.length > 0) {
+        await tx.insert(chatArtifact).values(artifactsToInsert);
       }
 
       return {
-        session: toSessionEntity(newSession),
-        messages: [],
+        session: {
+          ...toSessionEntity(newSession),
+          activeLeafId: lastClonedId,
+        },
+        messages: insertedMessages.map(toMessageNode),
       };
     });
   }

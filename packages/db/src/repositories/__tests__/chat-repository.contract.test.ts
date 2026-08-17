@@ -316,12 +316,22 @@ describe("ChatRepository Contract Tests (FakeChatRepository)", () => {
       expect(messages?.[2].content).toBe("How are you?");
     });
 
-    it("forks a session up to a specified message into a new independent session", async () => {
+    it("forks a session up to a specified message into a new independent session with correct parentId remapping and activeLeafId", async () => {
       await repo.createSession({ id: "orig-sess", userId: USER_A, title: "Original Research" });
-      await repo.saveMessage({ id: "m1", sessionId: "orig-sess", role: "user", content: "Step 1" }, USER_A);
-      await repo.saveMessage({ id: "m2", sessionId: "orig-sess", role: "assistant", content: "Result 1" }, USER_A);
-      await repo.saveMessage({ id: "m3", sessionId: "orig-sess", role: "user", content: "Step 2" }, USER_A);
-      await repo.saveMessage({ id: "m4", sessionId: "orig-sess", role: "assistant", content: "Result 2" }, USER_A);
+      await repo.saveMessage({ id: "m1", sessionId: "orig-sess", parentId: null, role: "user", content: "Step 1" }, USER_A);
+      await repo.saveMessage({ id: "m2", sessionId: "orig-sess", parentId: "m1", role: "assistant", content: "Result 1" }, USER_A);
+      await repo.saveMessage({ id: "m3", sessionId: "orig-sess", parentId: "m2", role: "user", content: "Step 2" }, USER_A);
+      await repo.saveMessage({ id: "m4", sessionId: "orig-sess", parentId: "m3", role: "assistant", content: "Result 2" }, USER_A);
+
+      // Save an artifact attached to m2 in orig-sess
+      await repo.saveArtifact({
+        id: "art-1",
+        sessionId: "orig-sess",
+        messageId: "m2",
+        name: "summary.txt",
+        storageKey: "artifacts/orig-sess/summary.txt",
+        mimeType: "text/plain",
+      });
 
       // Fork from message m2 (Step 1 + Result 1)
       const forkResult = await repo.forkSession("orig-sess", "m2", USER_A, "Custom Forked Title");
@@ -336,13 +346,54 @@ describe("ChatRepository Contract Tests (FakeChatRepository)", () => {
       expect(forkResult?.messages[0].sessionId).toBe(forkResult?.session.id);
       expect(forkResult?.messages[1].sessionId).toBe(forkResult?.session.id);
 
+      // Verify parentId remapping
+      const newM1 = forkResult!.messages[0];
+      const newM2 = forkResult!.messages[1];
+      expect(newM1.parentId).toBeNull();
+      expect(newM2.parentId).toBe(newM1.id);
+      expect(newM2.parentId).not.toBe("m1"); // MUST NOT point to source session message!
+
+      // Verify session activeLeafId
+      const newSession = await repo.getSession(forkResult!.session.id, USER_A);
+      expect(newSession?.activeLeafId).toBe(newM2.id);
+
       // Verify the new session exists independently
       const newSessionMessages = await repo.getMessages(forkResult!.session.id, USER_A);
       expect(newSessionMessages).toHaveLength(2);
+      expect(newSessionMessages![0].parentId).toBeNull();
+      expect(newSessionMessages![1].parentId).toBe(newSessionMessages![0].id);
+
+      // Verify artifacts are replicated to new session
+      const newArtifacts = await repo.getArtifactsBySession(forkResult!.session.id);
+      expect(newArtifacts).toHaveLength(1);
+      expect(newArtifacts[0].sessionId).toBe(forkResult!.session.id);
+      expect(newArtifacts[0].messageId).toBe(newM2.id);
+      expect(newArtifacts[0].name).toBe("summary.txt");
 
       // Verify original session is unchanged
       const origMessages = await repo.getMessages("orig-sess", USER_A);
       expect(origMessages).toHaveLength(4);
+    });
+
+    it("forks from a specific branch in a tree session without including abandoned sibling branches", async () => {
+      await repo.createSession({ id: "tree-sess", userId: USER_A, title: "Tree Research" });
+      // Root
+      await repo.saveMessage({ id: "t-root", sessionId: "tree-sess", parentId: null, role: "user", content: "Prompt 1" }, USER_A);
+      // Branch A
+      await repo.saveMessage({ id: "t-a1", sessionId: "tree-sess", parentId: "t-root", role: "assistant", content: "Branch A response" }, USER_A);
+      await repo.saveMessage({ id: "t-a2", sessionId: "tree-sess", parentId: "t-a1", role: "user", content: "Branch A follow-up" }, USER_A);
+      // Branch B (sibling of t-a1 off t-root)
+      await repo.saveMessage({ id: "t-b1", sessionId: "tree-sess", parentId: "t-root", role: "assistant", content: "Branch B response" }, USER_A);
+
+      // Fork from Branch B (t-b1)
+      const forkResult = await repo.forkSession("tree-sess", "t-b1", USER_A);
+      expect(forkResult).not.toBeNull();
+      expect(forkResult?.messages).toHaveLength(2);
+      expect(forkResult?.messages.map((m) => m.content)).toEqual(["Prompt 1", "Branch B response"]);
+
+      // Verify parentId remapping
+      expect(forkResult?.messages[0].parentId).toBeNull();
+      expect(forkResult?.messages[1].parentId).toBe(forkResult?.messages[0].id);
     });
 
     it("prevents unauthorized users from forking other users' sessions", async () => {

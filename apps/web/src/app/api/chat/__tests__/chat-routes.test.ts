@@ -340,15 +340,15 @@ describe("Zero-DB Chat API Route Handlers Integration", () => {
         title: "Source Session",
       });
       await hoisted.fakeRepo.saveMessage(
-        { id: "msg-1", sessionId: "sess-source", role: "user", content: "Prompt 1" },
+        { id: "msg-1", sessionId: "sess-source", parentId: null, role: "user", content: "Prompt 1" },
         TEST_USER.user.id
       );
       await hoisted.fakeRepo.saveMessage(
-        { id: "msg-2", sessionId: "sess-source", role: "assistant", content: "Response 1" },
+        { id: "msg-2", sessionId: "sess-source", parentId: "msg-1", role: "assistant", content: "Response 1" },
         TEST_USER.user.id
       );
       await hoisted.fakeRepo.saveMessage(
-        { id: "msg-3", sessionId: "sess-source", role: "user", content: "Prompt 2" },
+        { id: "msg-3", sessionId: "sess-source", parentId: "msg-2", role: "user", content: "Prompt 2" },
         TEST_USER.user.id
       );
 

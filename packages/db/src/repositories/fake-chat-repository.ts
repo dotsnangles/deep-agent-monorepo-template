@@ -136,30 +136,48 @@ export class FakeChatRepository implements ChatRepository {
       return null;
     }
 
-    const sourceMessages = (this.messages.get(sourceSessionId) || [])
-      .slice()
-      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    const sourceMessages = this.messages.get(sourceSessionId) || [];
+    const msgMap = new Map<string, MessageNode>(sourceMessages.map((m) => [m.id, m]));
 
-    const targetIdx = sourceMessages.findIndex((m) => m.id === fromMessageId);
-    if (targetIdx === -1) {
+    const targetMsg = msgMap.get(fromMessageId);
+    if (!targetMsg) {
       return null;
     }
 
-    const sliced = sourceMessages.slice(0, targetIdx + 1);
+    // Extract lineage from fromMessageId back to root
+    const lineage: MessageNode[] = [];
+    const visited = new Set<string>();
+    let curr: MessageNode | undefined = targetMsg;
+
+    while (curr && !visited.has(curr.id)) {
+      visited.add(curr.id);
+      lineage.push(curr);
+      curr = curr.parentId ? msgMap.get(curr.parentId) : undefined;
+    }
+    lineage.reverse(); // [root, ..., targetMsg]
+
     const newSessionId = `sess_fork_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const title = newTitle || `${sourceSession.title} (분기)`;
 
-    let lastClonedId: string | null = null;
-    const clonedMessages: MessageNode[] = sliced.map((m, idx) => {
-      const clonedId = `msg_fork_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 6)}`;
-      lastClonedId = clonedId;
+    // Map old message IDs to new cloned IDs
+    const idMap = new Map<string, string>();
+    lineage.forEach((m, idx) => {
+      idMap.set(m.id, `msg_fork_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 6)}`);
+    });
+
+    const clonedMessages: MessageNode[] = lineage.map((m, idx) => {
+      const clonedId = idMap.get(m.id)!;
       return {
         ...m,
         id: clonedId,
         sessionId: newSessionId,
+        parentId: m.parentId ? idMap.get(m.parentId) ?? null : null,
+        attachments: m.attachments ? [...m.attachments] : [],
         createdAt: new Date(m.createdAt.getTime() + idx),
       };
     });
+
+    const lastClonedId = idMap.get(fromMessageId) || null;
 
     const newSession: ChatSessionEntity = {
       id: newSessionId,
@@ -172,6 +190,20 @@ export class FakeChatRepository implements ChatRepository {
 
     this.sessions.set(newSessionId, newSession);
     this.messages.set(newSessionId, clonedMessages);
+
+    // Replicate associated artifacts
+    for (const art of this.artifacts.values()) {
+      if (art.sessionId === sourceSessionId && art.messageId && idMap.has(art.messageId)) {
+        const clonedArtId = `art_fork_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        this.artifacts.set(clonedArtId, {
+          ...art,
+          id: clonedArtId,
+          sessionId: newSessionId,
+          messageId: idMap.get(art.messageId)!,
+          createdAt: new Date(),
+        });
+      }
+    }
 
     return {
       session: { ...newSession },
