@@ -203,7 +203,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       {/* Scrollable Middle: Recent Chat Sessions ONLY (with High-Performance DOM Virtualization) */}
       <SidebarContent
         ref={scrollRef}
-        className="flex-1 min-h-0 overflow-y-auto px-2 py-1 group-data-[collapsible=icon]:hidden overscroll-contain"
+        className="flex-1 min-h-0 overflow-y-auto no-scrollbar scrollbar-none px-2 py-1 group-data-[collapsible=icon]:hidden overscroll-contain"
       >
         {/* User Chat Sessions Section */}
         <SidebarGroup className="p-0 pt-1">

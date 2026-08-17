@@ -70,7 +70,11 @@ describe("MessageFeed with shadcn MessageScroller & Chat Primitives", () => {
     expect(html).toContain("안녕하세요, 피보나치 수열 알고리즘 알려줘");
     expect(html).toContain("피보나치 수열 파이썬 구현 코드입니다.");
 
-    // Check scroll bottom button slot
-    expect(html).toContain("최신 메시지 보기");
+    // Check scrollbar-none and no-scrollbar classes on viewport
+    expect(html).toContain("no-scrollbar");
+    expect(html).toContain("scrollbar-none");
+
+    // Verify '최신 메시지 보기' button is removed for clean immersive UX
+    expect(html).not.toContain("최신 메시지 보기");
   });
 });

@@ -120,8 +120,8 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    scrollbar-width: thin;
-    scrollbar-color: color-mix(in oklch, var(--muted-foreground) 25%, transparent) transparent;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
   }
   body {
     @apply font-sans bg-background text-foreground;
@@ -130,27 +130,28 @@
     @apply font-sans;
   }
 
-  /* Modern Minimalist Scrollbar */
+  /* Hide scrollbar for Chrome, Safari and Opera across all elements */
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: color-mix(in oklch, var(--muted-foreground) 25%, transparent);
-    border-radius: 9999px;
-    transition: background 0.15s ease;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: color-mix(in oklch, var(--muted-foreground) 50%, transparent);
-  }
-
-  ::-webkit-scrollbar-corner {
+    display: none;
+    width: 0px;
+    height: 0px;
     background: transparent;
   }
 }
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+

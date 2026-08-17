@@ -193,7 +193,7 @@ export function ChatSearchDialog() {
         </div>
 
         {/* Sessions List Area */}
-        <div className="flex-1 overflow-y-auto p-3 min-h-[220px]" ref={listRef}>
+        <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none p-3 min-h-[220px]" ref={listRef}>
           <div className="flex items-center justify-between px-3 py-1.5 mb-1">
             <span className="text-xs font-semibold text-muted-foreground">
               {query ? `검색 결과 (${filteredSessions.length})` : "최근 대화"}

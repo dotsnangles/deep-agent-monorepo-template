@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowUp, Bot, Paperclip, Sparkles, Square, Terminal } from "lucide-react";
+import { ArrowUp, Bot, Paperclip, Sparkles, Square, Terminal } from "lucide-react";
 import { Button } from "@repo/ui/components/button";
 import { Textarea } from "@repo/ui/components/textarea";
 import {
@@ -11,7 +11,6 @@ import {
   MessageScrollerViewport,
   MessageScrollerContent,
   MessageScrollerItem,
-  MessageScrollerButton,
 } from "@repo/ui/components/message-scroller";
 import { useChatEngine } from "../hooks/use-chat-engine";
 import { useDirectUpload } from "../hooks/use-direct-upload";
@@ -122,19 +121,19 @@ export function MessageFeed({ sessionId }: MessageFeedProps) {
     (!inputPrompt.trim() && completedAttachments.length === 0) || isUploading;
 
   return (
-    <div className="flex flex-col h-full w-full max-w-4xl mx-auto min-h-0 relative">
+    <div className="flex flex-col h-full w-full min-h-0 relative">
       {/* Scrollable Message Feed Area with shadcn MessageScroller */}
       <MessageScrollerProvider autoScroll>
-        <MessageScroller className="flex-1 min-h-0">
-          <MessageScrollerViewport className="px-3 sm:px-6 py-4">
+        <MessageScroller className="flex-1 min-h-0 w-full">
+          <MessageScrollerViewport className="w-full h-full px-3 sm:px-6 py-4 no-scrollbar scrollbar-none">
             {isLoading && activePath.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-muted-foreground gap-2">
+              <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-muted-foreground gap-2 max-w-4xl mx-auto">
                 <span className="size-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
                 <p className="text-xs">대화 기록을 불러오는 중입니다...</p>
               </div>
             ) : activePath.length === 0 ? (
               /* Empty Starter State */
-              <div className="flex flex-col items-center justify-center min-h-[400px] h-full text-center px-4">
+              <div className="flex flex-col items-center justify-center min-h-[400px] h-full text-center px-4 max-w-4xl mx-auto">
                 <div className="flex items-center justify-center size-12 rounded-2xl bg-primary/10 text-primary mb-3 shadow-xs">
                   <Bot className="size-6" />
                 </div>
@@ -169,7 +168,7 @@ export function MessageFeed({ sessionId }: MessageFeedProps) {
               </div>
             ) : (
               /* Message List */
-              <MessageScrollerContent className="gap-4">
+              <MessageScrollerContent className="gap-4 max-w-4xl w-full mx-auto pb-4">
                 {activePath.map((msg, index) => {
                   const isLast = index === activePath.length - 1;
                   const isLastUser = msg.role === "user" && index === lastUserIndex;
@@ -216,21 +215,15 @@ export function MessageFeed({ sessionId }: MessageFeedProps) {
               </MessageScrollerContent>
             )}
           </MessageScrollerViewport>
-
-          {/* Built-in shadcn MessageScroller Floating Jump to End Button */}
-          <MessageScrollerButton direction="end">
-            <ArrowDown data-icon="inline-start" />
-            <span>최신 메시지 보기</span>
-          </MessageScrollerButton>
         </MessageScroller>
       </MessageScrollerProvider>
 
       {/* Bottom Floating Prompt Box with File Upload Staging & Dynamic Send/Stop Toggle Button */}
-      <div className="shrink-0 px-3 sm:px-6 pb-4 pt-1 bg-gradient-to-t from-background via-background/95 to-transparent">
+      <div className="shrink-0 w-full px-3 sm:px-6 pb-4 pt-1 bg-gradient-to-t from-background via-background/95 to-transparent">
         <div
           onDragOver={(e) => e.preventDefault()}
           onDrop={handleDrop}
-          className="relative flex flex-col rounded-2xl bg-card border border-border/80 shadow-md focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/15 transition-all"
+          className="relative max-w-4xl mx-auto flex flex-col rounded-2xl bg-card border border-border/80 shadow-md focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/15 transition-all"
         >
           {/* File Attachment Staging Bar */}
           <AttachmentStagingBar
