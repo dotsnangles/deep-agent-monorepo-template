@@ -196,5 +196,9 @@ export class StreamReasoningPartitioner {
 export function partitionMessageContent(rawContent: string): PartitionedStreamState {
   const partitioner = new StreamReasoningPartitioner();
   partitioner.feedToken(rawContent);
-  return partitioner.getState();
+  const state = partitioner.getState();
+  return {
+    ...state,
+    reasoningDuration: undefined,
+  };
 }

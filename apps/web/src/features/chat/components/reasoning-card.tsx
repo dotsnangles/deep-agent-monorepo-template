@@ -88,7 +88,7 @@ export function ReasoningCard({
               )}
             </CardTitle>
 
-            {!activeThinking && (
+            {!activeThinking && duration !== undefined && duration !== null && (
               <Badge variant="outline" className="text-[10px] font-normal py-0 px-1.5 h-4.5 text-muted-foreground">
                 <Sparkles className="size-2.5 mr-1 text-primary/70" />
                 {formatDuration(duration)}

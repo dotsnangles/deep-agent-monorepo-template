@@ -674,6 +674,7 @@ describe("ChatEngine (In-Process State Machine)", () => {
     expect(assistantNode?.content).toBe(
       "Quantum computing uses qubits instead of bits."
     );
+    expect(assistantNode?.reasoningDuration).toBeUndefined();
   });
 
   it("handles artifact_created stream event and binds artifacts to assistant node and persistence", async () => {

@@ -38,6 +38,21 @@ describe("ReasoningCard Unit Tests", () => {
     expect(html).not.toContain("생각하는 중...");
   });
 
+  it("renders clean header without duration badge when duration is undefined (e.g. loaded from history)", () => {
+    const html = renderToString(
+      <ReasoningCard
+        reasoning="저장된 대화에서 복원된 사고 과정입니다."
+        isThinking={false}
+      />
+    );
+
+    expect(html).toContain('data-testid="reasoning-card"');
+    expect(html).toContain("사고 과정");
+    expect(html).not.toContain("lucide-sparkles");
+    expect(html).not.toContain("동안 생각함");
+    expect(html).not.toContain("생각하는 중...");
+  });
+
   it("renders expanded accordion content when defaultOpen is true", () => {
     const html = renderToString(
       <ReasoningCard

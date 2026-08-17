@@ -154,6 +154,7 @@ describe("StreamReasoningPartitioner", () => {
     const parsed = partitionMessageContent(rawStored);
     expect(parsed.reasoning).toBe("복원된 사고 과정\n");
     expect(parsed.content).toBe("화면에 보여질 답변입니다.");
+    expect(parsed.reasoningDuration).toBeUndefined();
   });
 });
 
