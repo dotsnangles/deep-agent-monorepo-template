@@ -31,7 +31,8 @@ Key terms and definitions used across `hollow-echo-distant-signal`:
 | Multimodal Context Injection | Transforming attached images into vision blocks and document attachments into contextual prompt sections | Agent (`apps/agent`) |
 | Attachment Staging Bar | Input area component displaying staged file upload chips, progress bars, and image thumbnail previews | Web Client (`apps/web`) |
 | Linear Chat Session | A 1D chronological sequence of messages mapping 1:1 with a LangGraph execution thread and isolated sandbox workspace | Fullstack (`@repo/db`, `apps/web`, `apps/agent`) |
-| Session Forking | Spawning an independent, new chat session cloned up to a specific historical message turn without in-session DAG branching | Fullstack (`@repo/db`, `apps/web`) |
+| Session Forking | Spawning an independent new chat session cloned up to a specific historical turn by extracting ancestral lineage and remapping parent pointers | Fullstack (`@repo/db`, `apps/web`) |
+| Last Turn In-place Editing | Modifying the latest user prompt in-place and triggering an updated assistant response without creating a separate session | Web Client (`apps/web`) |
 | Live LLM Inference | Mandatory live token generation without global exact-match response caching (`set_llm_cache`) for interactive chat endpoints | Agent (`apps/agent`) |
 | Bounded Checkpointer | Confining LangGraph checkpointer scope to in-turn HITL approval interrupts and resumption rather than multi-turn tree history | Agent (`apps/agent`) |
 | Todo Plan Card | Inline collapsible UI component displaying real-time task decomposition and progress tracking from `TodoListMiddleware` | Web Client (`apps/web`) |

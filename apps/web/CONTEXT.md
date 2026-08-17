@@ -28,4 +28,5 @@ Domain glossary and architectural concepts for the Next.js 16 Web Application:
 | Todo Plan Card | Live collapsible UI component displaying real-time task checklist and completion count | `src/features/chat/components/todo-plan-card.tsx` |
 | Specialist Delegation Card | Subagent activity card rendering specialist execution badges, prompts, and output summaries | `src/features/chat/components/specialist-delegation-card.tsx` |
 | Interactive Chart Image | Media lightbox modal providing full-screen zoom, pan, and download for sandbox charts | `src/features/chat/components/interactive-chart-image.tsx` |
-| Session Forking | Instant historical thread cloning allowing users to branch conversations into independent sessions | `src/features/chat/components/message-item.tsx` |
+| Session Forking | Instant historical thread cloning up to a turn allowing users to branch conversations into independent sessions | `src/features/chat/components/message-item.tsx` |
+| Last Turn In-place Editing | Modifying the latest user prompt in-place and triggering an updated assistant response without creating a separate session | `src/features/chat/components/message-feed.tsx` |

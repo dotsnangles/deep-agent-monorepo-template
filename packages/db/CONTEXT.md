@@ -9,4 +9,4 @@ Domain glossary and architectural concepts for database access and persistence:
 | Chat Repository | Deep domain repository interface encapsulating session/message CRUD, linear queries, and transactional forking | `src/repositories/chat-repository.ts` |
 | Drizzle Chat Repository | Concrete Drizzle ORM implementation providing atomic database transactions for session forking and message insertion | `src/repositories/drizzle-chat-repository.ts` |
 | Fake Chat Repository | In-memory test double implementing ChatRepository with zero database dependencies for instant unit tests | `src/repositories/fake-chat-repository.ts` |
-| Atomic Session Fork Transaction | Single-transaction database execution creating a new session and cloning message history up to a turn | `src/repositories/drizzle-chat-repository.ts` |
+| Lineage-Preserving Fork | Atomic transactional cloning of ancestral message chain from a target node up to the root with parent ID remapping and artifact replication | `src/repositories/drizzle-chat-repository.ts` |
