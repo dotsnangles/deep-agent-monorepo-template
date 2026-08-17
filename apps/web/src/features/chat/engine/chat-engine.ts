@@ -48,7 +48,7 @@ export interface ChatEngineOptions {
   onSessionCreated?: (sessionId: string, title: string) => void;
 }
 
-function generateNodeId(_prefix?: "user" | "asst" | "sys"): string {
+function generateNodeId(): string {
   return crypto.randomUUID();
 }
 
@@ -201,8 +201,8 @@ export class ChatEngine {
       derivedTitle = titleSnippet || deriveSessionTitle(content || attachments?.[0]?.name || "새로운 대화");
     }
 
-    const userMessageId = generateNodeId("user");
-    const assistantMessageId = generateNodeId("asst");
+    const userMessageId = generateNodeId();
+    const assistantMessageId = generateNodeId();
     const parentId = this.state.activeLeafId;
 
     const userNode: MessageNode = {
@@ -331,8 +331,8 @@ export class ChatEngine {
       return;
     }
 
-    const newUserNodeId = generateNodeId("user");
-    const newAssistantNodeId = generateNodeId("asst");
+    const newUserNodeId = generateNodeId();
+    const newAssistantNodeId = generateNodeId();
     const inheritedAttachments =
       attachments !== undefined
         ? attachments
@@ -403,7 +403,7 @@ export class ChatEngine {
       return;
     }
 
-    const newAssistantNodeId = generateNodeId("asst");
+    const newAssistantNodeId = generateNodeId();
     const newAssistantNode: MessageNode = {
       id: newAssistantNodeId,
       sessionId: this.sessionId,
