@@ -107,8 +107,8 @@ class TestArtifactSyncAndStreamPipeline:
         assert "artifacts/sessions/sess-100/msg-999/sales_chart.png" in uploaded_keys
         assert "artifacts/sessions/sess-100/msg-999/data_summary.csv" in uploaded_keys
 
-        # Verify DB insert was called
-        assert mock_cursor.execute.call_count == 2
+        # Verify DB select and inserts were called (1 SELECT + 2 INSERTs)
+        assert mock_cursor.execute.call_count == 3
 
         # 2. Verify idempotency on second scan
         second_events = await processor.sync_session_artifacts(
@@ -116,6 +116,98 @@ class TestArtifactSyncAndStreamPipeline:
             message_id="msg-999",
         )
         assert len(second_events) == 0
+
+    @pytest.mark.asyncio
+    async def test_artifact_sync_processor_hash_change_detection_and_versioning(self, tmp_path: Path):
+        workspace_dir = tmp_path / "sessions"
+        sess_dir = workspace_dir / "sess-hash-1"
+        artifacts_dir = sess_dir / "artifacts"
+        artifacts_dir.mkdir(parents=True, exist_ok=True)
+
+        doc_path = artifacts_dir / "report.txt"
+        doc_path.write_text("Version 1 content", encoding="utf-8")
+
+        storage = FakeAsyncStorageService()
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchall.return_value = []
+        mock_conn = MagicMock()
+        mock_conn.cursor.return_value.__aenter__.return_value = mock_cursor
+        mock_pool = MagicMock()
+        mock_pool.connection.return_value.__aenter__.return_value = mock_conn
+
+        processor = ArtifactSyncProcessor(
+            workspace_dir=workspace_dir,
+            storage_service=storage,
+            db_pool=mock_pool,
+        )
+
+        # Turn 1: Create version 1
+        ev1 = await processor.sync_session_artifacts(
+            session_id="sess-hash-1",
+            message_id="asst_msg_turn1",
+        )
+        assert len(ev1) == 1
+        assert ev1[0].name == "report.txt"
+        assert ev1[0].message_id == "asst_msg_turn1"
+        assert "content_hash" in ev1[0].metadata
+        v1_hash = ev1[0].metadata["content_hash"]
+        assert len(v1_hash) == 64
+
+        # Turn 2: Unrelated prompt ("hello") - content unchanged -> NO-OP
+        ev2 = await processor.sync_session_artifacts(
+            session_id="sess-hash-1",
+            message_id="asst_msg_turn2",
+        )
+        assert len(ev2) == 0  # No duplicate artifact created!
+
+        # Turn 3: User requests modification - content changed -> New Version Snapshot
+        doc_path.write_text("Version 2 updated content", encoding="utf-8")
+        ev3 = await processor.sync_session_artifacts(
+            session_id="sess-hash-1",
+            message_id="asst_msg_turn3",
+        )
+        assert len(ev3) == 1
+        assert ev3[0].name == "report.txt"
+        assert ev3[0].message_id == "asst_msg_turn3"
+        v2_hash = ev3[0].metadata["content_hash"]
+        assert v2_hash != v1_hash
+
+    @pytest.mark.asyncio
+    async def test_artifact_sync_processor_restores_from_db_on_server_restart(self, tmp_path: Path):
+        workspace_dir = tmp_path / "sessions"
+        sess_dir = workspace_dir / "sess-restart-1"
+        artifacts_dir = sess_dir / "artifacts"
+        artifacts_dir.mkdir(parents=True, exist_ok=True)
+
+        doc_path = artifacts_dir / "love_letter.txt"
+        doc_path.write_text("Forever yours", encoding="utf-8")
+
+        from src.core.artifacts import compute_file_sha256
+        file_hash = compute_file_sha256(doc_path)
+
+        storage = FakeAsyncStorageService()
+        mock_cursor = AsyncMock()
+        # Mock DB returning existing artifact metadata from prior server session
+        mock_cursor.fetchall.return_value = [("love_letter.txt", file_hash)]
+        mock_conn = MagicMock()
+        mock_conn.cursor.return_value.__aenter__.return_value = mock_cursor
+        mock_pool = MagicMock()
+        mock_pool.connection.return_value.__aenter__.return_value = mock_conn
+
+        # Fresh instance (server restarted, empty in-memory state)
+        processor = ArtifactSyncProcessor(
+            workspace_dir=workspace_dir,
+            storage_service=storage,
+            db_pool=mock_pool,
+        )
+
+        events = await processor.sync_session_artifacts(
+            session_id="sess-restart-1",
+            message_id="asst_msg_new_turn",
+        )
+        # Because content_hash matches DB record, no duplicate should be registered!
+        assert len(events) == 0
+        assert len(storage.uploaded) == 0
 
     @pytest.mark.asyncio
     async def test_gateway_stream_chat_emits_artifact_created_events(self, tmp_path: Path):

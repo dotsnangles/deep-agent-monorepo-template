@@ -37,6 +37,18 @@ def guess_artifact_mime_type(file_path: Path | str) -> str:
     return guessed or "application/octet-stream"
 
 
+import hashlib
+
+
+def compute_file_sha256(file_path: Path) -> str:
+    """Computes the SHA-256 hex digest of a file."""
+    sha = hashlib.sha256()
+    with file_path.open("rb") as f:
+        while chunk := f.read(65536):
+            sha.update(chunk)
+    return sha.hexdigest()
+
+
 class S3StorageService:
     """Asynchronous S3 / MinIO storage service for uploading artifacts and generating presigned URLs."""
 
@@ -145,12 +157,37 @@ class ArtifactSyncProcessor:
         )
         self.storage_service = storage_service
         self.db_pool = db_pool
-        # In-memory tracking of processed file signatures (session_id -> set of relative_paths)
-        self._synced_files: dict[str, set[str]] = {}
+        # In-memory tracking of processed file signatures (session_id -> dict of filename -> sha256)
+        self._synced_files: dict[str, dict[str, str]] = {}
 
-    def _get_synced_set(self, session_id: str) -> set[str]:
-        if session_id not in self._synced_files:
-            self._synced_files[session_id] = set()
+    async def _get_synced_map(self, session_id: str) -> dict[str, str]:
+        if session_id in self._synced_files:
+            return self._synced_files[session_id]
+
+        synced_map: dict[str, str] = {}
+        if self.db_pool is not None:
+            try:
+                async with self.db_pool.connection() as conn:
+                    async with conn.cursor() as cur:
+                        await cur.execute(
+                            """
+                            SELECT name, metadata->>'content_hash' as content_hash
+                            FROM chat_artifact
+                            WHERE session_id = %s
+                            ORDER BY created_at ASC
+                            """,
+                            (session_id,),
+                        )
+                        rows = await cur.fetchall()
+                        for row in rows:
+                            file_name = row[0]
+                            content_hash = row[1]
+                            if file_name and content_hash:
+                                synced_map[file_name] = content_hash
+            except Exception as db_err:
+                logger.warning("Failed to restore synced artifacts from DB for session %s: %s", session_id, db_err)
+
+        self._synced_files[session_id] = synced_map
         return self._synced_files[session_id]
 
     async def sync_session_artifacts(
@@ -158,15 +195,15 @@ class ArtifactSyncProcessor:
         session_id: str,
         message_id: str | None = None,
     ) -> list[ArtifactCreatedEventData]:
-        """Scans the artifacts/ directory of a session, uploads new items,
-        persists to DB, and returns event data."""
+        """Scans the artifacts/ directory of a session, checks SHA-256 hash against
+        previously recorded version, uploads changed/new items, persists to DB, and returns event data."""
         session_dir = self.workspace_dir / session_id
         artifacts_dir = session_dir / "artifacts"
 
         if not artifacts_dir.exists() or not artifacts_dir.is_dir():
             return []
 
-        synced_set = self._get_synced_set(session_id)
+        synced_map = await self._get_synced_map(session_id)
         created_events: list[ArtifactCreatedEventData] = []
 
         try:
@@ -178,13 +215,18 @@ class ArtifactSyncProcessor:
                     continue
 
                 rel_name = file_path.name
-                if rel_name in synced_set:
+                content_hash = compute_file_sha256(file_path)
+                last_hash = synced_map.get(rel_name)
+
+                # If file content has not changed since last sync, skip (No-op)
+                if last_hash == content_hash:
                     continue
 
                 # 1. Build metadata and keys
                 mime_type = guess_artifact_mime_type(file_path)
                 size_bytes = file_path.stat().st_size
                 artifact_id = f"art_{uuid.uuid4().hex[:12]}"
+                metadata = {"content_hash": content_hash}
 
                 if message_id:
                     storage_key = f"artifacts/sessions/{session_id}/{message_id}/{rel_name}"
@@ -234,14 +276,14 @@ class ArtifactSyncProcessor:
                                         storage_key,
                                         mime_type,
                                         size_bytes,
-                                        json.dumps({}),
+                                        json.dumps(metadata),
                                     ),
                                 )
                     except Exception as db_err:
                         logger.warning("DB artifact insert failed for %s: %s", artifact_id, db_err)
 
                 # 4. Record as synced and append event
-                synced_set.add(rel_name)
+                synced_map[rel_name] = content_hash
                 event_data = ArtifactCreatedEventData(
                     id=artifact_id,
                     session_id=session_id,
@@ -251,7 +293,7 @@ class ArtifactSyncProcessor:
                     storage_key=storage_key,
                     mime_type=mime_type,
                     size_bytes=size_bytes,
-                    metadata={},
+                    metadata=metadata,
                 )
                 created_events.append(event_data)
 
