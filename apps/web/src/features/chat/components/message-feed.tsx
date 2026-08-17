@@ -13,6 +13,7 @@ import {
   MessageScrollerItem,
 } from "@repo/ui/components/message-scroller";
 import { cn } from "@repo/ui/lib/utils";
+import { authClient } from "../../../lib/auth-client";
 import { useChatEngine } from "../hooks/use-chat-engine";
 import { useDirectUpload } from "../hooks/use-direct-upload";
 import { MessageItem } from "./message-item";
@@ -110,6 +111,14 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
   const isSendDisabled =
     (!inputPrompt.trim() && completedAttachments.length === 0) || isUploading;
 
+  const { data: authSession } = authClient.useSession();
+  const userName = authSession?.user?.name
+    ? authSession.user.name.split(" ")[0] || authSession.user.name
+    : null;
+  const greetingText = userName
+    ? `What can I help with, ${userName}?`
+    : "Where should we start?";
+
   const isEmpty = activePath.length === 0;
 
   // 1. Loading State when session has not loaded
@@ -124,9 +133,21 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
 
   return (
     <div className="flex flex-col h-full w-full min-h-0 relative overflow-hidden">
-      {/* 1. Upper Dynamic Zone: Smoothly collapses from Center Hero to Message Feed */}
-      <div className="flex-1 min-h-0 w-full flex flex-col justify-end relative overflow-hidden">
-        {/* Gemini-style Center Hero Title (Smoothly fades & collapses upwards when messages appear) */}
+      {/* 1. Ambient Gemini Radial Glow / Aura (어스름) */}
+      <div
+        className={cn(
+          "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-all duration-700 ease-out z-0",
+          isEmpty
+            ? "opacity-100 scale-100 animate-in fade-in zoom-in-75 duration-1000"
+            : "opacity-0 scale-75 pointer-events-none"
+        )}
+      >
+        <div className="w-[520px] sm:w-[700px] h-[320px] sm:h-[420px] rounded-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-600/15 via-indigo-500/10 to-transparent blur-3xl animate-pulse duration-[6000ms]" />
+      </div>
+
+      {/* 2. Upper Dynamic Zone: Smoothly collapses from Center Hero to Message Feed */}
+      <div className="flex-1 min-h-0 w-full flex flex-col justify-end relative overflow-hidden z-10">
+        {/* Gemini-style Center Hero Title (Floats up on entrance, collapses upwards when messages appear) */}
         <div
           className={cn(
             "w-full flex flex-col items-center justify-end transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] overflow-hidden shrink-0",
@@ -135,8 +156,8 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
               : "max-h-0 opacity-0 scale-95 pointer-events-none pb-0 -translate-y-6"
           )}
         >
-          <h1 className="text-3xl sm:text-4xl font-normal tracking-tight text-foreground/90 text-center select-none">
-            Where should we start?
+          <h1 className="text-3xl sm:text-4xl font-normal tracking-tight text-foreground/90 text-center select-none animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out">
+            {greetingText}
           </h1>
         </div>
 
