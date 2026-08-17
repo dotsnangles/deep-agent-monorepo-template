@@ -56,6 +56,7 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
   } = useDirectUpload({ sessionId });
 
   const [inputPrompt, setInputPrompt] = useState("");
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -90,6 +91,8 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
       textareaRef.current.style.height = "auto";
     }
 
+    // Enable smooth slide-down animation ONLY when user triggers message send
+    setIsTransitioning(true);
     send(content, attachments);
   };
 
@@ -155,7 +158,8 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
       {/* 1. Ambient Gemini Radial Glow / Aura (어스름) - Centered & continuous organic movement */}
       <div
         className={cn(
-          "absolute inset-0 flex items-center justify-center pointer-events-none transition-all duration-700 ease-out z-0 select-none overflow-hidden",
+          "absolute inset-0 flex items-center justify-center pointer-events-none z-0 select-none overflow-hidden",
+          isTransitioning ? "transition-all duration-700 ease-out" : "",
           isEmpty
             ? "opacity-100"
             : "opacity-0 pointer-events-none"
@@ -175,7 +179,8 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
         {/* Gemini-style Center Hero Title (Floats up on entrance, collapses upwards when messages appear) */}
         <div
           className={cn(
-            "w-full flex flex-col items-center justify-end transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] overflow-hidden shrink-0",
+            "w-full flex flex-col items-center justify-end overflow-hidden shrink-0",
+            isTransitioning ? "transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]" : "",
             isEmpty
               ? "flex-1 opacity-100 scale-100 max-h-[45vh] pb-8 pointer-events-auto"
               : "max-h-0 opacity-0 scale-95 pointer-events-none pb-0 -translate-y-6"
@@ -197,7 +202,8 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
         {/* Scrollable Message Feed Area with shadcn MessageScroller */}
         <div
           className={cn(
-            "w-full flex-1 min-h-0 flex flex-col transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]",
+            "w-full flex-1 min-h-0 flex flex-col",
+            isTransitioning ? "transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]" : "",
             isEmpty ? "opacity-0 pointer-events-none max-h-0 overflow-hidden" : "opacity-100 pointer-events-auto"
           )}
         >
@@ -262,7 +268,8 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
       {/* 2. Persistent Single Prompt Box (Smoothly glides from Center to Bottom) */}
       <div
         className={cn(
-          "w-full px-3 sm:px-6 transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] shrink-0",
+          "w-full px-3 sm:px-6 shrink-0",
+          isTransitioning ? "transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]" : "",
           isEmpty
             ? "flex-1 flex flex-col items-center justify-start pt-0 pb-12"
             : "pb-4 pt-1 bg-gradient-to-t from-background via-background/95 to-transparent flex-none"
