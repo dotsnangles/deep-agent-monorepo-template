@@ -146,10 +146,12 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
     fetchSessions();
   }, [fetchSessions]);
 
-  // Wipe sessions and clear storage cache whenever user logs out
+  // Wipe sessions, reset active session ID to fresh draft, and clear in-memory engine registry whenever user logs out
   useEffect(() => {
     if (!isAuthPending && !sessionData?.user) {
       setSessions([]);
+      setActiveSessionId(crypto.randomUUID());
+      globalChatEngineRegistry.clear();
       if (typeof window !== "undefined") {
         localStorage.removeItem(STORAGE_KEY);
         localStorage.removeItem(SAVED_SESSION_IDS_KEY);

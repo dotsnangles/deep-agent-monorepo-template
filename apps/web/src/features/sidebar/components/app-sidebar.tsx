@@ -97,7 +97,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           {/* Expanded Mode: Brand Logo + Name */}
           <Link
             href="/"
-            className="flex items-center gap-2.5 rounded-lg hover:opacity-85 transition-opacity group-data-[collapsible=icon]:hidden min-w-0"
+            onClick={() => createNewSession()}
+            className="flex items-center gap-2.5 rounded-lg hover:opacity-85 transition-opacity group-data-[collapsible=icon]:hidden min-w-0 cursor-pointer"
           >
             <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs shrink-0">
               <Bot className="size-4.5" />
