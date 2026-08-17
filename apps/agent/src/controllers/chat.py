@@ -6,8 +6,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.controllers.dependencies import get_agent_runtime
-from src.runtime.runtime import AgentRuntime
-from src.runtime.types import (
+from src.runtime import (
+    AgentRuntime,
     AgentTurn,
     ApprovalDecision,
     Attachment,

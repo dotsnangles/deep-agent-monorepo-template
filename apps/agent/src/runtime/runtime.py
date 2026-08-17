@@ -26,26 +26,6 @@ from src.domain.ports import (
     SandboxExecutionPort,
     StoragePort,
 )
-from src.infrastructure.config import (
-    get_deep_agent_mode,
-    get_inference_concurrency_limit,
-    get_llm,
-)
-from src.infrastructure.models.adapter import FakeChatModelAdapter, LangChainModelAdapter
-from src.infrastructure.observability import get_langfuse_callback
-from src.infrastructure.persistence.adapter import (
-    InMemoryPersistenceAdapter,
-    PostgresPersistenceAdapter,
-)
-from src.infrastructure.redis import RedisEventBroker, RedisStreamingCallbackHandler
-from src.infrastructure.sandbox.adapter import (
-    DockerSandboxAdapter,
-    InProcessSandboxAdapter,
-)
-from src.infrastructure.storage.adapter import (
-    InMemoryStorageAdapter,
-    S3StorageAdapter,
-)
 from src.runtime.events import AgentStreamEvent, StreamEventType
 from src.runtime.types import (
     AgentStateSnapshot,
@@ -207,11 +187,12 @@ class AgentRuntime(AgentExecutionPort):
         self.model = model
         self.event_broker = event_broker
         self.registry = registry
-        self.concurrency_limit = (
-            concurrency_limit
-            if concurrency_limit is not None
-            else get_inference_concurrency_limit()
-        )
+        if concurrency_limit is not None:
+            self.concurrency_limit = concurrency_limit
+        else:
+            from src.infrastructure.config import get_inference_concurrency_limit
+
+            self.concurrency_limit = get_inference_concurrency_limit()
 
     @classmethod
     def create_in_memory(
@@ -222,6 +203,11 @@ class AgentRuntime(AgentExecutionPort):
         concurrency_limit: int | None = None,
     ) -> AgentRuntime:
         """Factory for 100% in-memory hermetic testing."""
+        from src.infrastructure.models.adapter import FakeChatModelAdapter
+        from src.infrastructure.persistence.adapter import InMemoryPersistenceAdapter
+        from src.infrastructure.sandbox.adapter import InProcessSandboxAdapter
+        from src.infrastructure.storage.adapter import InMemoryStorageAdapter
+
         return cls(
             persistence=InMemoryPersistenceAdapter(),
             sandbox=InProcessSandboxAdapter(root_dir=workspace_dir),
@@ -243,6 +229,14 @@ class AgentRuntime(AgentExecutionPort):
     ) -> AgentRuntime:
         """Factory for production deployment with PostgreSQL, Docker, S3, and Redis."""
         import redis.asyncio as aioredis
+        from src.infrastructure.config import get_llm
+        from src.infrastructure.persistence.adapter import (
+            InMemoryPersistenceAdapter,
+            PostgresPersistenceAdapter,
+        )
+        from src.infrastructure.redis import RedisEventBroker
+        from src.infrastructure.sandbox.adapter import DockerSandboxAdapter
+        from src.infrastructure.storage.adapter import S3StorageAdapter
 
         # 1. Persistence Adapter
         try:
@@ -304,6 +298,10 @@ class AgentRuntime(AgentExecutionPort):
     async def _stream_inner(self, turn: AgentTurn) -> AsyncIterator[AgentStreamEvent]:
         from src.graphs.chat.factory import DeepAgentEnvironmentFactory
         from src.graphs.chat.prompts import MAIN_SYSTEM_PROMPT
+        from src.infrastructure.config import get_llm
+        from src.infrastructure.models.adapter import FakeChatModelAdapter
+        from src.infrastructure.observability import get_langfuse_callback
+        from src.infrastructure.redis import RedisStreamingCallbackHandler
 
         thread_id = turn.thread_id
         lc_messages = _normalize_turn_messages(turn.input, system_prompt=turn.system_prompt)
@@ -600,12 +598,29 @@ class AgentRuntime(AgentExecutionPort):
         """Retrieves read-only state snapshot for a thread."""
         state = await self.persistence.get_state(thread_id)
         is_interrupted = bool(state and getattr(state, "next_nodes", None))
+
+        pending_approvals: list[dict[str, Any]] = []
+        if state and getattr(state, "tasks", None):
+            for task in state.tasks:
+                for interrupt in getattr(task, "interrupts", []):
+                    val = getattr(interrupt, "value", None)
+                    if isinstance(val, dict):
+                        for req in val.get("action_requests", []):
+                            pending_approvals.append(req)
+
+        active_artifacts: list[str] = []
+        try:
+            art_files = await self.sandbox.list_workspace_artifacts(thread_id)
+            active_artifacts = [f.path for f in art_files]
+        except Exception:
+            pass
+
         return AgentStateSnapshot(
             thread_id=thread_id,
             is_interrupted=is_interrupted,
-            pending_tool_approvals=[],
+            pending_tool_approvals=pending_approvals,
             turn_count=len(state.values.get("messages", [])) if state and state.values else 0,
-            active_artifacts=[],
+            active_artifacts=active_artifacts,
         )
 
     async def _collect_events(self, turn: AgentTurn) -> list[AgentStreamEvent]:

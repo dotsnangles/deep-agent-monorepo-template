@@ -1,5 +1,5 @@
 from fastapi import Request
-from src.runtime.runtime import AgentRuntime
+from src.runtime import AgentRuntime
 
 
 def get_agent_runtime(request: Request) -> AgentRuntime:

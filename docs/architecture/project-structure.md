@@ -53,36 +53,44 @@ The agent service encapsulates LangGraph deep agents, tool execution, and backgr
 ```text
 apps/agent/
 ├── src/
-│   ├── api/                     # External HTTP & SSE Endpoints
-│   │   ├── routes/
-│   │   │   ├── copilotkit.py    # CopilotKit AG-UI endpoint (/copilotkit)
-│   │   │   ├── events.py        # Redis Pub/Sub SSE stream (/events/{thread_id})
-│   │   │   ├── health.py        # Service health checks (/health, /)
-│   │   │   └── title.py         # Direct title summarization (/api/title)
-│   │   ├── app.py               # FastAPI App Factory & Lifespan Management
+│   ├── controllers/             # Inbound HTTP & SSE Presentation Layer
+│   │   ├── app.py               # FastAPI App Factory & Lifespan DI
+│   │   ├── chat.py              # POST /chat/stream SSE endpoint
+│   │   ├── copilotkit.py        # CopilotKit AG-UI endpoint (/copilotkit)
+│   │   ├── artifacts.py         # Secure session artifact endpoint (/sessions/.../artifacts)
+│   │   ├── events.py            # Redis Pub/Sub SSE stream (/events/{thread_id})
+│   │   ├── health.py            # Service health checks (/health, /)
+│   │   ├── title.py             # Direct title summarization (/api/title)
+│   │   └── dependencies.py      # Dependency injection providers (get_agent_runtime)
+│   ├── domain/                  # Pure Business Contracts & Outbound Ports
+│   │   └── ports.py             # PersistencePort, SandboxExecutionPort, StoragePort, ModelPort
+│   ├── runtime/                 # Deep Execution Engine (Single-flight lock, AST demuxing, HITL)
+│   │   ├── runtime.py           # AgentRuntime implementation (.stream, .inspect)
+│   │   ├── events.py            # AgentStreamEvent definitions & SSE serialization
+│   │   ├── types.py             # AgentTurn, ApprovalDecision, Attachment, ChatMessage
 │   │   └── __init__.py
-│   ├── core/                    # Core Infrastructure & Adapters
-│   │   ├── config.py            # Pydantic Settings & LLM Model Factory
-│   │   ├── observability.py     # Langfuse Callback Handler
-│   │   ├── redis.py             # RedisEventBroker, Redis Cache & PubSub
-│   │   └── __init__.py
+│   ├── infrastructure/          # Outbound Port Adapters & External Drivers
+│   │   ├── persistence/         # PostgresPersistenceAdapter, InMemoryPersistenceAdapter
+│   │   ├── sandbox/             # DockerSandboxAdapter, InProcessSandboxAdapter
+│   │   ├── storage/             # S3StorageAdapter, InMemoryStorageAdapter
+│   │   ├── models/              # LangChainModelAdapter, FakeChatModelAdapter
+│   │   ├── redis.py             # RedisEventBroker, Pub/Sub channels
+│   │   ├── observability.py     # Langfuse tracing & callback handlers
+│   │   └── config.py            # Pydantic Settings & environment modes
 │   ├── graphs/                  # Domain-specific LangGraph StateGraphs
-│   │   └── chat/                # Default Chat Agent
-│   │       ├── graph.py         # create_deep_agent graph compilation
-│   │       ├── prompts.py       # System Prompts & LCEL title prompt
-│   │       └── __init__.py
+│   │   └── chat/                # Deep Agent Environment & Custom Graph Factories
 │   ├── tools/                   # Agent Tools Registry
 │   │   ├── system.py            # System tools (time, math, status, finalize)
 │   │   └── __init__.py
 │   ├── workers/                 # Background Task Queue Workers
 │   │   ├── title_worker.py      # Redis Task Queue Worker (queue:title_generation)
 │   │   └── __init__.py
-│   ├── schemas/                 # Pydantic DTO Schemas
+│   ├── schemas/                 # Pydantic DTO Schemas & Event Re-exports
 │   │   └── __init__.py
 │   └── main.py                  # CLI and module runner entry point
-├── tests/                       # Pytest Suite
-│   ├── test_health.py
-│   └── __init__.py
+├── tests/                       # Pytest Suite (Unit, Integration, E2E)
+│   ├── unit/                    # Fast in-memory unit tests
+│   └── ...
 ├── main.py                      # Root execution entry point (`uv run python main.py`)
 ├── pyproject.toml
 └── Dockerfile

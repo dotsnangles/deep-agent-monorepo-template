@@ -112,7 +112,9 @@ class PostgresPersistenceAdapter(PersistencePort):
     async def save_checkpoint(
         self, thread_id: str, state: dict[str, Any], metadata: dict[str, Any]
     ) -> None:
-        pass
+        config = {"configurable": {"thread_id": thread_id}}
+        if hasattr(self.checkpointer, "aput"):
+            await self.checkpointer.aput(config, state, metadata, {})
 
     async def clear_messages(self, thread_id: str, message_ids: list[str]) -> None:
         pass

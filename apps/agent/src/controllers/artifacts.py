@@ -3,21 +3,10 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
-from src.infrastructure.sandbox.adapter import is_denied_path
+from src.infrastructure.sandbox.adapter import is_denied_path, MIME_TYPE_OVERRIDES, guess_mime_type
 from src.graphs.chat.backends import DEFAULT_WORKSPACE_DIR
 
 artifacts_router = APIRouter(prefix="/sessions", tags=["artifacts"])
-
-MIME_TYPE_OVERRIDES = {
-    ".png": "image/png",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".svg": "image/svg+xml",
-    ".html": "text/html; charset=utf-8",
-    ".json": "application/json",
-    ".csv": "text/csv; charset=utf-8",
-    ".pdf": "application/pdf",
-}
 
 
 @artifacts_router.get("/{session_id}/artifacts/{file_path:path}")
