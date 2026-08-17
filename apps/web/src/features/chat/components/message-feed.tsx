@@ -17,7 +17,7 @@ import { authClient } from "../../../lib/auth-client";
 import { ChatSessionContext } from "../context/chat-session-context";
 import { useChatEngine } from "../hooks/use-chat-engine";
 import { useDirectUpload } from "../hooks/use-direct-upload";
-import { getRandomGreeting } from "../lib/greetings";
+import { getSessionGreeting } from "../lib/greetings";
 import { MessageItem } from "./message-item";
 import { AttachmentStagingBar } from "./attachment-staging-bar";
 
@@ -124,17 +124,11 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
   const isSendDisabled =
     (!inputPrompt.trim() && completedAttachments.length === 0) || isUploading;
 
-  const [greetingSeed, setGreetingSeed] = useState(() => Math.floor(Math.random() * 100));
-
-  useEffect(() => {
-    setGreetingSeed(Math.floor(Math.random() * 100));
-  }, [sessionId]);
-
   const { data: authSession } = authClient.useSession();
   const userName = authSession?.user?.name
     ? authSession.user.name.split(" ")[0] || authSession.user.name
     : null;
-  const greetingText = getRandomGreeting(userName, greetingSeed);
+  const greetingText = getSessionGreeting(sessionId, userName);
 
   const chatSessionsContext = useContext(ChatSessionContext);
   const isExistingSession = chatSessionsContext
@@ -174,7 +168,10 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
               : "max-h-0 opacity-0 scale-95 pointer-events-none pb-0 -translate-y-6"
           )}
         >
-          <h1 className="text-3xl sm:text-4xl font-normal tracking-tight text-foreground/90 text-center select-none animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out">
+          <h1
+            suppressHydrationWarning
+            className="text-3xl sm:text-4xl font-normal tracking-tight text-foreground/90 text-center select-none animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"
+          >
             {greetingText}
           </h1>
         </div>

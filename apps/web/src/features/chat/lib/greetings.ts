@@ -14,11 +14,21 @@ export const KOREAN_GREETINGS_GUEST: string[] = [
   "어디서부터 시작해볼까요?",
 ];
 
+export function hashStringToIndex(str: string, modulo: number): number {
+  if (!str || modulo <= 0) return 0;
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash) % modulo;
+}
+
 export function getRandomGreeting(userName?: string | null, seedIndex?: number): string {
   const index =
     typeof seedIndex === "number" && seedIndex >= 0
-      ? seedIndex % KOREAN_GREETINGS_GUEST.length
-      : Math.floor(Math.random() * KOREAN_GREETINGS_GUEST.length);
+      ? Math.abs(seedIndex) % KOREAN_GREETINGS_GUEST.length
+      : 0;
 
   if (userName?.trim()) {
     const generator = KOREAN_GREETINGS_WITH_NAME[index] || KOREAN_GREETINGS_WITH_NAME[0];
@@ -26,4 +36,9 @@ export function getRandomGreeting(userName?: string | null, seedIndex?: number):
   }
 
   return KOREAN_GREETINGS_GUEST[index] || KOREAN_GREETINGS_GUEST[0];
+}
+
+export function getSessionGreeting(sessionId: string, userName?: string | null): string {
+  const index = hashStringToIndex(sessionId, KOREAN_GREETINGS_GUEST.length);
+  return getRandomGreeting(userName, index);
 }
