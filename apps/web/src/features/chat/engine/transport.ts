@@ -466,7 +466,7 @@ export class FakeChatTransport implements ChatTransport {
     if (targetIdx === -1) return null;
 
     const sliced = tree.messages.slice(0, targetIdx + 1);
-    const newSessionId = `sess_fork_${Date.now()}`;
+    const newSessionId = crypto.randomUUID();
     const newTitle = title || `${tree.title || "새로운 대화"} (분기)`;
     const lastId = sliced[sliced.length - 1]?.id || null;
 

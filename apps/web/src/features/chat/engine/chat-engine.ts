@@ -48,8 +48,8 @@ export interface ChatEngineOptions {
   onSessionCreated?: (sessionId: string, title: string) => void;
 }
 
-function generateNodeId(prefix: "user" | "asst" | "sys"): string {
-  return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+function generateNodeId(_prefix?: "user" | "asst" | "sys"): string {
+  return crypto.randomUUID();
 }
 
 export class ChatEngine {
