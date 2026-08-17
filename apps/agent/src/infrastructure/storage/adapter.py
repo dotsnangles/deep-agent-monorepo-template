@@ -141,11 +141,12 @@ class S3StorageAdapter(StoragePort):
                 )
                 query = (
                     "INSERT INTO chat_artifact "
-                    "(id, session_id, message_id, name, mime_type, size_bytes, metadata, created_at) "
-                    "VALUES (%s, %s, %s, %s, %s, %s, %s, NOW()) "
+                    "(id, session_id, message_id, name, storage_key, mime_type, size_bytes, metadata, created_at) "
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW()) "
                     "ON CONFLICT (id) DO UPDATE SET "
-                    "name = EXCLUDED.name, mime_type = EXCLUDED.mime_type, "
-                    "size_bytes = EXCLUDED.size_bytes, metadata = EXCLUDED.metadata"
+                    "name = EXCLUDED.name, storage_key = EXCLUDED.storage_key, "
+                    "mime_type = EXCLUDED.mime_type, size_bytes = EXCLUDED.size_bytes, "
+                    "metadata = EXCLUDED.metadata"
                 )
                 await conn.execute(
                     query,
@@ -154,6 +155,7 @@ class S3StorageAdapter(StoragePort):
                         artifact.session_id,
                         artifact.message_id,
                         artifact.name,
+                        artifact.storage_key,
                         artifact.mime_type,
                         artifact.size_bytes,
                         meta_json,
