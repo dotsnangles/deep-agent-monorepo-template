@@ -133,16 +133,22 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
 
   return (
     <div className="flex flex-col h-full w-full min-h-0 relative overflow-hidden">
-      {/* 1. Ambient Gemini Radial Glow / Aura (어스름) */}
+      {/* 1. Ambient Gemini Radial Glow / Aura (어스름) - Continuous organic movement */}
       <div
         className={cn(
-          "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-all duration-700 ease-out z-0",
+          "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-all duration-700 ease-out z-0 select-none",
           isEmpty
-            ? "opacity-100 scale-100 animate-in fade-in zoom-in-75 duration-1000"
-            : "opacity-0 scale-75 pointer-events-none"
+            ? "opacity-100 scale-100"
+            : "opacity-0 scale-50 pointer-events-none"
         )}
       >
-        <div className="w-[520px] sm:w-[700px] h-[320px] sm:h-[420px] rounded-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-600/15 via-indigo-500/10 to-transparent blur-3xl animate-pulse duration-[6000ms]" />
+        <div className="relative flex items-center justify-center">
+          {/* Primary Luminous Deep Blue/Cyan Glow Orb */}
+          <div className="gemini-ambient-glow w-[560px] sm:w-[820px] h-[340px] sm:h-[480px] rounded-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-500/35 via-indigo-500/25 to-transparent blur-[85px]" />
+
+          {/* Secondary Violet/Indigo Counter-Movement Orb for organic depth */}
+          <div className="gemini-ambient-glow-secondary absolute w-[460px] sm:w-[680px] h-[280px] sm:h-[380px] rounded-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-600/30 via-purple-500/20 to-transparent blur-[95px]" />
+        </div>
       </div>
 
       {/* 2. Upper Dynamic Zone: Smoothly collapses from Center Hero to Message Feed */}
