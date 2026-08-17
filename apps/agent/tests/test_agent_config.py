@@ -5,8 +5,8 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
-from src.core.config import EnvironmentMode
-from src.core.settings import AgentConfig, AgentConfigLoader
+from src.infrastructure import EnvironmentMode
+from src.infrastructure import AgentConfig, AgentConfigLoader
 
 
 def test_default_agent_config():

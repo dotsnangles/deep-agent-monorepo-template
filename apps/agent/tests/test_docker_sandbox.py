@@ -5,7 +5,7 @@ from deepagents.backends.protocol import ExecuteResponse, SandboxBackendProtocol
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 
-from src.core.testing import FakeChatModel
+from src.infrastructure import FakeChatModel
 from src.graphs.chat.backends import DockerSandboxBackend, get_session_backend
 from src.graphs.chat.graph import build_agent
 

@@ -4,7 +4,7 @@ from langchain_core.tools import tool
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command
 
-from src.core.testing import FakeChatModel
+from src.infrastructure import FakeChatModel
 from src.graphs.chat.graph import build_agent
 from src.schemas import AgentStreamEvent, ApprovalRequestEventData
 

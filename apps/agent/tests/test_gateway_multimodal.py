@@ -1,7 +1,7 @@
 import pytest
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from src.core.testing import FakeChatModel
+from src.infrastructure import FakeChatModel
 from src.runtime import AgentRuntime
 from src.runtime.runtime import _normalize_turn_messages
 

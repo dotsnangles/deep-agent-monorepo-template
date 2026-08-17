@@ -5,8 +5,8 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.store.memory import InMemoryStore
 
-from src.core.config import EnvironmentMode, get_deep_agent_mode
-from src.core.testing import FakeChatModel
+from src.infrastructure import EnvironmentMode, get_deep_agent_mode
+from src.infrastructure import FakeChatModel
 from src.graphs.chat.factory import DeepAgentEnvironmentFactory
 from src.graphs.chat.graph import build_agent
 

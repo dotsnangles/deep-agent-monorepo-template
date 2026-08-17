@@ -29,14 +29,14 @@ from langchain.agents.middleware import (
     ToolRetryMiddleware,
 )
 
-from src.core.checkpointer import CheckpointerFactory
-from src.core.config import (
+from src.infrastructure import (
     ENABLE_SUBAGENTS,
+    CheckpointerFactory,
     EnvironmentMode,
+    get_agent_config,
     get_deep_agent_mode,
     get_llm,
 )
-from src.core.settings import get_agent_config
 from src.graphs.chat.prompts import get_prompt_catalog
 
 logger = logging.getLogger(__name__)

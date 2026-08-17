@@ -2,7 +2,7 @@ from typing import Any
 
 from langchain_core.output_parsers import StrOutputParser
 
-from src.core.config import get_llm
+from src.infrastructure import get_llm
 from src.graphs.chat.factory import DeepAgentEnvironmentFactory
 from src.graphs.chat.prompts import get_prompt_catalog
 

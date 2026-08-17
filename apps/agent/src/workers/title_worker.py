@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from src.core.redis import RedisEventBroker
+from src.infrastructure import RedisEventBroker
 from src.graphs.chat.graph import generate_title
 
 logger = logging.getLogger(__name__)
@@ -98,7 +98,7 @@ class TitleGenerationWorker:
 
                 # 1. Generate title (Heuristic slicing in local_slm mode to avoid compute
                 # contention; LLM generator in cloud_provider)
-                from src.core.config import EnvironmentMode, get_deep_agent_mode
+                from src.infrastructure import EnvironmentMode, get_deep_agent_mode
 
                 if get_deep_agent_mode() == EnvironmentMode.LOCAL_SLM:
                     smart_title = task.userPrompt.strip().replace("\n", " ")[:25].strip()

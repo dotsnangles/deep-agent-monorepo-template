@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from langgraph.checkpoint.memory import MemorySaver
 
-from src.core.testing import FakeChatModel
+from src.infrastructure import FakeChatModel
 from src.graphs.chat.backends import DockerSandboxBackend
 from src.graphs.chat.graph import build_agent
 from src.graphs.chat.subagents import get_default_subagents

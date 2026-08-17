@@ -6,7 +6,7 @@ from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 
-from src.core.testing import FakeChatModel
+from src.infrastructure import FakeChatModel
 from src.graphs.registry import GraphRegistry
 from src.runtime import AgentRuntime
 from src.schemas.events import AgentStreamEvent

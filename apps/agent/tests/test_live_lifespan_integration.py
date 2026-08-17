@@ -6,7 +6,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from src.controllers.app import create_app
-from src.core import FakeChatModel
+from src.infrastructure import FakeChatModel
 
 
 @pytest.mark.asyncio

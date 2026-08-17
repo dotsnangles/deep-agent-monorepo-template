@@ -4,7 +4,7 @@ from langchain_core.tools import tool
 from langgraph.checkpoint.memory import MemorySaver
 
 from src.controllers.app import create_app
-from src.core import FakeChatModel
+from src.infrastructure import FakeChatModel
 from src.graphs.chat import build_agent
 from src.graphs.registry import GraphRegistry
 from src.runtime import AgentRuntime

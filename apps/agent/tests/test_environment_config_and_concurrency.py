@@ -5,12 +5,12 @@ from unittest.mock import patch
 import pytest
 from langchain_core.messages import HumanMessage
 
-from src.core.config import (
+from src.infrastructure import (
     EnvironmentMode,
     get_deep_agent_mode,
     get_inference_concurrency_limit,
 )
-from src.core.testing import FakeChatModel
+from src.infrastructure import FakeChatModel
 from src.runtime import AgentRuntime
 
 

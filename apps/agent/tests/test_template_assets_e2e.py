@@ -3,8 +3,8 @@ from pathlib import Path
 import yaml
 from langgraph.checkpoint.memory import MemorySaver
 
-from src.core.settings import AgentConfig, AgentConfigLoader
-from src.core.testing import FakeChatModel
+from src.infrastructure import AgentConfig, AgentConfigLoader
+from src.infrastructure import FakeChatModel
 from src.graphs.chat.factory import DeepAgentEnvironmentFactory
 from src.graphs.chat.prompts import PromptCatalog
 

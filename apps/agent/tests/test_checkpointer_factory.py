@@ -5,7 +5,7 @@ import pytest
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.store.memory import InMemoryStore
 
-from src.core.checkpointer import CheckpointerFactory
+from src.infrastructure import CheckpointerFactory
 from src.runtime import AgentRuntime
 
 

@@ -5,7 +5,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.store.memory import InMemoryStore
 
 from src.controllers.app import create_app
-from src.core.checkpointer import CheckpointerFactory
+from src.infrastructure import CheckpointerFactory
 
 
 @pytest.mark.asyncio
@@ -46,15 +46,15 @@ async def test_lifespan_manages_postgres_pool_lifecycle_and_injections():
             },
         ),
         patch(
-            "src.core.checkpointer.CheckpointerFactory.create_pool",
+            "src.infrastructure.persistence.adapter.CheckpointerFactory.create_pool",
             side_effect=fake_create_pool,
         ) as mock_create_pool,
         patch(
-            "src.core.checkpointer.CheckpointerFactory.create_checkpointer",
+            "src.infrastructure.persistence.adapter.CheckpointerFactory.create_checkpointer",
             return_value=mock_checkpointer,
         ) as mock_create_cp,
         patch(
-            "src.core.checkpointer.CheckpointerFactory.create_store",
+            "src.infrastructure.persistence.adapter.CheckpointerFactory.create_store",
             return_value=mock_store,
         ) as mock_create_st,
         patch("redis.asyncio.from_url", return_value=mock_redis),

@@ -2,7 +2,7 @@ import pytest
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 
-from src.core import FakeChatModel
+from src.infrastructure import FakeChatModel
 from src.graphs.chat.graph import build_agent
 from src.graphs.registry import GraphRegistry
 from src.runtime import AgentRuntime

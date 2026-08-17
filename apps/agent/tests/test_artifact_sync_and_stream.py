@@ -5,8 +5,8 @@ import pytest
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 
-from src.core.artifacts import ArtifactSyncProcessor
-from src.core.testing import FakeChatModel
+from src.infrastructure import ArtifactSyncProcessor
+from src.infrastructure import FakeChatModel
 from src.graphs.chat.backends import DockerSandboxBackend
 from src.graphs.chat.graph import build_agent
 from src.graphs.registry import GraphRegistry
@@ -182,7 +182,7 @@ class TestArtifactSyncAndStreamPipeline:
         doc_path = artifacts_dir / "love_letter.txt"
         doc_path.write_text("Forever yours", encoding="utf-8")
 
-        from src.core.artifacts import compute_file_sha256
+        from src.infrastructure import compute_file_sha256
         file_hash = compute_file_sha256(doc_path)
 
         storage = FakeAsyncStorageService()
@@ -264,7 +264,7 @@ class TestArtifactSyncAndStreamPipeline:
 
     @pytest.mark.asyncio
     async def test_s3_storage_service_upload_and_presigned_url(self, tmp_path: Path):
-        from src.core.artifacts import S3StorageService
+        from src.infrastructure import S3StorageService
 
         test_file = tmp_path / "test_chart.png"
         test_file.write_bytes(b"\x89PNG\r\n\x1a\nfake_image_bytes")
@@ -296,10 +296,10 @@ class TestArtifactSyncAndStreamPipeline:
 
         with pytest.MonkeyPatch.context() as mp:
             mp.setenv("DATABASE_URL", "postgresql://user:pass@localhost:5432/testdb")
-            mp.setattr("src.core.checkpointer.CheckpointerFactory.create_pool", AsyncMock(return_value=mock_pool))
-            mp.setattr("src.core.checkpointer.CheckpointerFactory.create_checkpointer", MagicMock(return_value=MemorySaver()))
-            mp.setattr("src.core.checkpointer.CheckpointerFactory.create_store", MagicMock(return_value=None))
-            mp.setattr("src.core.checkpointer.CheckpointerFactory.close_pool", AsyncMock())
+            mp.setattr("src.infrastructure.persistence.adapter.CheckpointerFactory.create_pool", AsyncMock(return_value=mock_pool))
+            mp.setattr("src.infrastructure.persistence.adapter.CheckpointerFactory.create_checkpointer", MagicMock(return_value=MemorySaver()))
+            mp.setattr("src.infrastructure.persistence.adapter.CheckpointerFactory.create_store", MagicMock(return_value=None))
+            mp.setattr("src.infrastructure.persistence.adapter.CheckpointerFactory.close_pool", AsyncMock())
 
             async with app.router.lifespan_context(app):
                 assert app.state.agent_runtime is not None

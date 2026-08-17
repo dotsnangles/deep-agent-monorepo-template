@@ -1,7 +1,7 @@
 import pytest
 from langchain_core.messages import HumanMessage
 
-from src.core.testing import FakeChatModel
+from src.infrastructure import FakeChatModel
 from src.schemas.events import AgentStreamEvent
 
 

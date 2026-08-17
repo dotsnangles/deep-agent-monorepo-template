@@ -1,43 +1,25 @@
+from __future__ import annotations
+
+import asyncio
+import hashlib
 import json
 import logging
 import mimetypes
-import uuid
+import os
 from pathlib import Path
 from typing import Any
+import uuid
 
+from botocore.client import Config
 from src.graphs.chat.backends import DEFAULT_WORKSPACE_DIR, _is_denied_path
 from src.schemas.events import ArtifactCreatedEventData
+from src.infrastructure.sandbox.adapter import MIME_TYPE_OVERRIDES, guess_mime_type
 
 logger = logging.getLogger(__name__)
 
-MIME_TYPE_OVERRIDES = {
-    ".png": "image/png",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".svg": "image/svg+xml",
-    ".html": "text/html; charset=utf-8",
-    ".json": "application/json",
-    ".csv": "text/csv; charset=utf-8",
-    ".pdf": "application/pdf",
-    ".txt": "text/plain; charset=utf-8",
-    ".md": "text/markdown; charset=utf-8",
-}
-
-
-import asyncio
-import os
-from botocore.client import Config
 
 def guess_artifact_mime_type(file_path: Path | str) -> str:
-    path = Path(file_path)
-    suffix = path.suffix.lower()
-    if suffix in MIME_TYPE_OVERRIDES:
-        return MIME_TYPE_OVERRIDES[suffix]
-    guessed, _ = mimetypes.guess_type(str(path))
-    return guessed or "application/octet-stream"
-
-
-import hashlib
+    return guess_mime_type(file_path)
 
 
 def compute_file_sha256(file_path: Path) -> str:
@@ -131,7 +113,7 @@ class S3StorageService:
         expires_in: int = 3600,
     ) -> str:
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(
+        url = await loop.run_in_executor(
             None,
             lambda: self.client.generate_presigned_url(
                 "get_object",
@@ -139,30 +121,26 @@ class S3StorageService:
                 ExpiresIn=expires_in,
             ),
         )
+        return url
 
 
 class ArtifactSyncProcessor:
-    """Synchronizes generated artifacts from session workspace to Object Storage and Database."""
+    """Scans session sandbox `artifacts/` folder, detects new/modified deliverables,"""
 
     def __init__(
         self,
-        workspace_dir: Path | str | None = None,
+        workspace_dir: Path | str = DEFAULT_WORKSPACE_DIR,
         storage_service: Any = None,
         db_pool: Any = None,
     ) -> None:
-        self.workspace_dir = (
-            Path(workspace_dir).resolve()
-            if workspace_dir is not None
-            else DEFAULT_WORKSPACE_DIR.resolve()
-        )
+        self.workspace_dir = Path(workspace_dir)
         self.storage_service = storage_service
         self.db_pool = db_pool
-        # In-memory tracking of processed file signatures (session_id -> dict of filename -> sha256)
-        self._synced_files: dict[str, dict[str, str]] = {}
+        self._synced_cache: dict[str, dict[str, str]] = {}
 
     async def _get_synced_map(self, session_id: str) -> dict[str, str]:
-        if session_id in self._synced_files:
-            return self._synced_files[session_id]
+        if session_id in self._synced_cache:
+            return self._synced_cache[session_id]
 
         synced_map: dict[str, str] = {}
         if self.db_pool is not None:
@@ -171,32 +149,27 @@ class ArtifactSyncProcessor:
                     async with conn.cursor() as cur:
                         await cur.execute(
                             """
-                            SELECT name, metadata->>'content_hash' as content_hash
+                            SELECT name, metadata->>'content_hash'
                             FROM chat_artifact
                             WHERE session_id = %s
-                            ORDER BY created_at ASC
                             """,
                             (session_id,),
                         )
                         rows = await cur.fetchall()
                         for row in rows:
-                            file_name = row[0]
-                            content_hash = row[1]
-                            if file_name and content_hash:
-                                synced_map[file_name] = content_hash
-            except Exception as db_err:
-                logger.warning("Failed to restore synced artifacts from DB for session %s: %s", session_id, db_err)
+                            if row[0] and row[1]:
+                                synced_map[row[0]] = row[1]
+            except Exception as e:
+                logger.warning("Failed querying existing artifacts for session %s: %s", session_id, e)
 
-        self._synced_files[session_id] = synced_map
-        return self._synced_files[session_id]
+        self._synced_cache[session_id] = synced_map
+        return synced_map
 
     async def sync_session_artifacts(
         self,
         session_id: str,
         message_id: str | None = None,
     ) -> list[ArtifactCreatedEventData]:
-        """Scans the artifacts/ directory of a session, checks SHA-256 hash against
-        previously recorded version, uploads changed/new items, persists to DB, and returns event data."""
         session_dir = self.workspace_dir / session_id
         artifacts_dir = session_dir / "artifacts"
 
@@ -218,11 +191,9 @@ class ArtifactSyncProcessor:
                 content_hash = compute_file_sha256(file_path)
                 last_hash = synced_map.get(rel_name)
 
-                # If file content has not changed since last sync, skip (No-op)
                 if last_hash == content_hash:
                     continue
 
-                # 1. Build metadata and keys
                 mime_type = guess_artifact_mime_type(file_path)
                 size_bytes = file_path.stat().st_size
                 artifact_id = str(uuid.uuid4())
@@ -233,7 +204,6 @@ class ArtifactSyncProcessor:
                 else:
                     storage_key = f"artifacts/sessions/{session_id}/{rel_name}"
 
-                # 2. Upload to Storage Service if available, otherwise generate local fallback URL
                 download_url: str
                 if self.storage_service is not None:
                     try:
@@ -255,7 +225,6 @@ class ArtifactSyncProcessor:
                 else:
                     download_url = f"/sessions/{session_id}/artifacts/{rel_name}"
 
-                # 3. Persist metadata to PostgreSQL database if pool available
                 if self.db_pool is not None:
                     try:
                         async with self.db_pool.connection() as conn:
@@ -282,7 +251,6 @@ class ArtifactSyncProcessor:
                     except Exception as db_err:
                         logger.warning("DB artifact insert failed for %s: %s", artifact_id, db_err)
 
-                # 4. Record as synced and append event
                 synced_map[rel_name] = content_hash
                 event_data = ArtifactCreatedEventData(
                     id=artifact_id,

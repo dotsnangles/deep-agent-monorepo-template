@@ -3,8 +3,8 @@ from unittest.mock import patch
 
 from langgraph.checkpoint.memory import MemorySaver
 
-from src.core.config import EnvironmentMode
-from src.core.testing import FakeChatModel
+from src.infrastructure import EnvironmentMode
+from src.infrastructure import FakeChatModel
 from src.graphs.chat.factory import DeepAgentEnvironmentFactory
 
 
