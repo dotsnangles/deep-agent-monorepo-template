@@ -5,10 +5,10 @@ import pytest
 from langgraph.checkpoint.memory import MemorySaver
 
 from src.core.config import EnvironmentMode
-from src.core.gateway import AgentExecutionGateway
 from src.core.testing import FakeChatModel
 from src.graphs.chat.factory import DeepAgentEnvironmentFactory
 from src.graphs.chat.subagents import create_custom_subagent, get_default_subagents
+from src.runtime import AgentRuntime
 
 
 def test_subagent_templates_and_default():
@@ -67,7 +67,7 @@ async def test_subagent_delegation_stream_events():
         ]
     )
 
-    gateway = AgentExecutionGateway(model=model)
+    gateway = AgentRuntime.create_in_memory(model=model)
     events = []
     async for event in gateway.stream_execution(
         messages=[{"role": "user", "content": "Please analyze this"}],

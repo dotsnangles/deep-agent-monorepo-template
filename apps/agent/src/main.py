@@ -2,7 +2,7 @@ import os
 
 import uvicorn
 
-from src.api.app import create_app
+from src.controllers.app import create_app
 from src.core.config import SERVER_HOST, SERVER_PORT
 
 app = create_app()

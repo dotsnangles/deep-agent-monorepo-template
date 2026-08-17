@@ -33,13 +33,15 @@ class ApprovalDecision:
 class AgentTurn:
     """Represents a single invocation turn in an agent conversation."""
     thread_id: str
-    input: Union[str, list[ChatMessage], ApprovalDecision]
+    input: Union[str, list[ChatMessage], ApprovalDecision, list[Any]]
     user_id: str | None = None
     assistant_message_id: str | None = None
     agent_type: str = "default"
     system_prompt: str | None = None
+    resume: Any = None
     backend: Any = None
     model: Any = None
+    turn_index: int = 1
     metadata: dict[str, Any] = field(default_factory=dict)
 
 

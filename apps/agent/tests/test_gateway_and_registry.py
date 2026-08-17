@@ -6,9 +6,9 @@ from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 
-from src.core.gateway import AgentExecutionGateway
 from src.core.testing import FakeChatModel
 from src.graphs.registry import GraphRegistry
+from src.runtime import AgentRuntime
 from src.schemas.events import AgentStreamEvent
 
 
@@ -64,11 +64,11 @@ class TestGraphRegistry:
         assert resolved == "default_graph"
 
 
-class TestAgentExecutionGateway:
+class TestAgentRuntime:
     @pytest.mark.asyncio
     async def test_stream_execution_with_dictionary_messages(self):
         fake_llm = FakeChatModel(tokens=["Response"])
-        gateway = AgentExecutionGateway(model=fake_llm)
+        gateway = AgentRuntime.create_in_memory(model=fake_llm)
 
         events: list[AgentStreamEvent] = []
         async for event in gateway.stream_execution(
@@ -84,7 +84,7 @@ class TestAgentExecutionGateway:
     @pytest.mark.asyncio
     async def test_stream_execution_with_custom_system_prompt(self):
         fake_llm = FakeChatModel(tokens=["Custom prompt response"])
-        gateway = AgentExecutionGateway(model=fake_llm)
+        gateway = AgentRuntime.create_in_memory(model=fake_llm)
 
         events: list[AgentStreamEvent] = []
         async for event in gateway.stream_execution(
@@ -103,7 +103,7 @@ class TestAgentExecutionGateway:
     async def test_stream_execution_yields_token_and_done_events(self):
         fake_llm = FakeChatModel(tokens=["Streamed", " ", "response", " ", "content"])
         checkpointer = MemorySaver()
-        gateway = AgentExecutionGateway(model=fake_llm, checkpointer=checkpointer)
+        gateway = AgentRuntime.create_in_memory(model=fake_llm, checkpointer=checkpointer)
 
         events: list[AgentStreamEvent] = []
         async for event in gateway.stream_execution(
@@ -131,7 +131,7 @@ class TestAgentExecutionGateway:
 
         fake_llm = FakeChatModel(tokens=["Graph", " ", "output"])
         checkpointer = MemorySaver()
-        gateway = AgentExecutionGateway(
+        gateway = AgentRuntime.create_in_memory(
             registry=registry,
             checkpointer=checkpointer,
             model=fake_llm,
@@ -159,7 +159,7 @@ class TestAgentExecutionGateway:
     async def test_stream_execution_yields_tool_start_events(self):
         tool_call_def = {"name": "search_docs", "args": {"query": "python"}, "id": "call_999"}
         fake_llm = FakeChatModel(tool_calls=[tool_call_def])
-        gateway = AgentExecutionGateway(model=fake_llm)
+        gateway = AgentRuntime.create_in_memory(model=fake_llm)
 
         events: list[AgentStreamEvent] = []
         async for event in gateway.stream_execution(
@@ -186,7 +186,7 @@ class TestAgentExecutionGateway:
                 raise RuntimeError("Simulated LLM Provider Outage")
                 yield  # pragma: no cover
 
-        gateway = AgentExecutionGateway(model=BrokenChatModel())
+        gateway = AgentRuntime.create_in_memory(model=BrokenChatModel())
 
         events: list[AgentStreamEvent] = []
         async for event in gateway.stream_execution(

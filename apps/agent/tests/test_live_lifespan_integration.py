@@ -5,7 +5,7 @@ import time
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from src.api.app import create_app
+from src.controllers.app import create_app
 from src.core import FakeChatModel
 
 
@@ -20,9 +20,9 @@ async def test_live_fastapi_lifespan_and_chat_streaming(caplog):
     app = create_app()
 
     async with app.router.lifespan_context(app):
-        # Override gateway model with deterministic FakeChatModel
+        # Override runtime model with deterministic FakeChatModel
         fake_model = FakeChatModel(tokens=["안녕하세요!", " ", "통합", " ", "테스트입니다."])
-        app.state.gateway.default_model = fake_model
+        app.state.agent_runtime.model = fake_model
 
         transport = ASGITransport(app=app)
         async with AsyncClient(

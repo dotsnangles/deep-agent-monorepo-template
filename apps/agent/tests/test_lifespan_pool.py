@@ -4,7 +4,7 @@ import pytest
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.store.memory import InMemoryStore
 
-from src.api.app import create_app
+from src.controllers.app import create_app
 from src.core.checkpointer import CheckpointerFactory
 
 
@@ -37,12 +37,14 @@ async def test_lifespan_manages_postgres_pool_lifecycle_and_injections():
         return mock_pool
 
     with (
-        patch(
-            "src.api.app.DATABASE_URL",
-            "postgresql://postgres:password@localhost:5432/app_test_db",
+        patch.dict(
+            "os.environ",
+            {
+                "DATABASE_URL": "postgresql://postgres:password@localhost:5432/app_test_db",
+                "REDIS_URL": "redis://localhost:6379/0",
+                "ENABLE_TITLE_WORKER": "true",
+            },
         ),
-        patch("src.api.app.REDIS_URL", "redis://localhost:6379/0"),
-        patch("src.api.app.ENABLE_TITLE_WORKER", True),
         patch(
             "src.core.checkpointer.CheckpointerFactory.create_pool",
             side_effect=fake_create_pool,
@@ -56,7 +58,7 @@ async def test_lifespan_manages_postgres_pool_lifecycle_and_injections():
             return_value=mock_store,
         ) as mock_create_st,
         patch("redis.asyncio.from_url", return_value=mock_redis),
-        patch("src.api.app.TitleGenerationWorker") as mock_worker_cls,
+        patch("src.controllers.app.TitleGenerationWorker") as mock_worker_cls,
     ):
         mock_worker_inst = MagicMock()
         mock_worker_inst.start = MagicMock()
@@ -80,9 +82,9 @@ async def test_lifespan_manages_postgres_pool_lifecycle_and_injections():
             assert app.state.pg_pool == mock_pool
             assert app.state.checkpointer == mock_checkpointer
             assert app.state.store == mock_store
-            assert app.state.gateway is not None
-            assert app.state.gateway.checkpointer == mock_checkpointer
-            assert app.state.gateway.store == mock_store
+            assert app.state.agent_runtime is not None
+            assert app.state.agent_runtime.persistence.checkpointer == mock_checkpointer
+            assert app.state.agent_runtime.persistence.store == mock_store
 
             # 3. Verify worker received shared pg_pool
             mock_worker_cls.assert_called_once()

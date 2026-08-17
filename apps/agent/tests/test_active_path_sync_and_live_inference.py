@@ -2,10 +2,10 @@ import pytest
 from langgraph.checkpoint.memory import MemorySaver
 from pydantic import Field
 
-from src.core.gateway import AgentExecutionGateway
 from src.core.testing import FakeChatModel
 from src.graphs.chat.graph import build_agent
 from src.graphs.registry import GraphRegistry
+from src.runtime import AgentRuntime
 
 
 class RecordingFakeChatModel(FakeChatModel):
@@ -40,7 +40,7 @@ class TestActivePathSyncAndLiveInference:
         registry = GraphRegistry()
         registry.register("default", build_agent)
 
-        gateway = AgentExecutionGateway(
+        gateway = AgentRuntime.create_in_memory(
             registry=registry,
             checkpointer=checkpointer,
             model=fake_llm,
@@ -120,7 +120,7 @@ class TestActivePathSyncAndLiveInference:
         Consecutive identical prompts must invoke model freshly.
         """
         fake_llm = FakeChatModel(tokens=["Token A", "Token B"])
-        gateway = AgentExecutionGateway(model=fake_llm)
+        gateway = AgentRuntime.create_in_memory(model=fake_llm)
 
         prompt = "파이썬으로 최적화된 피보나치 수열 생성 함수를 작성하고 시간 복잡도를 설명해줘."
 

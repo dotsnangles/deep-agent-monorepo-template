@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import os
 import uuid
@@ -10,10 +11,12 @@ from typing import Any
 
 from langchain_core.messages import (
     AIMessage,
+    AIMessageChunk,
     BaseMessage,
     HumanMessage,
     RemoveMessage,
     SystemMessage,
+    ToolMessage,
 )
 from langgraph.types import Command
 
@@ -38,36 +41,59 @@ from src.runtime.types import (
 logger = logging.getLogger(__name__)
 
 
-def _is_image_attachment(att: Attachment) -> bool:
-    return att.mime_type.lower().startswith("image/")
+def _is_image_attachment(att: Any) -> bool:
+    mime = (
+        att.get("mime_type", att.get("mimeType", ""))
+        if isinstance(att, dict)
+        else getattr(att, "mime_type", getattr(att, "mimeType", ""))
+    )
+    return str(mime).lower().startswith("image/")
 
 
-def _format_document_attachments(docs: list[Attachment]) -> str:
-    sections = [
-        f"- **{doc.name}** ({doc.mime_type}, {doc.size_bytes} bytes): [Download/View Document]({doc.url})"
-        for doc in docs
-    ]
+def _format_document_attachments(docs: list[Any]) -> str:
+    sections = []
+    for doc in docs:
+        name = (
+            doc.get("name", "document")
+            if isinstance(doc, dict)
+            else getattr(doc, "name", "document")
+        )
+        mime = (
+            doc.get("mime_type", doc.get("mimeType", "application/octet-stream"))
+            if isinstance(doc, dict)
+            else getattr(doc, "mime_type", getattr(doc, "mimeType", "application/octet-stream"))
+        )
+        size = (
+            doc.get("size", doc.get("size_bytes", 0))
+            if isinstance(doc, dict)
+            else getattr(doc, "size_bytes", getattr(doc, "size", 0))
+        )
+        url = doc.get("url", "") if isinstance(doc, dict) else getattr(doc, "url", "")
+        sections.append(
+            f"- **{name}** ({mime}, {size} bytes): [Download/View Document]({url})"
+        )
     return "\n[Attached Documents]\n" + "\n".join(sections)
 
 
 def _build_multimodal_content(
-    text_content: str, images: list[Attachment]
+    text_content: str, images: list[Any]
 ) -> list[dict[str, Any]]:
     blocks: list[dict[str, Any]] = []
     if text_content:
         blocks.append({"type": "text", "text": text_content})
     for img in images:
+        url = img.get("url", "") if isinstance(img, dict) else getattr(img, "url", "")
         blocks.append(
             {
                 "type": "image_url",
-                "image_url": {"url": img.url},
+                "image_url": {"url": url},
             }
         )
     return blocks
 
 
 def _normalize_turn_messages(
-    turn_input: str | list[ChatMessage] | ApprovalDecision,
+    turn_input: str | list[Any] | ApprovalDecision,
     system_prompt: str | None = None,
 ) -> list[BaseMessage]:
     from src.graphs.chat.prompts import MAIN_SYSTEM_PROMPT
@@ -87,15 +113,29 @@ def _normalize_turn_messages(
     has_system = False
 
     for msg in turn_input:
-        if msg.role == "system":
+        if isinstance(msg, BaseMessage):
+            if isinstance(msg, SystemMessage):
+                has_system = True
+            normalized.append(msg)
+            continue
+
+        role = msg.get("role", "") if isinstance(msg, dict) else getattr(msg, "role", "")
+        content = msg.get("content", "") if isinstance(msg, dict) else getattr(msg, "content", "")
+        attachments = (
+            msg.get("attachments", [])
+            if isinstance(msg, dict)
+            else getattr(msg, "attachments", [])
+        )
+
+        if role in ("system", "SystemMessage"):
             has_system = True
-            normalized.append(SystemMessage(content=msg.content or effective_sys))
-        elif msg.role == "assistant":
-            normalized.append(AIMessage(content=msg.content))
+            normalized.append(SystemMessage(content=content or effective_sys))
+        elif role in ("assistant", "AIMessage"):
+            normalized.append(AIMessage(content=content))
         else:
-            images = [att for att in msg.attachments if _is_image_attachment(att)]
-            docs = [att for att in msg.attachments if not _is_image_attachment(att)]
-            text = msg.content
+            images = [att for att in attachments if _is_image_attachment(att)]
+            docs = [att for att in attachments if not _is_image_attachment(att)]
+            text = content
             if docs:
                 doc_text = _format_document_attachments(docs)
                 text = f"{text}\n\n{doc_text}" if text else doc_text
@@ -110,6 +150,73 @@ def _normalize_turn_messages(
         normalized.insert(0, SystemMessage(content=effective_sys))
 
     return normalized
+
+
+def _build_trace_metadata(
+    messages: list[Any],
+    agent_type: str,
+    thread_id: str,
+    user_id: str | None = None,
+    turn_index: int = 1,
+    environment: str | None = None,
+) -> dict[str, Any]:
+    """Constructs enriched trace metadata for Langfuse and observability."""
+    user_prompt = ""
+    has_attachments = False
+
+    if isinstance(messages, str):
+        user_prompt = messages
+    elif isinstance(messages, list):
+        for msg in reversed(messages):
+            role = msg.get("role") if isinstance(msg, dict) else getattr(msg, "role", getattr(msg, "type", ""))
+            if role in ("user", "human"):
+                content = msg.get("content") if isinstance(msg, dict) else getattr(msg, "content", "")
+                if isinstance(content, str):
+                    user_prompt = content
+                elif isinstance(content, list):
+                    text_parts = [
+                        p.get("text", "")
+                        for p in content
+                        if isinstance(p, dict) and p.get("type") == "text"
+                    ]
+                    user_prompt = " ".join(text_parts)
+                atts = msg.get("attachments") if isinstance(msg, dict) else getattr(msg, "attachments", [])
+                if atts:
+                    has_attachments = True
+                break
+
+    snippet = user_prompt.strip()
+    if len(snippet) > 30:
+        snippet = snippet[:30] + "..."
+
+    user_msg_count = 0
+    if isinstance(messages, list):
+        user_msg_count = sum(
+            1
+            for m in messages
+            if (m.get("role") if isinstance(m, dict) else getattr(m, "role", getattr(m, "type", "")))
+            in ("user", "human")
+        )
+    effective_turn = max(turn_index, user_msg_count) if user_msg_count > 0 else turn_index
+
+    trace_name = f"[Turn {effective_turn}] {snippet}" if snippet else f"[Turn {effective_turn}]"
+
+    tags = ["chat", "streaming", f"agent:{agent_type}"]
+    if environment:
+        tags.append(f"env:{environment}")
+    if has_attachments:
+        tags.append("multimodal")
+
+    return {
+        "langfuse_session_id": thread_id,
+        "langfuse_user_id": user_id,
+        "langfuse_trace_name": trace_name,
+        "langfuse_tags": tags,
+        "user_prompt": user_prompt,
+        "active_path_length": len(messages) if isinstance(messages, list) else 1,
+        "turn_index": effective_turn,
+        "has_attachments": has_attachments,
+    }
 
 
 def _extract_interrupt_events(graph_state: Any) -> list[AgentStreamEvent]:
@@ -194,6 +301,32 @@ class AgentRuntime(AgentExecutionPort):
 
             self.concurrency_limit = get_inference_concurrency_limit()
 
+    @property
+    def checkpointer(self) -> Any:
+        return getattr(self.persistence, "checkpointer", None)
+
+    @checkpointer.setter
+    def checkpointer(self, value: Any) -> None:
+        if hasattr(self.persistence, "checkpointer"):
+            self.persistence.checkpointer = value
+
+    @property
+    def store(self) -> Any:
+        return getattr(self.persistence, "store", None)
+
+    @store.setter
+    def store(self, value: Any) -> None:
+        if hasattr(self.persistence, "store"):
+            self.persistence.store = value
+
+    @property
+    def default_model(self) -> Any:
+        return self.model
+
+    @default_model.setter
+    def default_model(self, value: Any) -> None:
+        self.model = value
+
     @classmethod
     def create_in_memory(
         cls,
@@ -201,6 +334,8 @@ class AgentRuntime(AgentExecutionPort):
         workspace_dir: Path | str = "./workspace/sessions",
         registry: Any = None,
         concurrency_limit: int | None = None,
+        checkpointer: Any = None,
+        store: Any = None,
     ) -> AgentRuntime:
         """Factory for 100% in-memory hermetic testing."""
         from src.infrastructure.models.adapter import FakeChatModelAdapter
@@ -209,7 +344,7 @@ class AgentRuntime(AgentExecutionPort):
         from src.infrastructure.storage.adapter import InMemoryStorageAdapter
 
         return cls(
-            persistence=InMemoryPersistenceAdapter(),
+            persistence=InMemoryPersistenceAdapter(checkpointer=checkpointer, store=store),
             sandbox=InProcessSandboxAdapter(root_dir=workspace_dir),
             storage=InMemoryStorageAdapter(),
             model=model or FakeChatModelAdapter(),
@@ -278,10 +413,42 @@ class AgentRuntime(AgentExecutionPort):
         return self._semaphores[self.concurrency_limit]
 
     async def stream_execution(
-        self, request: AgentTurn
+        self,
+        request_or_thread_id: AgentTurn | str | None = None,
+        messages: list[Any] | None = None,
+        system_prompt: str | None = None,
+        turn_index: int = 1,
+        agent_type: str = "default",
+        user_id: str | None = None,
+        assistant_message_id: str | None = None,
+        resume: Any = None,
+        resume_action: Any = None,
+        backend: str | None = None,
+        model: Any = None,
+        thread_id: str | None = None,
+        **kwargs: Any,
     ) -> AsyncIterator[AgentStreamEvent]:
-        """Implements AgentExecutionPort protocol."""
-        async for event in self.stream(request):
+        """Convenience stream method accepting either AgentTurn or positional/keyword arguments."""
+        if isinstance(request_or_thread_id, AgentTurn):
+            turn = request_or_thread_id
+        else:
+            eff_thread_id = thread_id or (
+                request_or_thread_id if isinstance(request_or_thread_id, str) else "default"
+            )
+            eff_resume = resume if resume is not None else resume_action
+            turn = AgentTurn(
+                thread_id=eff_thread_id,
+                input=messages or [],
+                system_prompt=system_prompt,
+                agent_type=agent_type,
+                turn_index=turn_index,
+                user_id=user_id,
+                assistant_message_id=assistant_message_id,
+                resume=eff_resume,
+                backend=backend,
+                model=model,
+            )
+        async for event in self.stream(turn):
             yield event
 
     async def stream(self, turn: AgentTurn) -> AsyncIterator[AgentStreamEvent]:
@@ -426,6 +593,19 @@ class AgentRuntime(AgentExecutionPort):
                 else [{"type": "reject", "message": turn.input.feedback or "Rejected"}]
             )
             graph_input = Command(resume={"decisions": decisions})
+        elif turn.resume is not None:
+            if isinstance(turn.resume, dict):
+                approved = turn.resume.get("approved", True)
+                reason = turn.resume.get("reason", turn.resume.get("feedback", "Rejected"))
+                tool_call_id = turn.resume.get("tool_call_id", turn.resume.get("toolCallId"))
+                decisions = (
+                    [{"type": "approve", "tool_call_id": tool_call_id}]
+                    if approved
+                    else [{"type": "reject", "message": reason, "tool_call_id": tool_call_id}]
+                )
+                graph_input = Command(resume={"decisions": decisions})
+            else:
+                graph_input = Command(resume=turn.resume)
         else:
             non_default_msgs = [
                 m
@@ -449,7 +629,7 @@ class AgentRuntime(AgentExecutionPort):
                             if remove_ops:
                                 await graph.aupdate_state(stream_config, {"messages": remove_ops})
                 except Exception as sync_err:
-                    logger.debug("State synchronization skipped: %s", sync_err)
+                    logger.debug("Active path sync skipped: %s", sync_err)
 
         total_tokens = 0
         try:
@@ -490,22 +670,36 @@ class AgentRuntime(AgentExecutionPort):
                             yield AgentStreamEvent.todo_update(todos=todos)
 
                     yield AgentStreamEvent.tool_start(
-                        tool=tool_name, tool_input=tool_input, run_id=event.get("run_id")
+                        tool=tool_name,
+                        tool_input=tool_input if isinstance(tool_input, dict) else {},
+                        run_id=event.get("run_id"),
                     )
                 elif kind == "on_tool_end":
                     tool_name = event.get("name", "tool")
                     tool_output = event.get("data", {}).get("output")
                     if tool_name == "task":
                         yield AgentStreamEvent.subagent_end(
-                            subagent="subagent", output=tool_output, run_id=event.get("run_id")
+                            subagent="subagent",
+                            output=str(tool_output),
+                            run_id=event.get("run_id"),
                         )
                     elif tool_name == "write_todos":
-                        todos = getattr(tool_output, "update", {}).get("todos") if hasattr(tool_output, "update") else (tool_output.get("todos") if isinstance(tool_output, dict) else None)
+                        todos = (
+                            getattr(tool_output, "update", {}).get("todos")
+                            if hasattr(tool_output, "update")
+                            else (
+                                tool_output.get("todos")
+                                if isinstance(tool_output, dict)
+                                else None
+                            )
+                        )
                         if todos and isinstance(todos, list):
                             yield AgentStreamEvent.todo_update(todos=todos)
 
                     yield AgentStreamEvent.tool_end(
-                        tool=tool_name, output=tool_output, run_id=event.get("run_id")
+                        tool=tool_name,
+                        output=tool_output,
+                        run_id=event.get("run_id"),
                     )
                 elif kind == "on_chain_start" and event.get("name") in ("agent", "tools", "generate"):
                     yield AgentStreamEvent.node_transition(node=event.get("name", "node"))
@@ -528,7 +722,7 @@ class AgentRuntime(AgentExecutionPort):
                 return
 
         # Synchronize and emit artifacts
-        async for art_ev in self._emit_artifact_events(thread_id, turn.assistant_message_id):
+        async for art_ev in self._emit_artifact_events(thread_id, turn.assistant_message_id, backend=backend):
             yield art_ev
 
         yield AgentStreamEvent.done(
@@ -545,10 +739,30 @@ class AgentRuntime(AgentExecutionPort):
         return events
 
     async def _emit_artifact_events(
-        self, thread_id: str, message_id: str | None = None
+        self, thread_id: str, message_id: str | None = None, backend: Any = None
     ) -> AsyncIterator[AgentStreamEvent]:
+        from src.infrastructure.sandbox.adapter import guess_mime_type, is_denied_path
+
         try:
-            workspace_files = await self.sandbox.list_workspace_artifacts(thread_id)
+            workspace_files: list[FileDescriptor] = []
+            if backend and hasattr(backend, "root_dir"):
+                root_path = Path(backend.root_dir)
+                art_dir = root_path / "artifacts" if (root_path / "artifacts").exists() else root_path
+                for p in art_dir.rglob("*"):
+                    if p.is_file() and not is_denied_path(p.name) and (p.parent.name == "artifacts" or "artifacts" in str(p)):
+                        data = p.read_bytes()
+                        h = hashlib.sha256(data).hexdigest()
+                        rel_path = str(p.relative_to(root_path)).replace("\\", "/")
+                        workspace_files.append(
+                            FileDescriptor(
+                                path=rel_path,
+                                size_bytes=len(data),
+                                content_hash=h,
+                                mime_type=guess_mime_type(p),
+                            )
+                        )
+            if not workspace_files:
+                workspace_files = await self.sandbox.list_workspace_artifacts(thread_id)
             if not workspace_files:
                 return
 
@@ -561,7 +775,12 @@ class AgentRuntime(AgentExecutionPort):
                     continue
 
                 # Read bytes and upload
-                data = await self.sandbox.read_artifact_bytes(thread_id, f.path)
+                if backend and hasattr(backend, "root_dir"):
+                    target_p = Path(backend.root_dir) / f.path
+                    data = target_p.read_bytes() if target_p.exists() else await self.sandbox.read_artifact_bytes(thread_id, f.path)
+                else:
+                    data = await self.sandbox.read_artifact_bytes(thread_id, f.path)
+
                 storage_key = f"artifacts/sessions/{thread_id}/{message_id or 'default'}/{filename}"
                 await self.storage.upload(storage_key, data, f.mime_type)
 

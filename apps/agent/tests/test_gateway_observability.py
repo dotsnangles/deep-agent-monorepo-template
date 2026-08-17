@@ -1,10 +1,11 @@
 import pytest
 from langgraph.checkpoint.memory import MemorySaver
 
-from src.core.gateway import AgentExecutionGateway, _build_trace_metadata
 from src.core.testing import FakeChatModel
 from src.graphs.chat.graph import build_agent
 from src.graphs.registry import GraphRegistry
+from src.runtime import AgentRuntime
+from src.runtime.runtime import _build_trace_metadata
 
 
 @pytest.mark.asyncio
@@ -93,7 +94,7 @@ class TestGatewayObservability:
         checkpointer = MemorySaver()
         registry.register("default", build_agent)
 
-        gateway = AgentExecutionGateway(
+        gateway = AgentRuntime.create_in_memory(
             registry=registry,
             checkpointer=checkpointer,
             model=fake_llm,

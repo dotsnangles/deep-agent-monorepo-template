@@ -3,12 +3,12 @@ from pathlib import Path
 import pytest
 from langgraph.checkpoint.memory import MemorySaver
 
-from src.core.gateway import AgentExecutionGateway
 from src.core.testing import FakeChatModel
 from src.graphs.chat.backends import DockerSandboxBackend
 from src.graphs.chat.graph import build_agent
 from src.graphs.chat.subagents import get_default_subagents
 from src.graphs.registry import GraphRegistry
+from src.runtime import AgentRuntime
 from src.schemas import (
     AgentStreamEvent,
     SubagentEndEventData,
@@ -159,7 +159,7 @@ class TestDataAnalysisFlowAndSubagents:
             ),
         )
         checkpointer = MemorySaver()
-        gateway = AgentExecutionGateway(
+        gateway = AgentRuntime.create_in_memory(
             registry=registry,
             checkpointer=checkpointer,
             model=fake_llm,
@@ -223,7 +223,7 @@ class TestDataAnalysisFlowAndSubagents:
             lambda **kw: build_agent(interrupt_on={"execute": True}, **kw),
         )
         checkpointer = MemorySaver()
-        gateway = AgentExecutionGateway(
+        gateway = AgentRuntime.create_in_memory(
             registry=registry,
             checkpointer=checkpointer,
             model=fake_llm,

@@ -1,15 +1,16 @@
 import pytest
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from src.core.gateway import AgentExecutionGateway, _normalize_messages
 from src.core.testing import FakeChatModel
+from src.runtime import AgentRuntime
+from src.runtime.runtime import _normalize_turn_messages
 
 
 def test_normalize_messages_with_plain_text():
     raw_messages = [
         {"role": "user", "content": "Hello agent"},
     ]
-    normalized = _normalize_messages(raw_messages)
+    normalized = _normalize_turn_messages(raw_messages)
     assert len(normalized) == 2
     assert isinstance(normalized[0], SystemMessage)
     assert isinstance(normalized[1], HumanMessage)
@@ -33,7 +34,7 @@ def test_normalize_messages_with_image_attachments():
             ],
         }
     ]
-    normalized = _normalize_messages(raw_messages)
+    normalized = _normalize_turn_messages(raw_messages)
     assert len(normalized) == 2
     user_msg = normalized[1]
     assert isinstance(user_msg, HumanMessage)
@@ -71,7 +72,7 @@ def test_normalize_messages_with_document_attachments():
             ],
         }
     ]
-    normalized = _normalize_messages(raw_messages)
+    normalized = _normalize_turn_messages(raw_messages)
     assert len(normalized) == 2
     user_msg = normalized[1]
     assert isinstance(user_msg, HumanMessage)
@@ -108,7 +109,7 @@ def test_normalize_messages_with_mixed_multimodal_and_documents():
             ],
         }
     ]
-    normalized = _normalize_messages(raw_messages)
+    normalized = _normalize_turn_messages(raw_messages)
     user_msg = normalized[1]
     assert isinstance(user_msg.content, list)
     # First block is text containing prompt + formatted doc section
@@ -123,7 +124,7 @@ def test_normalize_messages_with_mixed_multimodal_and_documents():
 @pytest.mark.asyncio
 async def test_gateway_stream_execution_with_multimodal_payload():
     fake_model = FakeChatModel(tokens=["Image", " ", "analyzed", "."])
-    gateway = AgentExecutionGateway(model=fake_model)
+    gateway = AgentRuntime.create_in_memory(model=fake_model)
 
     messages = [
         {

@@ -1,4 +1,5 @@
 import logging
+import os
 from contextlib import asynccontextmanager
 
 import redis.asyncio as aioredis
@@ -12,10 +13,18 @@ from src.controllers.health import health_router
 from src.controllers.title import title_router
 from src.core.checkpointer import CheckpointerFactory
 from src.core.config import DATABASE_URL, ENABLE_TITLE_WORKER, REDIS_URL
-from src.core.gateway import AgentExecutionGateway
 from src.core.redis import RedisEventBroker
 from src.graphs.chat.graph import build_agent
-from src.runtime.runtime import AgentRuntime
+from src.infrastructure.persistence.adapter import (
+    InMemoryPersistenceAdapter,
+    PostgresPersistenceAdapter,
+)
+from src.infrastructure.sandbox.adapter import InProcessSandboxAdapter
+from src.infrastructure.storage.adapter import (
+    InMemoryStorageAdapter,
+    S3StorageAdapter,
+)
+from src.runtime import AgentRuntime
 from src.workers import TitleGenerationWorker
 
 logger = logging.getLogger(__name__)
@@ -26,13 +35,9 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        import os
-        import sys
-        api_app_mod = sys.modules.get("src.api.app")
-        db_url = getattr(api_app_mod, "DATABASE_URL", None) or os.getenv("DATABASE_URL") or DATABASE_URL
-        redis_url = getattr(api_app_mod, "REDIS_URL", None) or os.getenv("REDIS_URL") or REDIS_URL
-        enable_title_worker = getattr(api_app_mod, "ENABLE_TITLE_WORKER", None) or (os.getenv("ENABLE_TITLE_WORKER", "false").lower() == "true") or ENABLE_TITLE_WORKER
-        TitleWorkerCls = getattr(api_app_mod, "TitleGenerationWorker", TitleGenerationWorker)
+        db_url = os.getenv("DATABASE_URL") or DATABASE_URL
+        redis_url = os.getenv("REDIS_URL") or REDIS_URL
+        enable_title_worker = (os.getenv("ENABLE_TITLE_WORKER", "false").lower() == "true") or ENABLE_TITLE_WORKER
 
         app.state.pg_pool = None
         app.state.checkpointer = CheckpointerFactory.create_checkpointer()
@@ -40,7 +45,6 @@ def create_app() -> FastAPI:
         app.state.redis = None
         app.state.broker = None
         app.state.title_worker = None
-        app.state.gateway = None
         app.state.agent_runtime = None
 
         # 1. Initialize Redis Client & Event Broker
@@ -86,24 +90,32 @@ def create_app() -> FastAPI:
             except Exception as e:
                 logger.warning("PostgreSQL connection failed: %s. Using in-memory fallback.", e)
 
-        # 3. Initialize Gateway and AgentRuntime
-        from src.core.artifacts import ArtifactSyncProcessor, S3StorageService
-        storage_service = S3StorageService() if (db_url and not db_url.startswith("sqlite")) else None
-        artifact_processor = ArtifactSyncProcessor(
-            db_pool=app.state.pg_pool,
-            storage_service=storage_service,
-        )
-        app.state.gateway = AgentExecutionGateway(
-            checkpointer=app.state.checkpointer,
-            store=app.state.store,
+        # 3. Initialize AgentRuntime
+        if app.state.pg_pool:
+            persistence = PostgresPersistenceAdapter(
+                checkpointer=app.state.checkpointer,
+                store=app.state.store,
+                pool=app.state.pg_pool,
+            )
+            storage = S3StorageAdapter(db_pool=app.state.pg_pool)
+        else:
+            persistence = InMemoryPersistenceAdapter(
+                checkpointer=app.state.checkpointer,
+                store=app.state.store,
+            )
+            storage = InMemoryStorageAdapter()
+
+        sandbox = InProcessSandboxAdapter()
+        app.state.agent_runtime = AgentRuntime(
+            persistence=persistence,
+            sandbox=sandbox,
+            storage=storage,
             event_broker=app.state.broker,
-            artifact_processor=artifact_processor,
         )
-        app.state.agent_runtime = app.state.gateway.runtime
 
         # 4. Initialize & Start Title Generation Queue Worker
         if app.state.redis and enable_title_worker:
-            title_worker = TitleWorkerCls(
+            title_worker = TitleGenerationWorker(
                 redis_client=app.state.redis,
                 event_broker=app.state.broker,
                 pg_pool=app.state.pg_pool,

@@ -10,8 +10,8 @@ from src.core.config import (
     get_deep_agent_mode,
     get_inference_concurrency_limit,
 )
-from src.core.gateway import AgentExecutionGateway
 from src.core.testing import FakeChatModel
+from src.runtime import AgentRuntime
 
 
 def test_environment_mode_defaults_and_resolution():
@@ -61,7 +61,7 @@ async def test_inference_serialization_gateway_serializes_local_slm():
     # Set local_slm mode with concurrency_limit = 1
     with patch.dict(os.environ, {"DEEP_AGENT_MODE": "local_slm", "LLM_PROVIDER": "ollama"}):
         model = DelayedFakeChatModel()
-        gateway = AgentExecutionGateway(model=model)
+        gateway = AgentRuntime.create_in_memory(model=model, concurrency_limit=1)
 
         async def run_stream(thread_id: str):
             events = []

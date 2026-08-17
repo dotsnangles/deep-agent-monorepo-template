@@ -6,11 +6,11 @@ from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 
 from src.core.artifacts import ArtifactSyncProcessor
-from src.core.gateway import AgentExecutionGateway
 from src.core.testing import FakeChatModel
 from src.graphs.chat.backends import DockerSandboxBackend
 from src.graphs.chat.graph import build_agent
 from src.graphs.registry import GraphRegistry
+from src.runtime import AgentRuntime
 from src.schemas import AgentStreamEvent, ArtifactCreatedEventData
 
 
@@ -232,11 +232,11 @@ class TestArtifactSyncAndStreamPipeline:
         registry = GraphRegistry()
         registry.register("default", build_agent)
 
-        gateway = AgentExecutionGateway(
+        gateway = AgentRuntime.create_in_memory(
+            workspace_dir=workspace_dir,
             registry=registry,
             model=fake_llm,
             checkpointer=MemorySaver(),
-            artifact_processor=processor,
         )
 
         events = []
@@ -286,7 +286,7 @@ class TestArtifactSyncAndStreamPipeline:
 
     @pytest.mark.asyncio
     async def test_app_lifespan_wires_artifact_processor_with_pool_and_storage(self):
-        from src.api.app import create_app
+        from src.controllers.app import create_app
 
         app = create_app()
         # Mock CheckpointerFactory to return a pool
@@ -300,10 +300,7 @@ class TestArtifactSyncAndStreamPipeline:
             mp.setattr("src.core.checkpointer.CheckpointerFactory.create_checkpointer", MagicMock(return_value=MemorySaver()))
             mp.setattr("src.core.checkpointer.CheckpointerFactory.create_store", MagicMock(return_value=None))
             mp.setattr("src.core.checkpointer.CheckpointerFactory.close_pool", AsyncMock())
-            mp.setattr("src.core.artifacts.S3StorageService", MagicMock())
 
             async with app.router.lifespan_context(app):
-                assert app.state.gateway is not None
-                assert app.state.gateway.artifact_processor is not None
-                assert app.state.gateway.artifact_processor.db_pool is not None
-                assert app.state.gateway.artifact_processor.storage_service is not None
+                assert app.state.agent_runtime is not None
+                assert app.state.agent_runtime.storage is not None

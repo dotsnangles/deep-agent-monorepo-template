@@ -3,7 +3,7 @@ import shutil
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from src.api.app import create_app
+from src.controllers.app import create_app
 from src.graphs.chat.backends import DEFAULT_WORKSPACE_DIR
 
 

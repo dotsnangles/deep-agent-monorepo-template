@@ -6,7 +6,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.store.memory import InMemoryStore
 
 from src.core.checkpointer import CheckpointerFactory
-from src.core.gateway import AgentExecutionGateway
+from src.runtime import AgentRuntime
 
 
 class TestCheckpointerFactory:
@@ -80,10 +80,10 @@ class TestCheckpointerFactory:
             mock_pool_cls.assert_called_once()
             mock_pool_instance.open.assert_awaited_once()
 
-    def test_gateway_default_checkpointer_integration(self):
+    def test_runtime_default_checkpointer_integration(self):
         with patch.object(
             CheckpointerFactory, "get_default_checkpointer", return_value=MemorySaver()
         ) as mock_get_default:
-            gateway = AgentExecutionGateway()
+            runtime = AgentRuntime.create_in_memory(checkpointer=CheckpointerFactory.get_default_checkpointer())
             mock_get_default.assert_called_once()
-            assert isinstance(gateway.checkpointer, MemorySaver)
+            assert isinstance(runtime.checkpointer, MemorySaver)

@@ -2,9 +2,10 @@ import pytest
 from langchain_core.tools import tool
 from langgraph.checkpoint.memory import MemorySaver
 
-from src.core import AgentExecutionGateway, FakeChatModel
+from src.core import FakeChatModel
 from src.graphs.chat.graph import build_agent
 from src.graphs.registry import GraphRegistry
+from src.runtime import AgentRuntime
 from src.schemas import AgentStreamEvent
 
 
@@ -27,7 +28,7 @@ def hitl_gateway_fixture():
         ),
     )
     fake_llm = FakeChatModel()
-    gateway = AgentExecutionGateway(
+    gateway = AgentRuntime.create_in_memory(
         registry=registry,
         checkpointer=checkpointer,
         model=fake_llm,
@@ -39,7 +40,7 @@ def hitl_gateway_fixture():
     }
 
 
-class TestAgentExecutionGatewayHITL:
+class TestRuntimeHITL:
     @pytest.mark.asyncio
     async def test_stream_execution_emits_approval_request_on_interrupt(self, hitl_gateway_fixture):
         tool_call = {
@@ -51,7 +52,7 @@ class TestAgentExecutionGatewayHITL:
         fake_llm.tool_calls = [tool_call]
         fake_llm.responses = ["명령어가 실행되었습니다."]
 
-        gateway: AgentExecutionGateway = hitl_gateway_fixture["gateway"]
+        gateway: AgentRuntime = hitl_gateway_fixture["gateway"]
 
         events: list[AgentStreamEvent] = []
         async for event in gateway.stream_execution(
@@ -86,7 +87,7 @@ class TestAgentExecutionGatewayHITL:
         fake_llm.tool_calls = [tool_call]
         fake_llm.tokens = ["명령어", " ", "실행", " ", "완료"]
 
-        gateway: AgentExecutionGateway = hitl_gateway_fixture["gateway"]
+        gateway: AgentRuntime = hitl_gateway_fixture["gateway"]
 
         # 1. Initial invocation halts at interrupt
         initial_events: list[AgentStreamEvent] = []
@@ -108,7 +109,7 @@ class TestAgentExecutionGatewayHITL:
             messages=[],
             thread_id="thread_resume_stream",
             agent_type="hitl_test",
-            resume_action={"approved": True},
+            resume={"approved": True},
         ):
             resume_events.append(event)
 
@@ -134,7 +135,7 @@ class TestAgentExecutionGatewayHITL:
         fake_llm.tool_calls = [tool_call]
         fake_llm.tokens = ["삭제", " ", "취소됨"]
 
-        gateway: AgentExecutionGateway = hitl_gateway_fixture["gateway"]
+        gateway: AgentRuntime = hitl_gateway_fixture["gateway"]
 
         # 1. Trigger interrupt
         async for _ in gateway.stream_execution(
@@ -152,7 +153,7 @@ class TestAgentExecutionGatewayHITL:
             messages=[],
             thread_id="thread_reject_stream",
             agent_type="hitl_test",
-            resume_action={"approved": False, "reason": "사용자 거부"},
+            resume={"approved": False, "reason": "사용자 거부"},
         ):
             resume_events.append(event)
 

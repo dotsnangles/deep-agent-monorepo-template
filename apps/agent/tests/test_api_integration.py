@@ -3,10 +3,11 @@ from httpx import ASGITransport, AsyncClient
 from langchain_core.tools import tool
 from langgraph.checkpoint.memory import MemorySaver
 
-from src.api import create_app
-from src.core import AgentExecutionGateway, FakeChatModel
-from src.graphs.chat.graph import build_agent
+from src.controllers.app import create_app
+from src.core import FakeChatModel
+from src.graphs.chat import build_agent
 from src.graphs.registry import GraphRegistry
+from src.runtime import AgentRuntime
 
 
 @pytest.mark.asyncio
@@ -14,7 +15,7 @@ async def test_chat_stream_api_endpoint_returns_sse_stream():
     app = create_app()
 
     fake_model = FakeChatModel(tokens=["FastAPI", " ", "SSE", " ", "Response"])
-    app.state.gateway = AgentExecutionGateway(model=fake_model)
+    app.state.agent_runtime = AgentRuntime.create_in_memory(model=fake_model)
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -42,7 +43,7 @@ async def test_chat_stream_api_endpoint_accepts_attachments():
     app = create_app()
 
     fake_model = FakeChatModel(tokens=["Visual", " ", "Summary"])
-    app.state.gateway = AgentExecutionGateway(model=fake_model)
+    app.state.agent_runtime = AgentRuntime.create_in_memory(model=fake_model)
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -82,7 +83,7 @@ async def test_chat_stream_api_endpoint_accepts_user_id():
     app = create_app()
 
     fake_model = FakeChatModel(tokens=["User", " ", "Traced"])
-    app.state.gateway = AgentExecutionGateway(model=fake_model)
+    app.state.agent_runtime = AgentRuntime.create_in_memory(model=fake_model)
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -98,6 +99,7 @@ async def test_chat_stream_api_endpoint_accepts_user_id():
         response = await client.post("/chat/stream", json=payload)
         assert response.status_code == 200
         assert "text/event-stream" in response.headers.get("content-type", "")
+
         body_text = response.text
         assert "event: token" in body_text
         assert "User" in body_text
@@ -134,11 +136,12 @@ async def test_chat_stream_api_endpoint_handles_hitl_interrupt_and_approval():
         ),
     )
 
-    app.state.gateway = AgentExecutionGateway(
-        registry=registry,
-        checkpointer=checkpointer,
+    runtime = AgentRuntime.create_in_memory(
         model=fake_model,
+        registry=registry,
     )
+    runtime.persistence.checkpointer = checkpointer
+    app.state.agent_runtime = runtime
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -204,11 +207,12 @@ async def test_chat_stream_api_endpoint_handles_hitl_rejection():
         ),
     )
 
-    app.state.gateway = AgentExecutionGateway(
-        registry=registry,
-        checkpointer=checkpointer,
+    runtime = AgentRuntime.create_in_memory(
         model=fake_model,
+        registry=registry,
     )
+    runtime.persistence.checkpointer = checkpointer
+    app.state.agent_runtime = runtime
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -233,21 +237,41 @@ async def test_chat_stream_api_endpoint_handles_hitl_rejection():
             "resume": {
                 "toolCallId": "call_api_del_1",
                 "approved": False,
-                "reason": "사용자 거부",
+                "reason": "사용자가 거부했습니다.",
             },
         }
         res2 = await client.post("/chat/stream", json=payload2)
         assert res2.status_code == 200
         assert "event: token" in res2.text
         assert "거절" in res2.text
+        assert '"finish_reason": "stop"' in res2.text
 
 
 @pytest.mark.asyncio
-async def test_health_check_endpoint():
+async def test_chat_stream_api_endpoint_handles_internal_errors():
     app = create_app()
+
+    class BrokenModel(FakeChatModel):
+        def _generate(self, *args, **kwargs):
+            raise RuntimeError("Database connection dropped during inference")
+
+        async def _agenerate(self, *args, **kwargs):
+            raise RuntimeError("Database connection dropped during inference")
+
+        async def _astream(self, *args, **kwargs):
+            raise RuntimeError("Database connection dropped during inference")
+            yield
+
+    app.state.agent_runtime = AgentRuntime.create_in_memory(model=BrokenModel())
+
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.get("/health")
+        payload = {
+            "threadId": "thread_err_1",
+            "messages": [{"role": "user", "content": "Error trigger"}],
+            "agentType": "direct",
+        }
+        response = await client.post("/chat/stream", json=payload)
         assert response.status_code == 200
-        data = response.json()
-        assert data.get("status") == "healthy"
+        assert "event: error" in response.text
+        assert "Database connection dropped during inference" in response.text

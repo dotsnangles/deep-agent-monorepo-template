@@ -8,7 +8,6 @@ from src.core.config import (
     TITLE_WORKER_CONCURRENCY,
     get_llm,
 )
-from src.core.gateway import AgentExecutionGateway
 from src.core.observability import get_langfuse_callback
 from src.core.redis import (
     RedisEventBroker,
@@ -25,7 +24,6 @@ from src.core.testing import FakeChatModel
 __all__ = [
     "AgentConfig",
     "AgentConfigLoader",
-    "AgentExecutionGateway",
     "CheckpointerFactory",
     "DATABASE_URL",
     "FakeChatModel",

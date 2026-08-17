@@ -2,9 +2,10 @@ import pytest
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 
-from src.core import AgentExecutionGateway, FakeChatModel
+from src.core import FakeChatModel
 from src.graphs.chat.graph import build_agent
 from src.graphs.registry import GraphRegistry
+from src.runtime import AgentRuntime
 from src.schemas import AgentStreamEvent, TodoItem, TodoUpdateEventData
 
 
@@ -69,7 +70,7 @@ class TestTodoListMiddlewareAndStreaming:
         registry = GraphRegistry()
         registry.register("todo_test", build_agent)
         checkpointer = MemorySaver()
-        gateway = AgentExecutionGateway(
+        gateway = AgentRuntime.create_in_memory(
             registry=registry,
             checkpointer=checkpointer,
             model=fake_llm,
@@ -148,7 +149,7 @@ class TestTodoListMiddlewareAndStreaming:
         registry = GraphRegistry()
         registry.register("todo_multistep", build_agent)
         checkpointer = MemorySaver()
-        gateway = AgentExecutionGateway(
+        gateway = AgentRuntime.create_in_memory(
             registry=registry,
             checkpointer=checkpointer,
             model=fake_llm,
