@@ -18,7 +18,6 @@ import { Textarea } from "@repo/ui/components/textarea";
 import {
   Message,
   MessageContent,
-  MessageHeader,
   MessageFooter,
 } from "@repo/ui/components/message";
 import { Bubble, BubbleContent } from "@repo/ui/components/bubble";
@@ -207,19 +206,6 @@ export function MessageItem({
     <Message align={isUser ? "end" : "start"} className="group/message py-2 px-1">
       {/* Main Message Content Column */}
       <MessageContent className="min-w-0 w-full">
-        {/* Header: Sender Label & Time (User only) */}
-        {isUser && (
-          <MessageHeader className="gap-2 mb-1 text-[11px] font-medium text-muted-foreground justify-end">
-            <span>나</span>
-            <span className="text-[10px] opacity-60">
-              {new Date(message.createdAt).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </span>
-          </MessageHeader>
-        )}
-
         {/* Content Body: User bubble vs AI canvas markdown */}
         {isEditing ? (
           <div className="flex flex-col gap-2 w-full min-w-[320px] max-w-xl p-3 rounded-2xl bg-background border border-primary/40 shadow-sm">
