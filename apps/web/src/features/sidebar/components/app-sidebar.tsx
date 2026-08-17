@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
-import { Badge } from "@repo/ui/components/badge";
 import { Button } from "@repo/ui/components/button";
 import {
   DropdownMenu,
@@ -98,22 +97,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           {/* Expanded Mode: Brand Logo + Name */}
           <Link
             href="/"
-            className="flex items-center gap-2.5 rounded-lg hover:opacity-85 transition-opacity group-data-[collapsible=icon]:hidden"
+            className="flex items-center gap-2.5 rounded-lg hover:opacity-85 transition-opacity group-data-[collapsible=icon]:hidden min-w-0"
           >
             <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs shrink-0">
               <Bot className="size-4.5" />
             </div>
-            <div className="grid flex-1 text-left text-xs leading-tight">
-              <div className="flex items-center gap-1.5 font-semibold text-foreground">
-                <span>Hollow Echo</span>
-                <Badge variant="outline" className="h-3.5 px-1 text-[9px] font-mono leading-none">
-                  v1.0
-                </Badge>
-              </div>
-              <span className="truncate text-[11px] text-muted-foreground">
-                Deep Agent Platform
-              </span>
-            </div>
+            <span className="text-sm font-semibold text-foreground tracking-tight truncate">
+              Hollow Echo
+            </span>
           </Link>
 
           {/* Expanded Mode: Collapse Button */}
