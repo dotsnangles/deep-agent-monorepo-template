@@ -59,11 +59,13 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
     }
     return "default-session";
   });
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const { data: sessionData, isPending: isAuthPending } = authClient.useSession();
+  const [isSessionsLoading, setIsSessionsLoading] = useState<boolean>(true);
   const [generatingSessionIds, setGeneratingSessionIds] = useState<string[]>(() =>
     globalChatEngineRegistry.getGeneratingSessionIds()
   );
-  const { data: sessionData } = authClient.useSession();
+
+  const isLoading = isAuthPending || isSessionsLoading;
 
   const openSearch = useCallback(() => setIsSearchOpen(true), []);
   const closeSearch = useCallback(() => setIsSearchOpen(false), []);
@@ -90,12 +92,15 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
 
   const fetchSessions = useCallback(
     async (silent = false) => {
+      if (isAuthPending) {
+        return;
+      }
       if (!sessionData?.user) {
-        setIsLoading(false);
+        setIsSessionsLoading(false);
         return;
       }
       try {
-        if (!silent) setIsLoading(true);
+        if (!silent) setIsSessionsLoading(true);
         const res = await fetch("/api/chat/sessions");
         if (res.ok) {
           const data = await res.json();
@@ -116,10 +121,10 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
       } catch (error) {
         console.error("[ChatSessionProvider] Failed to fetch chat sessions:", error);
       } finally {
-        setIsLoading(false);
+        setIsSessionsLoading(false);
       }
     },
-    [sessionData?.user]
+    [sessionData?.user, isAuthPending]
   );
 
   // Initial fetch on user auth readiness
