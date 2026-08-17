@@ -315,7 +315,7 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
                   ? "답변 생성 중... (새 질문 작성 후 Enter 시 전송)"
                   : "무엇이든 물어보세요... (Enter: 전송, Shift+Enter: 줄바꿈, 파일 드래그앤드롭)"
               }
-              className="flex-1 min-h-[38px] max-h-[160px] resize-none border-none shadow-none focus-visible:ring-0 focus:ring-0 focus:outline-none text-sm px-2 py-2 bg-transparent leading-relaxed"
+              className="flex-1 min-h-[38px] max-h-[160px] resize-none border-none shadow-none focus-visible:ring-0 focus:ring-0 focus:outline-none text-sm px-2 py-2 bg-transparent dark:bg-transparent leading-relaxed"
               rows={1}
             />
 
