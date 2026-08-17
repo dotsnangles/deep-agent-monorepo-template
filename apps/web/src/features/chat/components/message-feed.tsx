@@ -17,6 +17,7 @@ import { authClient } from "../../../lib/auth-client";
 import { ChatSessionContext } from "../context/chat-session-context";
 import { useChatEngine } from "../hooks/use-chat-engine";
 import { useDirectUpload } from "../hooks/use-direct-upload";
+import { getRandomGreeting } from "../lib/greetings";
 import { MessageItem } from "./message-item";
 import { AttachmentStagingBar } from "./attachment-staging-bar";
 
@@ -123,13 +124,17 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
   const isSendDisabled =
     (!inputPrompt.trim() && completedAttachments.length === 0) || isUploading;
 
+  const [greetingSeed, setGreetingSeed] = useState(() => Math.floor(Math.random() * 100));
+
+  useEffect(() => {
+    setGreetingSeed(Math.floor(Math.random() * 100));
+  }, [sessionId]);
+
   const { data: authSession } = authClient.useSession();
   const userName = authSession?.user?.name
     ? authSession.user.name.split(" ")[0] || authSession.user.name
     : null;
-  const greetingText = userName
-    ? `What can I help with, ${userName}?`
-    : "Where should we start?";
+  const greetingText = getRandomGreeting(userName, greetingSeed);
 
   const chatSessionsContext = useContext(ChatSessionContext);
   const isExistingSession = chatSessionsContext
