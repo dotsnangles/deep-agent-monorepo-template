@@ -178,4 +178,23 @@ export class StreamReasoningPartitioner {
       isThinking: currentlyThinking,
     };
   }
+
+  public getRawContent(): string {
+    if (this.hasExplicitReasoning && this.explicitReasoning.trim()) {
+      if (this.rawTokens.toLowerCase().includes(THINK_START)) {
+        return this.rawTokens;
+      }
+      if (this.rawTokens) {
+        return `<think>\n${this.explicitReasoning.trim()}\n</think>\n\n${this.rawTokens}`;
+      }
+      return `<think>\n${this.explicitReasoning.trim()}\n</think>`;
+    }
+    return this.rawTokens;
+  }
+}
+
+export function partitionMessageContent(rawContent: string): PartitionedStreamState {
+  const partitioner = new StreamReasoningPartitioner();
+  partitioner.feedToken(rawContent);
+  return partitioner.getState();
 }

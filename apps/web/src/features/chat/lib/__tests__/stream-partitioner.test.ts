@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { StreamReasoningPartitioner } from "../stream-partitioner";
+import { StreamReasoningPartitioner, partitionMessageContent } from "../stream-partitioner";
 
 describe("StreamReasoningPartitioner", () => {
   let partitioner: StreamReasoningPartitioner;
@@ -132,6 +132,28 @@ describe("StreamReasoningPartitioner", () => {
     expect(partitioner.getState().reasoning).toContain("1차 생각 완료");
     expect(partitioner.getState().reasoning).toContain("2차 도구 실행 후 중간 생각 중...");
     expect(partitioner.getState().content).toBe("1차 답변 완료.");
+  });
+
+  it("returns lossless raw content with getRawContent preserving <think> tags", () => {
+    partitioner.feedToken("<think>\n단계별 사고 과정\n</think>\n최종 분석 결과입니다.");
+    expect(partitioner.getRawContent()).toBe(
+      "<think>\n단계별 사고 과정\n</think>\n최종 분석 결과입니다."
+    );
+  });
+
+  it("formats explicit reasoning into <think> block in getRawContent if explicit SSE reasoning was used", () => {
+    partitioner.feedReasoning("SSE reasoning chunk");
+    partitioner.feedToken("답변 내용입니다.");
+    expect(partitioner.getRawContent()).toBe(
+      "<think>\nSSE reasoning chunk\n</think>\n\n답변 내용입니다."
+    );
+  });
+
+  it("partitions raw stored message using partitionMessageContent utility", () => {
+    const rawStored = "<think>\n복원된 사고 과정\n</think>\n화면에 보여질 답변입니다.";
+    const parsed = partitionMessageContent(rawStored);
+    expect(parsed.reasoning).toBe("복원된 사고 과정\n");
+    expect(parsed.content).toBe("화면에 보여질 답변입니다.");
   });
 });
 

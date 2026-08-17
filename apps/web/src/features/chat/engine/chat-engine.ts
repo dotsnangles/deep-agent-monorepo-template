@@ -23,7 +23,7 @@ import {
   type ChatTransport,
   type StreamMessageContext,
 } from "./transport";
-import { StreamReasoningPartitioner } from "../lib/stream-partitioner";
+import { StreamReasoningPartitioner, partitionMessageContent } from "../lib/stream-partitioner";
 
 export interface ChatEngineState {
   sessionId: string;
@@ -158,9 +158,24 @@ export class ChatEngine {
         }
       }
 
+      const parsedNodes = result.messages.map((node) => {
+        if (node.role === "assistant" && node.content && (!node.reasoning || !node.reasoning.trim())) {
+          const parsed = partitionMessageContent(node.content);
+          if (parsed.reasoning) {
+            return {
+              ...node,
+              content: parsed.content,
+              reasoning: parsed.reasoning,
+              reasoningDuration: parsed.reasoningDuration,
+            };
+          }
+        }
+        return node;
+      });
+
       this.state = {
         ...this.state,
-        allNodes: result.messages,
+        allNodes: parsedNodes,
         activeLeafId: result.activeLeafId,
         title: result.title || this.state.title,
         artifacts: Array.from(artifactMap.values()),
@@ -861,15 +876,16 @@ export class ChatEngine {
     } finally {
       this.abortController = null;
 
-      // Always persist the final assistant node with whatever content was accumulated
+      // Always persist the final assistant node with whatever raw tokens/content was accumulated
+      const rawContent = partitioner.getRawContent();
       const savedPState = partitioner.getState();
-      if (savedPState.content.length > 0 || savedPState.reasoning) {
+      if (rawContent.length > 0 || savedPState.content.length > 0 || savedPState.reasoning) {
         await this.transport.persistNode({
           id: params.assistantMessageId,
           sessionId: this.sessionId,
           parentId: params.userMessageId,
           role: "assistant",
-          content: savedPState.content,
+          content: rawContent || savedPState.content,
           artifacts: capturedArtifacts.length > 0 ? capturedArtifacts : undefined,
         });
       }

@@ -605,7 +605,7 @@ describe("ChatEngine (In-Process State Machine)", () => {
     expect(assistantNode?.subagents?.[0].output).toEqual({ median: 42 });
   });
 
-  it("partitions <think>...</think> reasoning from final answer in assistant node", async () => {
+  it("partitions <think>...</think> reasoning from final answer in assistant node and persists raw tokens", async () => {
     transport.setMockStreamChunks([
       "<think>\nLet me analyze the request step by step.\n1. Check inputs\n2. Compute result\n</think>\n",
       "The result is ",
@@ -627,6 +627,53 @@ describe("ChatEngine (In-Process State Machine)", () => {
     );
     expect(assistantNode?.content).toBe("The result is 42.");
     expect(assistantNode?.reasoningDuration).toBeDefined();
+
+    // Verify raw tokens are preserved in persistence for lossless replay/logging
+    expect(transport.persistedNodes[1].content).toContain(
+      "<think>\nLet me analyze the request step by step."
+    );
+    expect(transport.persistedNodes[1].content).toContain("The result is 42.");
+  });
+
+  it("restores <think> reasoning and partitions clean content on loadMessages", async () => {
+    transport.setMockTree("session-restore-test", {
+      messages: [
+        {
+          id: "msg-user-1",
+          sessionId: "session-restore-test",
+          parentId: null,
+          role: "user",
+          content: "Explain quantum computing",
+          createdAt: new Date(),
+        },
+        {
+          id: "msg-asst-1",
+          sessionId: "session-restore-test",
+          parentId: "msg-user-1",
+          role: "assistant",
+          content:
+            "<think>\nQubits use superposition and entanglement.\n</think>\nQuantum computing uses qubits instead of bits.",
+          createdAt: new Date(),
+        },
+      ],
+      activeLeafId: "msg-asst-1",
+    });
+
+    const engine = new ChatEngine({
+      sessionId: "session-restore-test",
+      transport,
+    });
+
+    await engine.loadMessages();
+
+    const state = engine.getState();
+    const assistantNode = state.allNodes.find((n) => n.id === "msg-asst-1");
+    expect(assistantNode?.reasoning).toBe(
+      "Qubits use superposition and entanglement.\n"
+    );
+    expect(assistantNode?.content).toBe(
+      "Quantum computing uses qubits instead of bits."
+    );
   });
 
   it("handles artifact_created stream event and binds artifacts to assistant node and persistence", async () => {
