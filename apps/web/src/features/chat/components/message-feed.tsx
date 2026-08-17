@@ -2,7 +2,7 @@
 
 import { useContext, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUp, Paperclip, Square } from "lucide-react";
+import { ArrowUp, ChevronDown, Mic, Plus, Square } from "lucide-react";
 import { Button } from "@repo/ui/components/button";
 import { Textarea } from "@repo/ui/components/textarea";
 import {
@@ -272,93 +272,110 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
           onDragOver={(e) => e.preventDefault()}
           onDrop={handleDrop}
           className={cn(
-            "relative w-full flex flex-col rounded-2xl bg-card border border-border/80 shadow-md focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/15 transition-all duration-300",
-            isEmpty ? "max-w-3xl shadow-lg border-border/90" : "max-w-4xl mx-auto"
+            "relative w-full flex flex-col bg-card/95 dark:bg-[#1e1f20] border border-border/40 shadow-sm transition-all duration-300",
+            stagedFiles.length > 0 ? "rounded-2xl p-2" : "rounded-full px-2 py-1.5",
+            isEmpty ? "max-w-2xl" : "max-w-4xl mx-auto"
           )}
         >
           {/* File Attachment Staging Bar */}
-          <AttachmentStagingBar
-            stagedFiles={stagedFiles}
-            onRemove={removeFile}
-            disabled={isUploading}
-          />
+          {stagedFiles.length > 0 && (
+            <AttachmentStagingBar
+              stagedFiles={stagedFiles}
+              onRemove={removeFile}
+              disabled={isUploading}
+            />
+          )}
 
-          <Textarea
-            ref={textareaRef}
-            autoFocus
-            value={inputPrompt}
-            onChange={(e) => setInputPrompt(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={
-              isUploading
-                ? "파일을 업로드하는 중입니다..."
-                : isGenerating
-                ? "답변 생성 중... (새 질문 작성 후 Enter 시 이전 생성 중단 후 전송)"
-                : "무엇이든 물어보세요... (Enter: 전송, Shift+Enter: 줄바꿈, 파일 드래그앤드롭)"
-            }
-            className="min-h-[52px] max-h-[180px] resize-none border-none shadow-none focus-visible:ring-0 text-sm px-4 py-3 bg-transparent leading-relaxed"
-            rows={1}
-          />
+          {/* Single-Row Horizontal Pill Bar */}
+          <div className="flex items-center w-full min-h-[44px] gap-2">
+            {/* Left Plus (+) / File Attachment Trigger */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/50 cursor-pointer shrink-0"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              title="파일 첨부 (이미지, PDF, TXT, CSV, JSON, MD)"
+            >
+              <Plus className="size-5" />
+            </Button>
 
-          {/* Hidden File Input */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,text/markdown,text/csv,application/json"
-            className="hidden"
-            onChange={(e) => {
-              if (e.target.files && e.target.files.length > 0) {
-                addFiles(e.target.files);
-              }
-              e.target.value = "";
-            }}
-          />
-
-          <div className="flex items-center justify-between px-3.5 pb-2.5 pt-0.5">
-            <div className="flex items-center gap-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-8 rounded-xl text-muted-foreground hover:text-foreground cursor-pointer"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-                title="파일 첨부 (이미지, PDF, TXT, CSV, JSON, MD)"
-              >
-                <Paperclip data-icon="inline-start" />
-              </Button>
-              <span className="text-[11px] text-muted-foreground/80 select-none">
-                {isUploading
-                  ? "파일 업로드 중..."
+            {/* Middle Flexible Input */}
+            <Textarea
+              ref={textareaRef}
+              autoFocus
+              value={inputPrompt}
+              onChange={(e) => setInputPrompt(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={
+                isUploading
+                  ? "파일을 업로드하는 중입니다..."
                   : isGenerating
-                  ? "답변 생성 진행 중"
-                  : "선형 대화 세션 및 멀티모달 첨부 지원"}
-              </span>
-            </div>
+                  ? "답변 생성 중... (새 질문 작성 후 Enter 시 전송)"
+                  : "무엇이든 물어보세요..."
+              }
+              className="flex-1 min-h-[38px] max-h-[160px] resize-none border-none shadow-none focus-visible:ring-0 focus:ring-0 focus:outline-none text-sm px-2 py-2 bg-transparent leading-relaxed"
+              rows={1}
+            />
 
-            {isGenerating && !inputPrompt.trim() && completedAttachments.length === 0 ? (
-              <Button
-                type="button"
-                size="icon"
-                className="size-8 rounded-xl shadow-xs bg-foreground text-background hover:bg-foreground/90 transition-all cursor-pointer animate-in zoom-in-90 duration-150"
-                onClick={stop}
-                title="답변 생성 중단 (Stop)"
-              >
-                <Square data-icon="inline-start" className="fill-current" />
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                size="icon"
-                className="size-8 rounded-xl shadow-xs"
-                onClick={handleSend}
-                disabled={isSendDisabled}
-                title={isGenerating ? "생성 중단 및 새 질문 전송 (Enter)" : "메시지 전송 (Enter)"}
-              >
-                <ArrowUp data-icon="inline-start" />
-              </Button>
-            )}
+            {/* Hidden File Input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,text/markdown,text/csv,application/json"
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files && e.target.files.length > 0) {
+                  addFiles(e.target.files);
+                }
+                e.target.value = "";
+              }}
+            />
+
+            {/* Right Action Group */}
+            <div className="flex items-center gap-1.5 shrink-0 pr-1">
+              {/* Subtle Model Badge */}
+              <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium text-muted-foreground/75 hover:text-foreground hover:bg-muted/40 cursor-default select-none transition-colors">
+                <span>Flash</span>
+                <ChevronDown className="size-3.5 opacity-70" />
+              </div>
+
+              {/* Send / Stop / Mic Button */}
+              {isGenerating ? (
+                <Button
+                  type="button"
+                  size="icon"
+                  className="size-8 rounded-full shadow-xs bg-foreground text-background hover:bg-foreground/90 transition-all cursor-pointer animate-in zoom-in-90 duration-150"
+                  onClick={stop}
+                  title="답변 생성 중단 (Stop)"
+                >
+                  <Square className="size-3.5 fill-current" />
+                </Button>
+              ) : !isSendDisabled ? (
+                <Button
+                  type="button"
+                  size="icon"
+                  className="size-8 rounded-full bg-blue-600 hover:bg-blue-500 text-white shadow-xs transition-all cursor-pointer animate-in zoom-in-90 duration-150"
+                  onClick={handleSend}
+                  title="메시지 전송 (Enter)"
+                >
+                  <ArrowUp className="size-4" />
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 rounded-full text-muted-foreground/60 hover:text-foreground cursor-pointer"
+                  onClick={() => textareaRef.current?.focus()}
+                  title="마이크 / 음성 입력"
+                >
+                  <Mic className="size-4" />
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </div>
