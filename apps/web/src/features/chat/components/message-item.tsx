@@ -8,6 +8,7 @@ import {
   Copy,
   Download,
   Edit2,
+  FileCode,
   GitFork,
   RotateCw,
   Trash2,
@@ -34,7 +35,7 @@ import {
   AttachmentAction,
 } from "@repo/ui/components/attachment";
 import { Alert, AlertDescription } from "@repo/ui/components/alert";
-import type { AttachmentEntity } from "@repo/validators";
+import type { AttachmentEntity, ChatArtifactEntity } from "@repo/validators";
 import type { MessageNode } from "../lib/types";
 import { MarkdownRenderer } from "./markdown-renderer";
 import { ToolActionCard } from "./tool-action-card";
@@ -58,6 +59,7 @@ interface MessageItemProps {
   onFork?: () => void;
   onApprove?: (toolCallId: string) => void;
   onReject?: (toolCallId: string, reason?: string) => void;
+  onOpenArtifact?: (artifact?: ChatArtifactEntity) => void;
 }
 
 function MessageAttachmentsView({
@@ -184,6 +186,7 @@ export function MessageItem({
   onFork,
   onApprove,
   onReject,
+  onOpenArtifact,
 }: MessageItemProps) {
   const isUser = message.role === "user";
   const { copied, copy } = useCopyToClipboard();
@@ -308,8 +311,53 @@ export function MessageItem({
             ) : message.status === "error" ||
               message.error ||
               message.toolApproval ||
-              (message.todos && message.todos.length > 0) ? null : (
+              (message.todos && message.todos.length > 0) ||
+              (message.artifacts && message.artifacts.length > 0) ? null : (
               <span className="text-muted-foreground italic text-xs">(내용 없음)</span>
+            )}
+
+            {/* Inline Gemini-style Created Artifacts Cards */}
+            {message.artifacts && message.artifacts.length > 0 && (
+              <div className="flex flex-col gap-2 w-full my-2">
+                {message.artifacts.map((art) => (
+                  <div
+                    key={art.id}
+                    className="flex items-center justify-between p-3 sm:p-3.5 rounded-2xl bg-card border border-border/80 hover:border-primary/50 transition-all shadow-xs group"
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1 pr-3">
+                      <div className="size-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 border border-primary/20">
+                        <FileCode className="size-4.5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4
+                          className="text-xs font-semibold text-foreground truncate group-hover:text-primary transition-colors"
+                          title={art.name}
+                        >
+                          {art.name}
+                        </h4>
+                        <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5 font-mono">
+                          <span>{formatFileSize(art.sizeBytes || 0)}</span>
+                          <span>•</span>
+                          <span>
+                            {new Date(art.createdAt).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="h-8 px-3.5 text-xs font-medium rounded-xl shrink-0 cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors"
+                      onClick={() => onOpenArtifact?.(art)}
+                    >
+                      열기
+                    </Button>
+                  </div>
+                ))}
+              </div>
             )}
 
             {/* Inline Interactive Tool Action Card */}

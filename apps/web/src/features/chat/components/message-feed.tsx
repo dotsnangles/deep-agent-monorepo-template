@@ -19,6 +19,7 @@ import { AttachmentStagingBar } from "./attachment-staging-bar";
 
 interface MessageFeedProps {
   sessionId: string;
+  onOpenArtifacts?: () => void;
 }
 
 const STARTER_PROMPTS = [
@@ -39,7 +40,7 @@ const STARTER_PROMPTS = [
   },
 ];
 
-export function MessageFeed({ sessionId }: MessageFeedProps) {
+export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
   const router = useRouter();
   const {
     activePath,
@@ -208,6 +209,7 @@ export function MessageFeed({ sessionId }: MessageFeedProps) {
                         onReject={(toolCallId, reason) => {
                           respondToApproval(toolCallId, false, reason);
                         }}
+                        onOpenArtifact={() => onOpenArtifacts?.()}
                       />
                     </MessageScrollerItem>
                   );

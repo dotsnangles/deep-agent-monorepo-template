@@ -9,14 +9,18 @@ describe("ArtifactListPanel Component Tests", () => {
       <ArtifactListPanel
         sessionId="sess-empty"
         artifacts={[]}
+        attachments={[]}
       />
     );
 
-    expect(html).toContain("대화 산출물");
-    expect(html).toContain("아직 생성된 산출물이 없습니다");
+    expect(html).toContain("Files");
+    expect(html).toContain("Created");
+    expect(html).toContain("아직 생성된 산출물이 없습니다.");
+    expect(html).toContain("Added");
+    expect(html).toContain("첨부된 파일이 없습니다.");
   });
 
-  it("renders artifact list with file names, sizes, and download links", () => {
+  it("renders artifact list and user attachments with file names, sizes, and download links", () => {
     const mockArtifacts = [
       {
         id: "art-1",
@@ -42,20 +46,36 @@ describe("ArtifactListPanel Component Tests", () => {
       },
     ];
 
+    const mockAttachments = [
+      {
+        id: "att-1",
+        name: "specification.pdf",
+        url: "https://storage.example.com/attachments/spec.pdf",
+        s3Key: "attachments/spec.pdf",
+        mimeType: "application/pdf",
+        size: 524288, // 512 KB
+      },
+    ];
+
     const html = renderToString(
       <ArtifactListPanel
         sessionId="sess-1"
         artifacts={mockArtifacts}
+        attachments={mockAttachments}
       />
     );
 
-    expect(html).toContain("대화 산출물");
-    expect(html).toContain("2"); // count badge
+    expect(html).toContain("Files");
+    expect(html).toContain("Created");
     expect(html).toContain("sales_chart.png");
     expect(html).toContain("data_report.csv");
     expect(html).toContain("1 MB");
     expect(html).toContain("2 KB");
     expect(html).toContain("/api/chat/sessions/sess-1/artifacts/sales_chart.png");
     expect(html).toContain("/api/chat/sessions/sess-1/artifacts/data_report.csv");
+
+    expect(html).toContain("Added");
+    expect(html).toContain("specification.pdf");
+    expect(html).toContain("512 KB");
   });
 });

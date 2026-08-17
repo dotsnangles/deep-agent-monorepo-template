@@ -4,7 +4,7 @@ Date: 2026-08-15
 
 ## Status
 
-Accepted
+Superseded by [ADR-0021](0021-linear-session-architecture-and-deep-agents-rich-ui.md) (Linear Session Architecture with Forking and Deep Agents Rich UI)
 
 ## Context
 

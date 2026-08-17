@@ -1,9 +1,18 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import { Bot, GitFork, Layers } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { FolderArchive, Layers, MoreVertical, Share2, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@repo/ui/components/badge";
 import { Button } from "@repo/ui/components/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@repo/ui/components/dropdown-menu";
 import {
   MessageFeed,
   useChatSessions,
@@ -16,10 +25,13 @@ export default function ChatSessionPage({
 }: {
   params: Promise<{ sessionId: string }>;
 }) {
+  const router = useRouter();
   const { sessionId } = use(params);
-  const { switchSession, activeSessionId } = useChatSessions();
-  const { artifacts } = useChatEngine(sessionId);
+  const { switchSession, activeSessionId, deleteSession } = useChatSessions();
+  const { artifacts, activePath } = useChatEngine(sessionId);
   const [isArtifactsOpen, setIsArtifactsOpen] = useState(false);
+
+  const sessionAttachments = activePath.flatMap((m) => m.attachments || []);
 
   useEffect(() => {
     if (sessionId && sessionId !== activeSessionId) {
@@ -27,60 +39,95 @@ export default function ChatSessionPage({
     }
   }, [sessionId, activeSessionId, switchSession]);
 
-  return (
-    <div className="flex flex-col h-full w-full">
-      {/* Top Status Header */}
-      <div className="shrink-0 w-full border-b border-border/40 px-3 sm:px-6 pt-3 sm:pt-4 pb-2">
-        <div className="flex items-center justify-between max-w-4xl mx-auto py-1">
-          <div className="flex items-center gap-2.5">
-            <div className="flex items-center justify-center size-7 rounded-lg bg-primary/10 text-primary shadow-xs">
-              <Bot className="size-4" />
-            </div>
-            <div>
-              <h2 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                <span>Hollow Echo Deep Agent</span>
-                <Badge variant="outline" className="h-4 px-1.5 text-[9px] font-mono leading-none gap-1">
-                  <GitFork className="size-2.5 text-primary" />
-                  Linear Session
-                </Badge>
-              </h2>
-            </div>
-          </div>
+  const handleShare = () => {
+    if (typeof window !== "undefined") {
+      navigator.clipboard.writeText(window.location.href);
+      toast.success("대화 링크가 클립보드에 복사되었습니다.");
+    }
+  };
 
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+  const handleDelete = async () => {
+    await deleteSession(sessionId);
+    router.push("/");
+  };
+
+  return (
+    <div className="flex flex-col h-full w-full relative">
+      {/* Top-Right Gemini-style Minimalist Action Bar */}
+      <div className="absolute top-3 right-4 z-20 flex items-center gap-1.5">
+        {artifacts.length > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 px-2.5 rounded-xl text-xs gap-1.5 bg-background/80 backdrop-blur-xs border-border/70 hover:border-primary/50 shadow-xs cursor-pointer animate-in fade-in duration-200"
+            onClick={() => setIsArtifactsOpen(true)}
+            title="대화 파일 및 산출물 보기"
+          >
+            <Layers className="size-3.5 text-primary" data-icon="inline-start" />
+            <span className="hidden sm:inline">산출물</span>
+            <Badge variant="secondary" className="h-4 px-1 text-[10px] font-mono leading-none">
+              {artifacts.length}
+            </Badge>
+          </Button>
+        )}
+
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8 rounded-xl text-muted-foreground hover:text-foreground bg-background/60 hover:bg-muted/80 backdrop-blur-xs shadow-xs cursor-pointer"
+                title="더보기"
+              />
+            }
+          >
+            <MoreVertical className="size-4" />
+            <span className="sr-only">대화 옵션</span>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem
               onClick={() => setIsArtifactsOpen(true)}
-              title="대화 산출물 보기"
+              className="gap-2.5 text-xs cursor-pointer"
             >
-              <Layers className="size-3.5" data-icon="inline-start" />
-              <span className="hidden sm:inline">산출물</span>
+              <FolderArchive className="size-4 text-primary" />
+              <span>이 대화의 파일 (Files)</span>
               {artifacts.length > 0 && (
-                <Badge variant="secondary" className="h-4 px-1 text-[10px] font-mono leading-none">
+                <Badge variant="secondary" className="ml-auto h-4 px-1 text-[9px] font-mono leading-none">
                   {artifacts.length}
                 </Badge>
               )}
-            </Button>
-
-            <Badge variant="secondary" className="gap-1.5 py-1 px-2.5 text-[10px] font-mono bg-muted/60">
-              <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>에이전트 준비됨</span>
-            </Badge>
-          </div>
-        </div>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleShare} className="gap-2.5 text-xs cursor-pointer">
+              <Share2 className="size-4" />
+              <span>대화 링크 복사</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={handleDelete}
+              className="gap-2.5 text-xs text-destructive focus:text-destructive cursor-pointer"
+            >
+              <Trash2 className="size-4" />
+              <span>대화 삭제</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Main Fullscreen Message Feed */}
       <div className="flex-1 min-h-0 relative flex flex-col w-full overflow-hidden">
-        <MessageFeed key={sessionId} sessionId={sessionId} />
+        <MessageFeed
+          key={sessionId}
+          sessionId={sessionId}
+          onOpenArtifacts={() => setIsArtifactsOpen(true)}
+        />
       </div>
 
-      {/* Right Artifacts Drawer */}
+      {/* Right Artifacts & Files Drawer */}
       <ArtifactSidebar
         sessionId={sessionId}
         artifacts={artifacts}
+        attachments={sessionAttachments}
         isOpen={isArtifactsOpen}
         onOpenChange={setIsArtifactsOpen}
       />

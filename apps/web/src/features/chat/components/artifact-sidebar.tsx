@@ -12,7 +12,7 @@ import {
   Layers,
   Sparkles,
 } from "lucide-react";
-import type { ChatArtifactEntity } from "@repo/validators";
+import type { AttachmentEntity, ChatArtifactEntity } from "@repo/validators";
 import {
   Sheet,
   SheetContent,
@@ -68,131 +68,230 @@ function formatBytes(bytes?: number | null): string {
 export interface ArtifactListPanelProps {
   sessionId: string;
   artifacts: (ChatArtifactEntity & { url?: string; downloadUrl?: string })[];
+  attachments?: AttachmentEntity[];
   onSelectImage?: (img: { src: string; alt: string }) => void;
+  onClose?: () => void;
 }
 
 export function ArtifactListPanel({
   sessionId,
   artifacts,
+  attachments = [],
   onSelectImage,
+  onClose,
 }: ArtifactListPanelProps) {
   return (
     <div className="flex flex-col h-full bg-background" data-testid="artifact-list-panel">
-      {/* Header */}
-      <div className="px-5 py-4 border-b border-border/40 shrink-0">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="size-7 rounded-lg bg-primary/10 flex items-center justify-center text-primary shadow-xs">
-              <Layers className="size-4" />
-            </div>
-            <div className="text-sm font-semibold tracking-tight text-foreground flex items-center gap-2">
-              <span>대화 산출물</span>
-              <Badge variant="secondary" className="h-5 px-1.5 text-[11px] font-mono">
-                {artifacts.length}
-              </Badge>
-            </div>
-          </div>
+      {/* Gemini-style Panel Header: Files + Close Button */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border/40 shrink-0">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-semibold tracking-tight text-foreground">
+            Files
+          </h3>
+          {artifacts.length > 0 && (
+            <Badge variant="secondary" className="h-5 px-1.5 text-[11px] font-mono">
+              {artifacts.length}
+            </Badge>
+          )}
         </div>
-        <p className="text-xs text-muted-foreground pt-1">
-          에이전트가 대화 중 생성한 차트, 파일 및 데이터 결과물 목록입니다.
-        </p>
+        {onClose && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7 rounded-lg text-muted-foreground hover:text-foreground cursor-pointer"
+            onClick={onClose}
+            title="닫기"
+          >
+            <span className="sr-only">닫기</span>
+            <span className="text-sm font-bold">✕</span>
+          </Button>
+        )}
       </div>
 
-      {/* Body */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3">
-        {artifacts.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-center space-y-3 py-12">
-            <div className="size-12 rounded-2xl bg-muted/60 flex items-center justify-center text-muted-foreground/60 shadow-2xs">
-              <Sparkles className="size-6" />
-            </div>
-            <div className="space-y-1 max-w-[240px]">
-              <p className="text-xs font-semibold text-foreground">
-                아직 생성된 산출물이 없습니다
-              </p>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                에이전트에게 데이터 분석, 차트 그리기, 보고서 작성을 요청해 보세요.
-              </p>
-            </div>
+      {/* Body: Created (Artifacts) & Added (User Attachments) Sections */}
+      <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar scrollbar-none px-5 py-4 space-y-6">
+        {/* Section 1: Created (에이전트가 생성한 산출물) */}
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-muted-foreground tracking-wide">
+              Created
+            </span>
+            {artifacts.length > 0 && (
+              <span className="text-[11px] text-muted-foreground/70 font-mono">
+                {artifacts.length}개
+              </span>
+            )}
           </div>
-        ) : (
-          <div className="space-y-2.5">
-            {artifacts.map((art) => {
-              const isImage = art.mimeType.startsWith("image/");
-              const downloadUrl =
-                art.downloadUrl ||
-                art.url ||
-                `/api/chat/sessions/${sessionId}/artifacts/${encodeURIComponent(art.name)}`;
 
-              return (
-                <Card
-                  key={art.id}
-                  className="group border border-border/70 bg-card hover:border-primary/40 transition-all shadow-2xs overflow-hidden"
-                >
-                  <CardContent className="p-3.5 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div className="size-9 rounded-xl bg-muted/50 flex items-center justify-center shrink-0 border border-border/50">
-                        {getFileIcon(art.mimeType, art.name)}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h4
-                          className="text-xs font-medium text-foreground truncate group-hover:text-primary transition-colors"
-                          title={art.name}
-                        >
-                          {art.name}
-                        </h4>
-                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-0.5 font-mono">
-                          <span>{formatBytes(art.sizeBytes)}</span>
-                          <span>•</span>
-                          <span>
-                            {new Date(art.createdAt).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </span>
+          {artifacts.length === 0 ? (
+            <div className="py-3 text-xs text-muted-foreground/70">
+              아직 생성된 산출물이 없습니다.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {artifacts.map((art) => {
+                const isImage = art.mimeType.startsWith("image/");
+                const downloadUrl =
+                  art.downloadUrl ||
+                  art.url ||
+                  `/api/chat/sessions/${sessionId}/artifacts/${encodeURIComponent(art.name)}`;
+
+                return (
+                  <Card
+                    key={art.id}
+                    className="group border border-border/70 bg-card hover:border-primary/40 transition-all shadow-2xs overflow-hidden"
+                  >
+                    <CardContent className="p-3 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="size-8 rounded-xl bg-muted/50 flex items-center justify-center shrink-0 border border-border/50">
+                          {getFileIcon(art.mimeType, art.name)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h4
+                            className="text-xs font-medium text-foreground truncate group-hover:text-primary transition-colors"
+                            title={art.name}
+                          >
+                            {art.name}
+                          </h4>
+                          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mt-0.5 font-mono">
+                            <span>{formatBytes(art.sizeBytes)}</span>
+                            <span>•</span>
+                            <span>
+                              {new Date(art.createdAt).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Action Buttons */}
-                    <div className="flex items-center gap-1 shrink-0">
-                      {isImage && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-7 text-muted-foreground hover:text-foreground"
-                          title="미리보기"
-                          onClick={() => {
-                            onSelectImage?.({
-                              src: downloadUrl,
-                              alt: art.name,
-                            });
-                          }}
+                      {/* Action Buttons */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        {isImage && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7 text-muted-foreground hover:text-foreground cursor-pointer"
+                            title="미리보기"
+                            onClick={() => {
+                              onSelectImage?.({
+                                src: downloadUrl,
+                                alt: art.name,
+                              });
+                            }}
+                          >
+                            <Eye className="size-3.5" data-icon="inline-start" />
+                          </Button>
+                        )}
+                        <a
+                          href={downloadUrl}
+                          download={art.name}
+                          target="_blank"
+                          rel="noopener noreferrer"
                         >
-                          <Eye className="size-3.5" data-icon="inline-start" />
-                        </Button>
-                      )}
-                      <a
-                        href={downloadUrl}
-                        download={art.name}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="size-7 text-muted-foreground hover:text-foreground hover:border-primary/40"
-                          title="다운로드"
-                        >
-                          <Download className="size-3.5" data-icon="inline-start" />
-                        </Button>
-                      </a>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="size-7 text-muted-foreground hover:text-foreground hover:border-primary/40 cursor-pointer"
+                            title="다운로드"
+                          >
+                            <Download className="size-3.5" data-icon="inline-start" />
+                          </Button>
+                        </a>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Section 2: Added (사용자가 첨부한 파일) */}
+        <div className="space-y-2.5 pt-2 border-t border-border/40">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-muted-foreground tracking-wide">
+              Added
+            </span>
+            {attachments.length > 0 && (
+              <span className="text-[11px] text-muted-foreground/70 font-mono">
+                {attachments.length}개
+              </span>
+            )}
           </div>
-        )}
+
+          {attachments.length === 0 ? (
+            <div className="py-3 text-xs text-muted-foreground/70">
+              첨부된 파일이 없습니다.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {attachments.map((att) => {
+                const isImage = att.mimeType.startsWith("image/");
+                return (
+                  <Card
+                    key={att.id}
+                    className="group border border-border/70 bg-card hover:border-primary/40 transition-all shadow-2xs overflow-hidden"
+                  >
+                    <CardContent className="p-3 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="size-8 rounded-xl bg-muted/50 flex items-center justify-center shrink-0 border border-border/50">
+                          {getFileIcon(att.mimeType, att.name)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h4
+                            className="text-xs font-medium text-foreground truncate group-hover:text-primary transition-colors"
+                            title={att.name}
+                          >
+                            {att.name}
+                          </h4>
+                          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mt-0.5 font-mono">
+                            <span>{formatBytes(att.size)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        {isImage && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7 text-muted-foreground hover:text-foreground cursor-pointer"
+                            title="미리보기"
+                            onClick={() => {
+                              onSelectImage?.({
+                                src: att.url,
+                                alt: att.name,
+                              });
+                            }}
+                          >
+                            <Eye className="size-3.5" data-icon="inline-start" />
+                          </Button>
+                        )}
+                        <a
+                          href={att.url}
+                          download={att.name}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="size-7 text-muted-foreground hover:text-foreground hover:border-primary/40 cursor-pointer"
+                            title="다운로드"
+                          >
+                            <Download className="size-3.5" data-icon="inline-start" />
+                          </Button>
+                        </a>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -201,6 +300,7 @@ export function ArtifactListPanel({
 export interface ArtifactSidebarProps {
   sessionId: string;
   artifacts: (ChatArtifactEntity & { url?: string; downloadUrl?: string })[];
+  attachments?: AttachmentEntity[];
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -208,6 +308,7 @@ export interface ArtifactSidebarProps {
 export function ArtifactSidebar({
   sessionId,
   artifacts,
+  attachments,
   isOpen,
   onOpenChange,
 }: ArtifactSidebarProps) {
@@ -226,7 +327,9 @@ export function ArtifactSidebar({
           <ArtifactListPanel
             sessionId={sessionId}
             artifacts={artifacts}
+            attachments={attachments}
             onSelectImage={setSelectedImage}
+            onClose={() => onOpenChange(false)}
           />
         </SheetContent>
       </Sheet>

@@ -1,7 +1,7 @@
 # 0017. Message Tree Active Path Synchronization and Live LLM Streaming
 
 ## Status
-Accepted
+Partially Superseded by [ADR-0021](0021-linear-session-architecture-and-deep-agents-rich-ui.md) (In-session DAG active path synchronization replaced by Linear Session Architecture with Forking)
 
 ## Context
 1. **메시지 트리와 LangGraph 체크포인터의 충돌**:
@@ -13,7 +13,7 @@ Accepted
 ## Decision
 1. **PostgreSQL을 대화 트리의 단일 진실 공급원(SSOT)으로 확정**:
    - 대화 히스토리의 저장 및 브랜치 관리는 DB와 프론트엔드가 전담합니다.
-2. **LangGraph AgentState 메시지 교체(Replace) 시맨틱 적용**:
+2. **LangGraph AgentState 메시지 교체(Replace) 시맨틱 적용** *(ADR-0021에서 선형 세션 및 포크 구조로 단순화)*:
    - `AgentState`의 `messages` 필드에서 `operator.add` 리듀서를 제거(또는 Active Path 덮어쓰기)하여, 백엔드 에이전트가 매 턴마다 프론트엔드가 전달한 정확한 Active Path만을 컨텍스트로 사용하도록 동기화합니다.
 3. **전역 LLM 응답 캐시(`set_llm_cache`) 제거**:
    - 대화형 에이전트 경로에서 `set_llm_cache`를 비활성화하여 항상 실시간 토큰 스트리밍과 신선한 응답 생성을 보장합니다.
