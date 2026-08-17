@@ -209,15 +209,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
           <SidebarGroupContent>
             {isLoading && sessions.length === 0 ? (
-              <div className="px-3 py-2 text-xs text-muted-foreground animate-pulse">
-                대화 목록 로딩 중...
+              <div className="flex items-center justify-center py-10">
+                <div className="size-5 rounded-full border-2 border-muted-foreground/20 border-t-foreground/80 animate-spin" />
               </div>
             ) : sessions.length === 0 ? (
-              <div className="px-3 py-3 text-center text-xs text-muted-foreground border border-dashed rounded-md mx-1 my-1">
-                저장된 대화 기록이 없습니다.
+              <div className="px-2.5 py-4 text-xs text-muted-foreground/50 select-none">
+                최근 대화가 없습니다.
               </div>
             ) : (
               <div
+                className="animate-in fade-in duration-300"
                 style={{
                   height: `${virtualizer.getTotalSize()}px`,
                   width: "100%",
