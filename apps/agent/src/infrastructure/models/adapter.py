@@ -3,7 +3,8 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Any
 
-from src.domain.ports import ChatMessage, ModelChunk, ModelProviderPort, ToolDefinition
+from src.domain.ports import ModelChunk, ModelProviderPort, ToolDefinition
+from src.runtime.types import ChatMessage
 
 
 class FakeChatModelAdapter(ModelProviderPort):

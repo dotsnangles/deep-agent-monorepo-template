@@ -127,8 +127,13 @@ class AgentStreamEvent(BaseModel):
 
     def to_sse(self) -> str:
         """Formats the domain event as standard Server-Sent Event text frame."""
-        data_json = self.data.model_dump_json(by_alias=True)
-        return f"event: {self.event}\ndata: {data_json}\n\n"
+        payload = (
+            self.data.model_dump(by_alias=True)
+            if isinstance(self.data, BaseModel)
+            else self.data
+        )
+        json_data = json.dumps(payload, ensure_ascii=False)
+        return f"event: {self.event}\ndata: {json_data}\n\n"
 
     @classmethod
     def token(cls, content: str) -> AgentStreamEvent:

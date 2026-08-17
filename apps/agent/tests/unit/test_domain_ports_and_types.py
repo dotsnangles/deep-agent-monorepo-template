@@ -112,7 +112,7 @@ class TestAgentStreamEvents:
         
         sse_str = event.to_sse()
         assert sse_str.startswith("event: token\n")
-        assert '"content":"Hello, world!"' in sse_str
+        assert '"content": "Hello, world!"' in sse_str
         assert sse_str.endswith("\n\n")
 
     def test_tool_start_and_end_events(self):

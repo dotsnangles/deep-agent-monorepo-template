@@ -23,6 +23,7 @@ class GraphRegistry:
         self.register("hitl", build_agent)
         self.register("deep_agent", build_agent)
         self.register("data_analysis", build_agent)
+        self.register("direct", build_agent)
 
     def register(self, agent_type: str, factory: GraphFactory) -> None:
         """Registers a graph factory function for the given agent_type."""

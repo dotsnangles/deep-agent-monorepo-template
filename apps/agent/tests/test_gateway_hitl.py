@@ -126,8 +126,8 @@ class TestAgentExecutionGatewayHITL:
     @pytest.mark.asyncio
     async def test_stream_execution_resumes_with_rejection(self, hitl_gateway_fixture):
         tool_call = {
-            "name": "delete_resource",
-            "args": {"resource_id": "res_123"},
+            "name": "execute_command",
+            "args": {"command": "delete resource res_123"},
             "id": "call_reject_stream_1",
         }
         fake_llm: FakeChatModel = hitl_gateway_fixture["model"]

@@ -4,10 +4,9 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
 from src.infrastructure.sandbox.adapter import is_denied_path
+from src.graphs.chat.backends import DEFAULT_WORKSPACE_DIR
 
 artifacts_router = APIRouter(prefix="/sessions", tags=["artifacts"])
-
-DEFAULT_WORKSPACE_DIR = Path("./workspace/sessions")
 
 MIME_TYPE_OVERRIDES = {
     ".png": "image/png",

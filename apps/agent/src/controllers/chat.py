@@ -116,8 +116,8 @@ async def stream_chat(
                     Attachment(
                         name=a.name,
                         url=a.url,
-                        mime_type=a.mime_type,
-                        size_bytes=a.size_bytes or 0,
+                        mime_type=getattr(a, "mime_type", None) or getattr(a, "mimeType", None) or "application/octet-stream",
+                        size_bytes=getattr(a, "size_bytes", None) or getattr(a, "size", None) or 0,
                     )
                     for a in msg.attachments
                 ],

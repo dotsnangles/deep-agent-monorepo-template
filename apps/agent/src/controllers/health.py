@@ -9,7 +9,7 @@ health_router = APIRouter(tags=["Health & Status"])
 def root():
     return {
         "service": "Agent Server",
-        "framework": "Clean Architecture + Deep Runtime + AG-UI",
+        "framework": "LangChain deepagents + AG-UI",
         "status": "running",
         "llm_provider": LLM_PROVIDER,
         "endpoint": "/copilotkit",

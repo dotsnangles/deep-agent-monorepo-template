@@ -38,6 +38,8 @@ class AgentTurn:
     assistant_message_id: str | None = None
     agent_type: str = "default"
     system_prompt: str | None = None
+    backend: Any = None
+    model: Any = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
 

@@ -198,6 +198,7 @@ class AgentRuntime(AgentExecutionPort):
         storage: StoragePort,
         model: Any = None,
         event_broker: RedisEventBroker | None = None,
+        registry: Any = None,
         concurrency_limit: int | None = None,
     ):
         self.persistence = persistence
@@ -205,6 +206,7 @@ class AgentRuntime(AgentExecutionPort):
         self.storage = storage
         self.model = model
         self.event_broker = event_broker
+        self.registry = registry
         self.concurrency_limit = (
             concurrency_limit
             if concurrency_limit is not None
@@ -216,6 +218,7 @@ class AgentRuntime(AgentExecutionPort):
         cls,
         model: Any = None,
         workspace_dir: Path | str = "./workspace/sessions",
+        registry: Any = None,
         concurrency_limit: int | None = None,
     ) -> AgentRuntime:
         """Factory for 100% in-memory hermetic testing."""
@@ -225,6 +228,7 @@ class AgentRuntime(AgentExecutionPort):
             storage=InMemoryStorageAdapter(),
             model=model or FakeChatModelAdapter(),
             event_broker=None,
+            registry=registry,
             concurrency_limit=concurrency_limit,
         )
 
@@ -303,16 +307,14 @@ class AgentRuntime(AgentExecutionPort):
 
         thread_id = turn.thread_id
         lc_messages = _normalize_turn_messages(turn.input, system_prompt=turn.system_prompt)
-        effective_model = self.model or get_llm()
-
-        # 1. State Summary Node Transition
-        yield AgentStreamEvent.node_transition(
-            node="agent_entry",
-            state_summary={"thread_id": thread_id, "agent_type": turn.agent_type},
-        )
+        effective_model = turn.model or self.model or get_llm()
 
         # If model is FakeChatModelAdapter, run lightweight fake stream directly
         if isinstance(effective_model, FakeChatModelAdapter):
+            yield AgentStreamEvent.node_transition(
+                node="agent_entry",
+                state_summary={"thread_id": thread_id, "agent_type": turn.agent_type},
+            )
             total_tokens = 0
             async for chunk in effective_model.generate_stream(
                 messages=[ChatMessage(role="user", content="msg")],
@@ -331,6 +333,45 @@ class AgentRuntime(AgentExecutionPort):
                 finish_reason="stop",
                 metadata={"total_chars": total_tokens, "thread_id": thread_id},
             )
+            return
+
+        if turn.agent_type == "direct" and hasattr(effective_model, "astream"):
+            total_tokens = 0
+            direct_config = {"configurable": {"thread_id": thread_id}}
+            try:
+                async for chunk in effective_model.astream(lc_messages, config=direct_config):
+                    # Check for tool call chunks
+                    if hasattr(chunk, "tool_call_chunks") and chunk.tool_call_chunks:
+                        for tc_chunk in chunk.tool_call_chunks:
+                            name = tc_chunk.get("name") if isinstance(tc_chunk, dict) else getattr(tc_chunk, "name", None)
+                            args = tc_chunk.get("args") if isinstance(tc_chunk, dict) else getattr(tc_chunk, "args", {})
+                            tc_id = tc_chunk.get("id") if isinstance(tc_chunk, dict) else getattr(tc_chunk, "id", None)
+                            if name:
+                                yield AgentStreamEvent.tool_start(
+                                    tool=name,
+                                    tool_input=args,
+                                    run_id=tc_id,
+                                )
+                    elif hasattr(chunk, "tool_calls") and chunk.tool_calls:
+                        for tc in chunk.tool_calls:
+                            yield AgentStreamEvent.tool_start(
+                                tool=tc.get("name", ""),
+                                tool_input=tc.get("args", {}),
+                                run_id=tc.get("id"),
+                            )
+                    content = chunk.content if hasattr(chunk, "content") else str(chunk)
+                    if content:
+                        total_tokens += len(content)
+                        yield AgentStreamEvent.token(content)
+                yield AgentStreamEvent.done(
+                    finish_reason="stop",
+                    metadata={"total_chars": total_tokens, "thread_id": thread_id},
+                )
+            except Exception as direct_err:
+                yield AgentStreamEvent.error(
+                    message=str(direct_err),
+                    code="STREAM_FAILED",
+                )
             return
 
         # 2. Compile LangGraph Agent via Factory
@@ -357,15 +398,27 @@ class AgentRuntime(AgentExecutionPort):
         # Resolve Sandbox backend
         from src.graphs.chat.backends import get_session_backend
 
-        backend = get_session_backend(thread_id)
+        backend = turn.backend or get_session_backend(thread_id)
 
-        graph = DeepAgentEnvironmentFactory.create_agent(
-            checkpointer=checkpointer,
-            store=store,
-            model=effective_model,
-            system_prompt=turn.system_prompt,
-            backend=backend,
-        )
+        from src.graphs.registry import global_graph_registry
+        reg = self.registry or global_graph_registry
+        if hasattr(reg, "has_graph") and reg.has_graph(turn.agent_type):
+            graph = reg.get_graph(
+                agent_type=turn.agent_type,
+                checkpointer=checkpointer,
+                store=store,
+                model=effective_model,
+                system_prompt=turn.system_prompt,
+                backend=backend,
+            )
+        else:
+            graph = DeepAgentEnvironmentFactory.create_agent(
+                checkpointer=checkpointer,
+                store=store,
+                model=effective_model,
+                system_prompt=turn.system_prompt,
+                backend=backend,
+            )
 
         # Determine graph input: Command(resume=...) for HITL or initial messages
         if isinstance(turn.input, ApprovalDecision):

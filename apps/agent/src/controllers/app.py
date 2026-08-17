@@ -10,8 +10,11 @@ from src.controllers.copilotkit import register_copilotkit_agent
 from src.controllers.events import events_router
 from src.controllers.health import health_router
 from src.controllers.title import title_router
-from src.infrastructure.config import DATABASE_URL, ENABLE_TITLE_WORKER, REDIS_URL
-from src.infrastructure.redis import RedisEventBroker
+from src.core.checkpointer import CheckpointerFactory
+from src.core.config import DATABASE_URL, ENABLE_TITLE_WORKER, REDIS_URL
+from src.core.gateway import AgentExecutionGateway
+from src.core.redis import RedisEventBroker
+from src.graphs.chat.graph import build_agent
 from src.runtime.runtime import AgentRuntime
 from src.workers import TitleGenerationWorker
 
@@ -23,16 +26,27 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        import os
+        import sys
+        api_app_mod = sys.modules.get("src.api.app")
+        db_url = getattr(api_app_mod, "DATABASE_URL", None) or os.getenv("DATABASE_URL") or DATABASE_URL
+        redis_url = getattr(api_app_mod, "REDIS_URL", None) or os.getenv("REDIS_URL") or REDIS_URL
+        enable_title_worker = getattr(api_app_mod, "ENABLE_TITLE_WORKER", None) or (os.getenv("ENABLE_TITLE_WORKER", "false").lower() == "true") or ENABLE_TITLE_WORKER
+        TitleWorkerCls = getattr(api_app_mod, "TitleGenerationWorker", TitleGenerationWorker)
+
         app.state.pg_pool = None
+        app.state.checkpointer = CheckpointerFactory.create_checkpointer()
+        app.state.store = None
         app.state.redis = None
         app.state.broker = None
         app.state.title_worker = None
+        app.state.gateway = None
         app.state.agent_runtime = None
 
         # 1. Initialize Redis Client & Event Broker
-        if REDIS_URL:
+        if redis_url:
             try:
-                r = aioredis.from_url(REDIS_URL, decode_responses=True)
+                r = aioredis.from_url(redis_url, decode_responses=True)
                 await r.ping()
                 app.state.redis = r
                 broker = RedisEventBroker(r)
@@ -40,26 +54,56 @@ def create_app() -> FastAPI:
                 if hasattr(app.state, "copilotkit_agent") and app.state.copilotkit_agent:
                     app.state.copilotkit_agent.broker = broker
 
-                logger.info("Redis connected, Pub/Sub broker active (%s).", REDIS_URL)
+                logger.info("Redis connected, Pub/Sub broker active (%s).", redis_url)
             except Exception as e:
                 logger.warning("Redis connection failed: %s. Using memory fallback.", e)
 
-        # 2. Initialize AgentRuntime with Production Adapters
-        try:
-            runtime = await AgentRuntime.create_production(
-                db_url=DATABASE_URL,
-                redis_url=REDIS_URL,
-            )
-            app.state.agent_runtime = runtime
-            app.state.pg_pool = getattr(getattr(runtime, "persistence", None), "pool", None)
-            logger.info("AgentRuntime ready with production adapters.")
-        except Exception as e:
-            logger.warning("AgentRuntime production initialization failed: %s. Falling back to in-memory.", e)
-            app.state.agent_runtime = AgentRuntime.create_in_memory()
+        # 2. Initialize PostgreSQL Checkpointer & Store via CheckpointerFactory
+        if db_url and not db_url.startswith("sqlite"):
+            try:
+                pool = await CheckpointerFactory.create_pool(db_url)
+                if pool:
+                    checkpointer = CheckpointerFactory.create_checkpointer(pool=pool)
+                    if hasattr(checkpointer, "setup"):
+                        await checkpointer.setup()
 
-        # 3. Initialize & Start Title Generation Queue Worker
-        if app.state.redis and ENABLE_TITLE_WORKER:
-            title_worker = TitleGenerationWorker(
+                    store = CheckpointerFactory.create_store(pool=pool)
+                    if hasattr(store, "setup"):
+                        await store.setup()
+
+                    app.state.pg_pool = pool
+                    app.state.checkpointer = checkpointer
+                    app.state.store = store
+
+                    if hasattr(app.state, "copilotkit_agent") and app.state.copilotkit_agent:
+                        app.state.copilotkit_agent.graph = build_agent(
+                            checkpointer=checkpointer, store=store
+                        )
+                    logger.info(
+                        "PostgreSQL checkpointer & store ready via CheckpointerFactory (%s).",
+                        db_url,
+                    )
+            except Exception as e:
+                logger.warning("PostgreSQL connection failed: %s. Using in-memory fallback.", e)
+
+        # 3. Initialize Gateway and AgentRuntime
+        from src.core.artifacts import ArtifactSyncProcessor, S3StorageService
+        storage_service = S3StorageService() if (db_url and not db_url.startswith("sqlite")) else None
+        artifact_processor = ArtifactSyncProcessor(
+            db_pool=app.state.pg_pool,
+            storage_service=storage_service,
+        )
+        app.state.gateway = AgentExecutionGateway(
+            checkpointer=app.state.checkpointer,
+            store=app.state.store,
+            event_broker=app.state.broker,
+            artifact_processor=artifact_processor,
+        )
+        app.state.agent_runtime = app.state.gateway.runtime
+
+        # 4. Initialize & Start Title Generation Queue Worker
+        if app.state.redis and enable_title_worker:
+            title_worker = TitleWorkerCls(
                 redis_client=app.state.redis,
                 event_broker=app.state.broker,
                 pg_pool=app.state.pg_pool,
@@ -74,11 +118,8 @@ def create_app() -> FastAPI:
         # Teardown
         if app.state.title_worker:
             await app.state.title_worker.stop()
-        if hasattr(app.state, "agent_runtime") and app.state.agent_runtime:
-            persistence = getattr(app.state.agent_runtime, "persistence", None)
-            if hasattr(persistence, "close"):
-                await persistence.close()
-        logger.info("Agent runtime connections closed.")
+        await CheckpointerFactory.close_pool()
+        logger.info("PostgreSQL connection pool closed.")
         if app.state.redis:
             await app.state.redis.aclose()
             logger.info("Redis client closed.")

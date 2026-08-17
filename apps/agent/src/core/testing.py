@@ -80,8 +80,8 @@ class FakeChatModel(BaseChatModel):
                 return t_tokens, None, t_resp
 
         t_tokens = self.tokens
-        t_tools = self.tool_calls
         idx = self.tracker.turn_idx
+        t_tools = self.tool_calls if idx == 0 else None
         t_resp = self.responses[idx % len(self.responses)]
         self.tracker.turn_idx += 1
         return t_tokens, t_tools, t_resp
