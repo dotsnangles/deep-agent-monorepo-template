@@ -77,7 +77,7 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
   }, [inputPrompt]);
 
   const handleSend = () => {
-    if ((!inputPrompt.trim() && completedAttachments.length === 0) || isUploading) {
+    if (isGenerating || (!inputPrompt.trim() && completedAttachments.length === 0) || isUploading) {
       return;
     }
     const content = inputPrompt.trim();
@@ -88,10 +88,6 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
 
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
-    }
-
-    if (isGenerating) {
-      stop();
     }
 
     send(content, attachments);
@@ -107,9 +103,8 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
         // Shift + Enter: Allow natural multiline newline insertion in textarea
         return;
       }
-      // Enter alone: Send message only when input is present
       e.preventDefault();
-      if (!isSendDisabled) {
+      if (!isGenerating && !isSendDisabled) {
         handleSend();
       }
     }
@@ -124,7 +119,7 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
   };
 
   const isSendDisabled =
-    (!inputPrompt.trim() && completedAttachments.length === 0) || isUploading;
+    isGenerating || (!inputPrompt.trim() && completedAttachments.length === 0) || isUploading;
 
   const [greetingIndex, setGreetingIndex] = useState(() =>
     Math.floor(Math.random() * 8)
@@ -310,11 +305,6 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
               value={inputPrompt}
               onChange={(e) => setInputPrompt(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={
-                isUploading
-                  ? "파일을 업로드하는 중입니다..."
-                  : "무엇이든 물어보세요..."
-              }
               className="flex-1 min-h-[38px] max-h-[160px] resize-none border-none shadow-none focus-visible:ring-0 focus:ring-0 focus:outline-none text-sm px-2 py-2 bg-transparent dark:bg-transparent leading-relaxed"
               rows={1}
             />
