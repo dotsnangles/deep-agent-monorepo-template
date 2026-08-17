@@ -9,16 +9,18 @@ describe("ReasoningCard Unit Tests", () => {
     expect(html).toBe("");
   });
 
-  it("renders live thinking state with spinner when isThinking is true (collapsed by default)", () => {
+  it("renders live thinking state with spinner and live duration badge when isThinking is true (collapsed by default)", () => {
     const html = renderToString(
       <ReasoningCard
         reasoning="데이터를 분석하기 위해 파이썬 코드를 작성해야 합니다."
         isThinking={true}
+        duration={1.2}
       />
     );
 
     expect(html).toContain('data-testid="reasoning-card"');
     expect(html).toContain("생각하는 중...");
+    expect(html).toContain("1.2초");
     expect(html).toContain('aria-expanded="false"');
   });
 

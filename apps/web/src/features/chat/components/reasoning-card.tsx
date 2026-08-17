@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Brain, ChevronDown, ChevronUp, Loader2, Sparkles } from "lucide-react";
 import { Badge } from "@repo/ui/components/badge";
 import { cn } from "@repo/ui/lib/utils";
@@ -31,8 +31,24 @@ export function ReasoningCard({
 }: ReasoningCardProps) {
   // Collapsed by default; user can expand on demand
   const [isOpen, setIsOpen] = useState(defaultOpen);
-
   const activeThinking = isThinking !== undefined ? isThinking : isGenerating;
+
+  const [liveDuration, setLiveDuration] = useState<number>(duration ?? 0);
+
+  useEffect(() => {
+    if (!activeThinking) {
+      return;
+    }
+    const initialSec = duration ?? 0;
+    const startTime = Date.now() - initialSec * 1000;
+    const interval = setInterval(() => {
+      setLiveDuration(Math.max(0.1, (Date.now() - startTime) / 1000));
+    }, 100);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [activeThinking, duration]);
 
   if (!reasoning || !reasoning.trim()) {
     return null;
@@ -88,12 +104,23 @@ export function ReasoningCard({
               )}
             </CardTitle>
 
-            {!activeThinking && duration !== undefined && duration !== null && (
-              <Badge variant="outline" className="text-[10px] font-normal py-0 px-1.5 h-4.5 text-muted-foreground">
+            {activeThinking ? (
+              <Badge
+                variant="outline"
+                className="text-[10px] font-normal py-0 px-1.5 h-4.5 text-primary/90 border-primary/20 bg-primary/5 font-mono"
+              >
+                <Sparkles className="size-2.5 mr-1 text-primary animate-pulse" />
+                {`${Math.max(0.1, duration ?? liveDuration).toFixed(1)}초`}
+              </Badge>
+            ) : duration !== undefined && duration !== null ? (
+              <Badge
+                variant="outline"
+                className="text-[10px] font-normal py-0 px-1.5 h-4.5 text-muted-foreground"
+              >
                 <Sparkles className="size-2.5 mr-1 text-primary/70" />
                 {formatDuration(duration)}
               </Badge>
-            )}
+            ) : null}
           </div>
 
           <CardAction>
