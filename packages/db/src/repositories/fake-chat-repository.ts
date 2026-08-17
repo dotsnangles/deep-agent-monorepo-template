@@ -10,6 +10,8 @@ import type {
   ForkSessionResult,
   ChatArtifactEntity,
   CreateArtifactParams,
+  ChatAttachmentEntity,
+  CreateAttachmentParams,
 } from "./chat-repository";
 import {
   traverseActivePath,
@@ -22,6 +24,7 @@ export class FakeChatRepository implements ChatRepository {
   private sessions: Map<string, ChatSessionEntity> = new Map();
   private messages: Map<string, MessageNode[]> = new Map();
   private artifacts: Map<string, ChatArtifactEntity> = new Map();
+  private attachments: Map<string, ChatAttachmentEntity> = new Map();
 
   public async getSessions(userId: string): Promise<ChatSessionEntity[]> {
     const userSessions: ChatSessionEntity[] = [];
@@ -205,6 +208,20 @@ export class FakeChatRepository implements ChatRepository {
       }
     }
 
+    // Replicate associated user attachments
+    for (const att of this.attachments.values()) {
+      if (att.sessionId === sourceSessionId && att.messageId && idMap.has(att.messageId)) {
+        const clonedAttId = `att_fork_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        this.attachments.set(clonedAttId, {
+          ...att,
+          id: clonedAttId,
+          sessionId: newSessionId,
+          messageId: idMap.get(att.messageId)!,
+          createdAt: new Date(),
+        });
+      }
+    }
+
     return {
       session: { ...newSession },
       messages: clonedMessages.map((m) => ({ ...m })),
@@ -330,9 +347,70 @@ export class FakeChatRepository implements ChatRepository {
     return art ? { ...art } : null;
   }
 
+  public async saveAttachment(params: CreateAttachmentParams): Promise<ChatAttachmentEntity> {
+    const id = params.id || `att_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const attachment: ChatAttachmentEntity = {
+      id,
+      sessionId: params.sessionId,
+      messageId: params.messageId ?? null,
+      userId: params.userId,
+      name: params.name,
+      storageKey: params.storageKey,
+      mimeType: params.mimeType,
+      sizeBytes: params.sizeBytes ?? null,
+      uploadStatus: params.uploadStatus || "ready",
+      metadata: params.metadata ? { ...params.metadata } : {},
+      createdAt: new Date(),
+    };
+    this.attachments.set(id, attachment);
+    return { ...attachment };
+  }
+
+  public async getAttachmentsBySession(sessionId: string, userId: string): Promise<ChatAttachmentEntity[]> {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.userId !== userId) {
+      return [];
+    }
+    const list: ChatAttachmentEntity[] = [];
+    for (const att of this.attachments.values()) {
+      if (att.sessionId === sessionId && att.userId === userId) {
+        list.push({ ...att });
+      }
+    }
+    return list.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  }
+
+  public async getAttachmentsByMessage(messageId: string, userId: string): Promise<ChatAttachmentEntity[]> {
+    const list: ChatAttachmentEntity[] = [];
+    for (const att of this.attachments.values()) {
+      if (att.messageId === messageId && att.userId === userId) {
+        list.push({ ...att });
+      }
+    }
+    return list.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  }
+
+  public async getAttachment(attachmentId: string, userId: string): Promise<ChatAttachmentEntity | null> {
+    const att = this.attachments.get(attachmentId);
+    if (!att || att.userId !== userId) {
+      return null;
+    }
+    return { ...att };
+  }
+
+  public async updateAttachmentStatus(attachmentId: string, userId: string, status: string): Promise<boolean> {
+    const att = this.attachments.get(attachmentId);
+    if (!att || att.userId !== userId) {
+      return false;
+    }
+    att.uploadStatus = status;
+    return true;
+  }
+
   public clear(): void {
     this.sessions.clear();
     this.messages.clear();
     this.artifacts.clear();
+    this.attachments.clear();
   }
 }

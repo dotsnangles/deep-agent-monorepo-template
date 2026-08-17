@@ -106,6 +106,15 @@ export async function POST(req: NextRequest) {
 
     const { sessionId, parentId = null, role, content, attachments, id } = parseResult.data;
 
+    const sanitizedAttachments = attachments?.map((att) => ({
+      id: att.id,
+      name: att.name,
+      mimeType: att.mimeType,
+      size: att.size,
+      s3Key: att.s3Key,
+      url: att.url ? att.url.split("?")[0] : `/api/storage/presigned-url?key=${encodeURIComponent(att.s3Key)}`,
+    }));
+
     const result = await chatRepository.saveMessage(
       {
         id,
@@ -113,7 +122,7 @@ export async function POST(req: NextRequest) {
         parentId: parentId || null,
         role,
         content,
-        attachments,
+        attachments: sanitizedAttachments,
       },
       userId
     );
@@ -123,6 +132,26 @@ export async function POST(req: NextRequest) {
         { error: "Unauthorized or session belongs to another user" },
         { status: 403 }
       );
+    }
+
+    if (sanitizedAttachments && sanitizedAttachments.length > 0 && role === "user") {
+      for (const att of sanitizedAttachments) {
+        try {
+          await chatRepository.saveAttachment({
+            id: att.id,
+            sessionId,
+            messageId: result.message.id,
+            userId,
+            name: att.name,
+            storageKey: att.s3Key,
+            mimeType: att.mimeType,
+            sizeBytes: att.size,
+            uploadStatus: "ready",
+          });
+        } catch (attErr) {
+          console.warn("[API POST /api/chat/messages] Attachment persistence failed:", attErr);
+        }
+      }
     }
 
     // Trigger smart title generation in background if first user message

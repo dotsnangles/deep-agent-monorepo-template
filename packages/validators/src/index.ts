@@ -67,6 +67,38 @@ export const presignedUploadResponseSchema = z.object({
 
 export type PresignedUploadResponseDTO = z.infer<typeof presignedUploadResponseSchema>;
 
+// Chat Attachment Schemas (User Inbound Files)
+export const chatAttachmentEntitySchema = z.object({
+  id: z.string(),
+  sessionId: z.string(),
+  messageId: z.string().nullable().optional(),
+  userId: z.string(),
+  name: z.string(),
+  storageKey: z.string(),
+  mimeType: z.string(),
+  sizeBytes: z.number().nullable().optional(),
+  uploadStatus: z.enum(["uploading", "ready", "failed"]).default("ready"),
+  metadata: z.record(z.string(), z.unknown()).default({}),
+  createdAt: z.date().or(z.string()),
+});
+
+export type ChatAttachmentEntity = z.infer<typeof chatAttachmentEntitySchema>;
+
+export const createChatAttachmentSchema = z.object({
+  id: z.string().optional(),
+  sessionId: z.string().min(1, "sessionId is required"),
+  messageId: z.string().nullable().optional(),
+  userId: z.string().min(1, "userId is required"),
+  name: z.string().min(1, "name is required"),
+  storageKey: z.string().min(1, "storageKey is required"),
+  mimeType: z.string().min(1, "mimeType is required"),
+  sizeBytes: z.number().nonnegative().nullable().optional(),
+  uploadStatus: z.enum(["uploading", "ready", "failed"]).optional().default("ready"),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export type CreateChatAttachmentDTO = z.infer<typeof createChatAttachmentSchema>;
+
 // Chat Session DTO Schemas
 export const createChatSessionSchema = z.object({
   id: z.string().optional(),

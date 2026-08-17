@@ -375,6 +375,33 @@ describe("ChatRepository Contract Tests (FakeChatRepository)", () => {
       expect(origMessages).toHaveLength(4);
     });
 
+    it("replicates user attachments to new session during forkSession", async () => {
+      await repo.createSession({ id: "attach-sess", userId: USER_A, title: "Attach Test" });
+      await repo.saveMessage({ id: "am-1", sessionId: "attach-sess", parentId: null, role: "user", content: "With file" }, USER_A);
+      await repo.saveMessage({ id: "am-2", sessionId: "attach-sess", parentId: "am-1", role: "assistant", content: "Got it" }, USER_A);
+
+      await repo.saveAttachment({
+        id: "att-1",
+        sessionId: "attach-sess",
+        messageId: "am-1",
+        userId: USER_A,
+        name: "data.csv",
+        storageKey: "uploads/data.csv",
+        mimeType: "text/csv",
+        sizeBytes: 500,
+        uploadStatus: "ready",
+      });
+
+      const forkResult = await repo.forkSession("attach-sess", "am-2", USER_A);
+      expect(forkResult).not.toBeNull();
+
+      const newAttachments = await repo.getAttachmentsBySession(forkResult!.session.id, USER_A);
+      expect(newAttachments).toHaveLength(1);
+      expect(newAttachments[0].sessionId).toBe(forkResult!.session.id);
+      expect(newAttachments[0].messageId).toBe(forkResult!.messages[0].id);
+      expect(newAttachments[0].name).toBe("data.csv");
+    });
+
     it("forks from a specific branch in a tree session without including abandoned sibling branches", async () => {
       await repo.createSession({ id: "tree-sess", userId: USER_A, title: "Tree Research" });
       // Root
@@ -466,6 +493,61 @@ describe("ChatRepository Contract Tests (FakeChatRepository)", () => {
 
       const nonExistent = await repo.getArtifact("art-missing");
       expect(nonExistent).toBeNull();
+    });
+  });
+
+  describe("Chat Attachment Management", () => {
+    it("creates, retrieves, and updates attachment status with user isolation", async () => {
+      await repo.createSession({ id: "sess-att-mgr", userId: USER_A, title: "Attachment Mgr" });
+      await repo.saveMessage({ id: "msg-att-1", sessionId: "sess-att-mgr", role: "user", content: "Input file" }, USER_A);
+
+      const attachment = await repo.saveAttachment({
+        id: "att-mgr-1",
+        sessionId: "sess-att-mgr",
+        messageId: "msg-att-1",
+        userId: USER_A,
+        name: "report.pdf",
+        storageKey: "uploads/sess-att-mgr/report.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 1048576,
+        uploadStatus: "uploading",
+        metadata: { pageCount: 5 },
+      });
+
+      expect(attachment.id).toBe("att-mgr-1");
+      expect(attachment.sessionId).toBe("sess-att-mgr");
+      expect(attachment.messageId).toBe("msg-att-1");
+      expect(attachment.userId).toBe(USER_A);
+      expect(attachment.name).toBe("report.pdf");
+      expect(attachment.uploadStatus).toBe("uploading");
+      expect(attachment.metadata).toEqual({ pageCount: 5 });
+
+      // Update status
+      const updated = await repo.updateAttachmentStatus("att-mgr-1", USER_A, "ready");
+      expect(updated).toBe(true);
+
+      const fetched = await repo.getAttachment("att-mgr-1", USER_A);
+      expect(fetched?.uploadStatus).toBe("ready");
+
+      // User B cannot access User A's attachment
+      const unauthorizedFetch = await repo.getAttachment("att-mgr-1", USER_B);
+      expect(unauthorizedFetch).toBeNull();
+
+      const unauthorizedUpdate = await repo.updateAttachmentStatus("att-mgr-1", USER_B, "failed");
+      expect(unauthorizedUpdate).toBe(false);
+
+      // Retrieve by session
+      const sessionAttachments = await repo.getAttachmentsBySession("sess-att-mgr", USER_A);
+      expect(sessionAttachments).toHaveLength(1);
+      expect(sessionAttachments[0].id).toBe("att-mgr-1");
+
+      const sessionAttachmentsUserB = await repo.getAttachmentsBySession("sess-att-mgr", USER_B);
+      expect(sessionAttachmentsUserB).toHaveLength(0);
+
+      // Retrieve by message
+      const messageAttachments = await repo.getAttachmentsByMessage("msg-att-1", USER_A);
+      expect(messageAttachments).toHaveLength(1);
+      expect(messageAttachments[0].id).toBe("att-mgr-1");
     });
   });
 });

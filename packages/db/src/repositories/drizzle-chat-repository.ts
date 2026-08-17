@@ -1,12 +1,14 @@
 import { and, asc, desc, eq, inArray, type SQL } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "../schema";
-import { chatArtifact, chatMessage, chatSession } from "../schema/chat";
+import { chatArtifact, chatAttachment, chatMessage, chatSession } from "../schema/chat";
 import type {
   ChatArtifactEntity,
+  ChatAttachmentEntity,
   ChatRepository,
   ChatSessionEntity,
   CreateArtifactParams,
+  CreateAttachmentParams,
   CreateMessageParams,
   CreateSessionParams,
   DeleteSubtreeResult,
@@ -33,6 +35,22 @@ function toArtifactEntity(record: typeof chatArtifact.$inferSelect): ChatArtifac
     storageKey: record.storageKey,
     mimeType: record.mimeType,
     sizeBytes: record.sizeBytes,
+    metadata: (record.metadata as Record<string, unknown>) ?? {},
+    createdAt: record.createdAt,
+  };
+}
+
+function toAttachmentEntity(record: typeof chatAttachment.$inferSelect): ChatAttachmentEntity {
+  return {
+    id: record.id,
+    sessionId: record.sessionId,
+    messageId: record.messageId,
+    userId: record.userId,
+    name: record.name,
+    storageKey: record.storageKey,
+    mimeType: record.mimeType,
+    sizeBytes: record.sizeBytes,
+    uploadStatus: record.uploadStatus,
     metadata: (record.metadata as Record<string, unknown>) ?? {},
     createdAt: record.createdAt,
   };
@@ -301,6 +319,31 @@ export class DrizzleChatRepository implements ChatRepository {
         await tx.insert(chatArtifact).values(artifactsToInsert);
       }
 
+      // 6. Replicate associated user attachments
+      const sourceAttachments = await tx
+        .select()
+        .from(chatAttachment)
+        .where(eq(chatAttachment.sessionId, sourceSessionId));
+
+      const attachmentsToInsert = sourceAttachments
+        .filter((att) => att.messageId && idMap.has(att.messageId))
+        .map((att) => ({
+          id: crypto.randomUUID(),
+          sessionId: newSessionId,
+          messageId: idMap.get(att.messageId!)!,
+          userId: att.userId,
+          name: att.name,
+          storageKey: att.storageKey,
+          mimeType: att.mimeType,
+          sizeBytes: att.sizeBytes,
+          uploadStatus: att.uploadStatus,
+          metadata: att.metadata ?? {},
+        }));
+
+      if (attachmentsToInsert.length > 0) {
+        await tx.insert(chatAttachment).values(attachmentsToInsert);
+      }
+
       return {
         session: {
           ...toSessionEntity(newSession),
@@ -486,5 +529,64 @@ export class DrizzleChatRepository implements ChatRepository {
       .where(eq(chatArtifact.id, artifactId));
 
     return record ? toArtifactEntity(record) : null;
+  }
+
+  public async saveAttachment(params: CreateAttachmentParams): Promise<ChatAttachmentEntity> {
+    const id = params.id || `att_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const [record] = await this.db
+      .insert(chatAttachment)
+      .values({
+        id,
+        sessionId: params.sessionId,
+        messageId: params.messageId || null,
+        userId: params.userId,
+        name: params.name,
+        storageKey: params.storageKey,
+        mimeType: params.mimeType,
+        sizeBytes: params.sizeBytes ?? null,
+        uploadStatus: params.uploadStatus || "ready",
+        metadata: params.metadata ?? {},
+      })
+      .returning();
+
+    return toAttachmentEntity(record);
+  }
+
+  public async getAttachmentsBySession(sessionId: string, userId: string): Promise<ChatAttachmentEntity[]> {
+    const records = await this.db
+      .select()
+      .from(chatAttachment)
+      .where(and(eq(chatAttachment.sessionId, sessionId), eq(chatAttachment.userId, userId)))
+      .orderBy(asc(chatAttachment.createdAt));
+
+    return records.map(toAttachmentEntity);
+  }
+
+  public async getAttachmentsByMessage(messageId: string, userId: string): Promise<ChatAttachmentEntity[]> {
+    const records = await this.db
+      .select()
+      .from(chatAttachment)
+      .where(and(eq(chatAttachment.messageId, messageId), eq(chatAttachment.userId, userId)))
+      .orderBy(asc(chatAttachment.createdAt));
+
+    return records.map(toAttachmentEntity);
+  }
+
+  public async getAttachment(attachmentId: string, userId: string): Promise<ChatAttachmentEntity | null> {
+    const [record] = await this.db
+      .select()
+      .from(chatAttachment)
+      .where(and(eq(chatAttachment.id, attachmentId), eq(chatAttachment.userId, userId)));
+
+    return record ? toAttachmentEntity(record) : null;
+  }
+
+  public async updateAttachmentStatus(attachmentId: string, userId: string, status: string): Promise<boolean> {
+    const result = await this.db
+      .update(chatAttachment)
+      .set({ uploadStatus: status })
+      .where(and(eq(chatAttachment.id, attachmentId), eq(chatAttachment.userId, userId)));
+
+    return (result.rowCount ?? 0) > 0;
   }
 }

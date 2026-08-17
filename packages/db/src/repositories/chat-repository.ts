@@ -81,6 +81,33 @@ export interface CreateArtifactParams {
   metadata?: Record<string, unknown>;
 }
 
+export interface ChatAttachmentEntity {
+  id: string;
+  sessionId: string;
+  messageId: string | null;
+  userId: string;
+  name: string;
+  storageKey: string;
+  mimeType: string;
+  sizeBytes: number | null;
+  uploadStatus: string;
+  metadata: Record<string, unknown>;
+  createdAt: Date;
+}
+
+export interface CreateAttachmentParams {
+  id?: string;
+  sessionId: string;
+  messageId?: string | null;
+  userId: string;
+  name: string;
+  storageKey: string;
+  mimeType: string;
+  sizeBytes?: number | null;
+  uploadStatus?: string;
+  metadata?: Record<string, unknown>;
+}
+
 export interface ChatRepository {
   getSessions(userId: string): Promise<ChatSessionEntity[]>;
   getSession(sessionId: string, userId: string): Promise<ChatSessionEntity | null>;
@@ -103,4 +130,9 @@ export interface ChatRepository {
   getArtifactsBySession(sessionId: string): Promise<ChatArtifactEntity[]>;
   getArtifactsByMessage(messageId: string): Promise<ChatArtifactEntity[]>;
   getArtifact(artifactId: string): Promise<ChatArtifactEntity | null>;
+  saveAttachment(params: CreateAttachmentParams): Promise<ChatAttachmentEntity>;
+  getAttachmentsBySession(sessionId: string, userId: string): Promise<ChatAttachmentEntity[]>;
+  getAttachmentsByMessage(messageId: string, userId: string): Promise<ChatAttachmentEntity[]>;
+  getAttachment(attachmentId: string, userId: string): Promise<ChatAttachmentEntity | null>;
+  updateAttachmentStatus(attachmentId: string, userId: string, status: string): Promise<boolean>;
 }

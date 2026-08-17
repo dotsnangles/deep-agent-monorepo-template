@@ -392,10 +392,15 @@ describe("DrizzleChatRepository Unit & Transaction Tests", () => {
         from: vi.fn().mockReturnThis(),
         where: vi.fn().mockResolvedValue([]),
       };
+      const attachmentsSelect = {
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockResolvedValue([]),
+      };
       mockDb.select
         .mockReturnValueOnce(sourceSessionSelect)
         .mockReturnValueOnce(messagesSelect)
-        .mockReturnValueOnce(artifactsSelect);
+        .mockReturnValueOnce(artifactsSelect)
+        .mockReturnValueOnce(attachmentsSelect);
 
       const sessionInsert = {
         values: vi.fn().mockReturnThis(),
@@ -422,6 +427,72 @@ describe("DrizzleChatRepository Unit & Transaction Tests", () => {
       expect(forkResult?.messages[1].content).toBe("A1");
       expect(forkResult?.messages[0].parentId).toBeNull();
       expect(forkResult?.messages[1].parentId).toBe("cloned-1");
+    });
+  });
+
+  describe("Chat Attachment Operations", () => {
+    it("saves chat attachment record", async () => {
+      const insertChain = {
+        values: vi.fn().mockReturnThis(),
+        returning: vi.fn().mockResolvedValue([
+          {
+            id: "att-1",
+            sessionId: "s1",
+            messageId: "m1",
+            userId: USER_ID,
+            name: "test.pdf",
+            storageKey: "uploads/s1/test.pdf",
+            mimeType: "application/pdf",
+            sizeBytes: 1024,
+            uploadStatus: "ready",
+            metadata: {},
+            createdAt: new Date(),
+          },
+        ]),
+      };
+      mockDb.insert.mockReturnValue(insertChain);
+
+      const result = await repo.saveAttachment({
+        id: "att-1",
+        sessionId: "s1",
+        messageId: "m1",
+        userId: USER_ID,
+        name: "test.pdf",
+        storageKey: "uploads/s1/test.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 1024,
+      });
+
+      expect(result.id).toBe("att-1");
+      expect(result.name).toBe("test.pdf");
+      expect(result.uploadStatus).toBe("ready");
+    });
+
+    it("retrieves attachments by session with user boundary check", async () => {
+      const selectChain = {
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        orderBy: vi.fn().mockResolvedValue([
+          {
+            id: "att-1",
+            sessionId: "s1",
+            messageId: "m1",
+            userId: USER_ID,
+            name: "test.pdf",
+            storageKey: "uploads/s1/test.pdf",
+            mimeType: "application/pdf",
+            sizeBytes: 1024,
+            uploadStatus: "ready",
+            metadata: {},
+            createdAt: new Date(),
+          },
+        ]),
+      };
+      mockDb.select.mockReturnValue(selectChain);
+
+      const results = await repo.getAttachmentsBySession("s1", USER_ID);
+      expect(results).toHaveLength(1);
+      expect(results[0].id).toBe("att-1");
     });
   });
 });

@@ -48,6 +48,36 @@ export const chatMessage = pgTable(
   ]
 );
 
+export const chatAttachment = pgTable(
+  "chat_attachment",
+  {
+    id: text("id").primaryKey(), // UUID string
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => chatSession.id, { onDelete: "cascade" }),
+    messageId: text("message_id")
+      .references(() => chatMessage.id, { onDelete: "set null" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    storageKey: text("storage_key").notNull(),
+    mimeType: text("mime_type").notNull(),
+    sizeBytes: integer("size_bytes"),
+    uploadStatus: text("upload_status").notNull().default("ready"),
+    metadata: jsonb("metadata")
+      .$type<Record<string, unknown>>()
+      .default({})
+      .notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("chat_attachment_sessionId_idx").on(table.sessionId),
+    index("chat_attachment_messageId_idx").on(table.messageId),
+    index("chat_attachment_userId_idx").on(table.userId),
+  ]
+);
+
 export const chatArtifact = pgTable(
   "chat_artifact",
   {
@@ -80,6 +110,7 @@ export const chatSessionRelations = relations(chatSession, ({ one, many }) => ({
   }),
   messages: many(chatMessage),
   artifacts: many(chatArtifact),
+  attachments: many(chatAttachment),
 }));
 
 export const chatMessageRelations = relations(chatMessage, ({ one, many }) => ({
@@ -96,6 +127,7 @@ export const chatMessageRelations = relations(chatMessage, ({ one, many }) => ({
     relationName: "message_tree",
   }),
   artifacts: many(chatArtifact),
+  attachments: many(chatAttachment),
 }));
 
 export const chatArtifactRelations = relations(chatArtifact, ({ one }) => ({
@@ -106,5 +138,20 @@ export const chatArtifactRelations = relations(chatArtifact, ({ one }) => ({
   message: one(chatMessage, {
     fields: [chatArtifact.messageId],
     references: [chatMessage.id],
+  }),
+}));
+
+export const chatAttachmentRelations = relations(chatAttachment, ({ one }) => ({
+  session: one(chatSession, {
+    fields: [chatAttachment.sessionId],
+    references: [chatSession.id],
+  }),
+  message: one(chatMessage, {
+    fields: [chatAttachment.messageId],
+    references: [chatMessage.id],
+  }),
+  user: one(user, {
+    fields: [chatAttachment.userId],
+    references: [user.id],
   }),
 }));
