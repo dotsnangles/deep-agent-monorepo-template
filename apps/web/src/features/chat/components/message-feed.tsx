@@ -88,7 +88,7 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
   }, [inputPrompt]);
 
   const handleSend = () => {
-    if ((!inputPrompt.trim() && completedAttachments.length === 0) || isGenerating || isUploading) {
+    if ((!inputPrompt.trim() && completedAttachments.length === 0) || isUploading) {
       return;
     }
     const content = inputPrompt.trim();
@@ -100,6 +100,11 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
+
+    if (isGenerating) {
+      stop();
+    }
+
     send(content, attachments);
   };
 
@@ -113,7 +118,7 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    if (isGenerating || isUploading) return;
+    if (isUploading) return;
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       addFiles(e.dataTransfer.files);
     }
@@ -235,7 +240,7 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
           <AttachmentStagingBar
             stagedFiles={stagedFiles}
             onRemove={removeFile}
-            disabled={isGenerating}
+            disabled={isUploading}
           />
 
           <Textarea
@@ -243,15 +248,14 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
             value={inputPrompt}
             onChange={(e) => setInputPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
-            disabled={isGenerating}
             placeholder={
-              isGenerating
-                ? "AI가 답변을 작성하고 있습니다... (필요시 중지 가능)"
-                : isUploading
+              isUploading
                 ? "파일을 업로드하는 중입니다..."
+                : isGenerating
+                ? "답변 생성 중... (새 질문 작성 후 Enter 시 이전 생성 중단 후 전송)"
                 : "무엇이든 물어보세요... (Enter: 전송, Shift+Enter: 줄바꿈, 파일 드래그앤드롭)"
             }
-            className="min-h-[52px] max-h-[180px] resize-none border-none shadow-none focus-visible:ring-0 text-sm px-4 py-3 bg-transparent leading-relaxed disabled:opacity-60 disabled:cursor-not-allowed"
+            className="min-h-[52px] max-h-[180px] resize-none border-none shadow-none focus-visible:ring-0 text-sm px-4 py-3 bg-transparent leading-relaxed"
             rows={1}
           />
 
@@ -278,21 +282,21 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
                 size="icon"
                 className="size-8 rounded-xl text-muted-foreground hover:text-foreground cursor-pointer"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={isGenerating || isUploading}
+                disabled={isUploading}
                 title="파일 첨부 (이미지, PDF, TXT, CSV, JSON, MD)"
               >
                 <Paperclip data-icon="inline-start" />
               </Button>
               <span className="text-[11px] text-muted-foreground/80 select-none">
-                {isGenerating
-                  ? "답변 생성 진행 중"
-                  : isUploading
+                {isUploading
                   ? "파일 업로드 중..."
+                  : isGenerating
+                  ? "답변 생성 진행 중 (새 질문 작성 가능)"
                   : "선형 대화 세션 및 멀티모달 첨부 지원"}
               </span>
             </div>
 
-            {isGenerating ? (
+            {isGenerating && !inputPrompt.trim() && completedAttachments.length === 0 ? (
               <Button
                 type="button"
                 size="icon"
@@ -309,7 +313,7 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
                 className="size-8 rounded-xl shadow-xs"
                 onClick={handleSend}
                 disabled={isSendDisabled}
-                title="메시지 전송 (Enter)"
+                title={isGenerating ? "생성 중단 및 새 질문 전송 (Enter)" : "메시지 전송 (Enter)"}
               >
                 <ArrowUp data-icon="inline-start" />
               </Button>
