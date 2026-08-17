@@ -298,10 +298,6 @@ export function MessageItem({
               <SpecialistDelegationCard subagents={message.subagents} />
             )}
 
-            {hasAttachments && (
-              <MessageAttachmentsView attachments={message.attachments!} isUser={false} />
-            )}
-
             {message.content ? (
               <MarkdownRenderer content={message.content} isGenerating={isGenerating} />
             ) : isGenerating && !message.toolApproval ? (

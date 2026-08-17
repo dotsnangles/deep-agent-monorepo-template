@@ -672,16 +672,10 @@ describe("ChatEngine (In-Process State Machine)", () => {
     expect(assistantNode?.artifacts).toHaveLength(2);
     expect(assistantNode?.artifacts?.[0].name).toBe("revenue_trend.png");
     expect(assistantNode?.artifacts?.[0].url).toBe("https://cdn.example.com/artifacts/revenue_trend.png");
+    expect(assistantNode?.artifacts?.[1].name).toBe("summary.csv");
+    expect(assistantNode?.artifacts?.[1].url).toBe("https://cdn.example.com/artifacts/summary.csv");
 
-    expect(assistantNode?.attachments).toHaveLength(2);
-    expect(assistantNode?.attachments?.[0].name).toBe("revenue_trend.png");
-    expect(assistantNode?.attachments?.[0].url).toBe("https://cdn.example.com/artifacts/revenue_trend.png");
-    expect(assistantNode?.attachments?.[1].name).toBe("summary.csv");
-
-    // Verify persisted node contains the attachments
-    const persistedAsst = transport.persistedNodes.find((n) => n.role === "assistant");
-    expect(persistedAsst).toBeDefined();
-    expect(persistedAsst?.attachments).toHaveLength(2);
-    expect(persistedAsst?.attachments?.[0].name).toBe("revenue_trend.png");
+    // Verify assistant node has no redundant attachments
+    expect(assistantNode?.attachments).toBeUndefined();
   });
 });

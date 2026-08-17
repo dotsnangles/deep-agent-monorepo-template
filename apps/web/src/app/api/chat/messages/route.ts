@@ -51,20 +51,10 @@ export async function GET(req: NextRequest) {
         for (const msg of tree.messages) {
           const msgArtifacts = artifactByMessage.get(msg.id);
           if (msgArtifacts) {
-            const existingAtts = msg.attachments || [];
-            for (const art of msgArtifacts) {
-              if (!existingAtts.some((a) => a.id === art.id || a.name === art.name)) {
-                existingAtts.push({
-                  id: art.id,
-                  name: art.name,
-                  url: `/api/storage/presigned-url?key=${encodeURIComponent(art.storageKey)}`,
-                  mimeType: art.mimeType,
-                  size: art.sizeBytes ?? 0,
-                  s3Key: art.storageKey,
-                });
-              }
-            }
-            msg.attachments = existingAtts;
+            (msg as any).artifacts = msgArtifacts.map((art) => ({
+              ...art,
+              url: `/api/chat/sessions/${sessionId}/artifacts/${encodeURIComponent(art.name)}`,
+            }));
           }
         }
       }

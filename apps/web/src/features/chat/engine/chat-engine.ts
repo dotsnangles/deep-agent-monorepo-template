@@ -730,31 +730,12 @@ export class ChatEngine {
               capturedArtifacts.push(artifact);
             }
 
-            const newAttachment: AttachmentEntity = {
-              id: artifact.id,
-              name: artifact.name,
-              url: artifact.url,
-              mimeType: artifact.mimeType,
-              size: artifact.sizeBytes ?? 0,
-              s3Key: artifact.storageKey,
-            };
-
-            const existingAttIdx = capturedAttachments.findIndex(
-              (a) => a.id === artifact.id || a.name === artifact.name
-            );
-            if (existingAttIdx >= 0) {
-              capturedAttachments[existingAttIdx] = newAttachment;
-            } else {
-              capturedAttachments.push(newAttachment);
-            }
-
             this.state = {
               ...this.state,
               allNodes: this.state.allNodes.map((n) =>
                 n.id === params.assistantMessageId
                   ? {
                       ...n,
-                      attachments: [...capturedAttachments],
                       artifacts: [...capturedArtifacts],
                     }
                   : n
