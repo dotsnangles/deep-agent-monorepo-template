@@ -124,18 +124,24 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
   const isSendDisabled =
     (!inputPrompt.trim() && completedAttachments.length === 0) || isUploading;
 
+  const [greetingIndex, setGreetingIndex] = useState(() =>
+    Math.floor(Math.random() * 8)
+  );
+
+  const prevSessionIdRef = useRef(sessionId);
+  useEffect(() => {
+    if (prevSessionIdRef.current !== sessionId) {
+      prevSessionIdRef.current = sessionId;
+      setGreetingIndex(Math.floor(Math.random() * 8));
+    }
+  }, [sessionId]);
+
   const { data: authSession } = authClient.useSession();
   const userName = authSession?.user?.name
     ? authSession.user.name.split(" ")[0] || authSession.user.name
     : null;
 
-  const [greetingText, setGreetingText] = useState<string>(() =>
-    getSessionGreeting(sessionId, userName)
-  );
-
-  useEffect(() => {
-    setGreetingText(getRandomGreeting(userName));
-  }, [sessionId, userName]);
+  const greetingText = getRandomGreeting(userName, greetingIndex);
 
   const chatSessionsContext = useContext(ChatSessionContext);
   const isExistingSession = chatSessionsContext
