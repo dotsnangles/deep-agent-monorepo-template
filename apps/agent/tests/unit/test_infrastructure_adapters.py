@@ -4,13 +4,13 @@ import pytest
 
 from src.domain.ports import (
     ArtifactDescriptor,
-    ChatMessage,
     ModelProviderPort,
     PersistencePort,
     SandboxExecutionPort,
     StoragePort,
     ToolDefinition,
 )
+from src.runtime.types import ChatMessage
 from src.infrastructure.models.adapter import FakeChatModelAdapter, LangChainModelAdapter
 from src.infrastructure.persistence.adapter import (
     InMemoryPersistenceAdapter,

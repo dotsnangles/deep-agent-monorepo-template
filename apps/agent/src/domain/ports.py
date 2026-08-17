@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
-from src.runtime.events import AgentStreamEvent
-from src.runtime.types import AgentTurn, ApprovalDecision, ChatMessage
+if TYPE_CHECKING:
+    from src.runtime.events import AgentStreamEvent
+    from src.runtime.types import AgentTurn, ApprovalDecision, ChatMessage
 
 
 @dataclass(frozen=True)
