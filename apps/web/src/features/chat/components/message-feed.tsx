@@ -133,21 +133,21 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
 
   return (
     <div className="flex flex-col h-full w-full min-h-0 relative overflow-hidden">
-      {/* 1. Ambient Gemini Radial Glow / Aura (어스름) - Continuous organic movement */}
+      {/* 1. Ambient Gemini Radial Glow / Aura (어스름) - Centered & continuous organic movement */}
       <div
         className={cn(
-          "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-all duration-700 ease-out z-0 select-none",
+          "absolute inset-0 flex items-center justify-center pointer-events-none transition-all duration-700 ease-out z-0 select-none overflow-hidden",
           isEmpty
-            ? "opacity-100 scale-100"
-            : "opacity-0 scale-50 pointer-events-none"
+            ? "opacity-100"
+            : "opacity-0 pointer-events-none"
         )}
       >
-        <div className="relative flex items-center justify-center">
+        <div className="relative w-full h-full flex items-center justify-center">
           {/* Primary Luminous Deep Blue/Cyan Glow Orb */}
-          <div className="gemini-ambient-glow w-[560px] sm:w-[820px] h-[340px] sm:h-[480px] rounded-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-500/35 via-indigo-500/25 to-transparent blur-[85px]" />
+          <div className="gemini-ambient-glow w-[560px] sm:w-[820px] h-[340px] sm:h-[480px] rounded-full shrink-0" />
 
           {/* Secondary Violet/Indigo Counter-Movement Orb for organic depth */}
-          <div className="gemini-ambient-glow-secondary absolute w-[460px] sm:w-[680px] h-[280px] sm:h-[380px] rounded-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-600/30 via-purple-500/20 to-transparent blur-[95px]" />
+          <div className="gemini-ambient-glow-secondary absolute w-[460px] sm:w-[680px] h-[280px] sm:h-[380px] rounded-full shrink-0" />
         </div>
       </div>
 
