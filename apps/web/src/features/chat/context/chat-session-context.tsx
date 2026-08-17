@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { authClient } from "@/lib/auth-client";
+import { authClient } from "../../../lib/auth-client";
 import { toast } from "sonner";
 import { globalChatEngineRegistry } from "../engine";
 import { DEFAULT_SESSION_TITLE } from "../lib/session-title";
@@ -15,7 +15,7 @@ export interface ChatSession {
   updatedAt: string;
 }
 
-interface ChatSessionContextType {
+export interface ChatSessionContextType {
   sessions: ChatSession[];
   activeSessionId: string;
   isLoading: boolean;
@@ -34,7 +34,7 @@ interface ChatSessionContextType {
   refreshSessions: () => Promise<void>;
 }
 
-const ChatSessionContext = createContext<ChatSessionContextType | null>(null);
+export const ChatSessionContext = createContext<ChatSessionContextType | null>(null);
 
 const STORAGE_KEY = "hollow_echo_active_thread_id";
 

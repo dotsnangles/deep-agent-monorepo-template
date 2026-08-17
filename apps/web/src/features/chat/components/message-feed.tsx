@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowUp, Paperclip, Square } from "lucide-react";
 import { Button } from "@repo/ui/components/button";
@@ -14,6 +14,7 @@ import {
 } from "@repo/ui/components/message-scroller";
 import { cn } from "@repo/ui/lib/utils";
 import { authClient } from "../../../lib/auth-client";
+import { ChatSessionContext } from "../context/chat-session-context";
 import { useChatEngine } from "../hooks/use-chat-engine";
 import { useDirectUpload } from "../hooks/use-direct-upload";
 import { MessageItem } from "./message-item";
@@ -130,7 +131,12 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
     ? `What can I help with, ${userName}?`
     : "Where should we start?";
 
-  const isEmpty = activePath.length === 0;
+  const chatSessionsContext = useContext(ChatSessionContext);
+  const isExistingSession = chatSessionsContext
+    ? chatSessionsContext.sessions.some((s) => s.id === sessionId)
+    : false;
+
+  const isEmpty = !isExistingSession && activePath.length === 0;
 
   return (
     <div className="flex flex-col h-full w-full min-h-0 relative overflow-hidden">
