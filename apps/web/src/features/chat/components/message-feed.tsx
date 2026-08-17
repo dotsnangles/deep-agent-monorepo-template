@@ -2,7 +2,7 @@
 
 import { useContext, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUp, ChevronDown, Mic, Plus, Square } from "lucide-react";
+import { ArrowUp, Plus, Square } from "lucide-react";
 import { Button } from "@repo/ui/components/button";
 import { Textarea } from "@repo/ui/components/textarea";
 import {
@@ -334,15 +334,8 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
               }}
             />
 
-            {/* Right Action Group */}
+            {/* Right Action Group: Send / Stop button */}
             <div className="flex items-center gap-1.5 shrink-0 pr-1">
-              {/* Subtle Model Badge */}
-              <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium text-muted-foreground/75 hover:text-foreground hover:bg-muted/40 cursor-default select-none transition-colors">
-                <span>Flash</span>
-                <ChevronDown className="size-3.5 opacity-70" />
-              </div>
-
-              {/* Send / Stop / Mic Button */}
               {isGenerating ? (
                 <Button
                   type="button"
@@ -353,26 +346,21 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
                 >
                   <Square className="size-3.5 fill-current" />
                 </Button>
-              ) : !isSendDisabled ? (
+              ) : (
                 <Button
                   type="button"
                   size="icon"
-                  className="size-8 rounded-full bg-blue-600 hover:bg-blue-500 text-white shadow-xs transition-all cursor-pointer animate-in zoom-in-90 duration-150"
+                  disabled={isSendDisabled}
+                  className={cn(
+                    "size-8 rounded-full transition-all cursor-pointer",
+                    !isSendDisabled
+                      ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs"
+                      : "bg-muted/50 text-muted-foreground/35 cursor-not-allowed"
+                  )}
                   onClick={handleSend}
                   title="메시지 전송 (Enter)"
                 >
                   <ArrowUp className="size-4" />
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="size-8 rounded-full text-muted-foreground/60 hover:text-foreground cursor-pointer"
-                  onClick={() => textareaRef.current?.focus()}
-                  title="마이크 / 음성 입력"
-                >
-                  <Mic className="size-4" />
                 </Button>
               )}
             </div>
