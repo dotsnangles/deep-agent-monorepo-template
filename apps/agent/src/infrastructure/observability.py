@@ -17,7 +17,7 @@ def get_langfuse_callback() -> Any:
         try:
             from langfuse.langchain import CallbackHandler
 
-            return CallbackHandler(public_key=langfuse_public_key)
+            return CallbackHandler()
         except (ImportError, TypeError):
             from langfuse.callback import CallbackHandler  # type: ignore
 
