@@ -14,11 +14,21 @@ Multi-context domain docs layout (`CONTEXT-MAP.md` + per-package `CONTEXT.md` fi
 
 ### Primary reference docs
 
-Curated offline primary sources for CopilotKit, Deep Agents, and LangGraph live under `docs/references/` (indexed in `docs/references/README.md`). Agents MUST consult these primary sources before designing architectures or implementing features touching these frameworks.
+Curated offline primary sources for CopilotKit, Deep Agents, and LangGraph. See `docs/references/README.md`.
+- Consult these primary sources before designing or modifying code touching these frameworks.
 
 ### UI components & shadcn rules
 
-Frontend UI in `@repo/ui` and `apps/web` strictly follows shadcn design and composition rules (`.agents/skills/shadcn/rules/`).
-- **`@repo/ui` Primitives Purity**: Components under `packages/ui/src/components/` MUST maintain 100% fidelity to the official upstream shadcn registry (`base-lyra`). Do NOT modify base primitives directly for application-specific behaviors or styles so that `npx shadcn add` remains fully idempotent.
-- **Composition Layer Customization**: All application-specific styles, layout behaviors, and responsive adaptations MUST live in the composition layer (`apps/web` or wrapper components), composing existing shadcn primitives (`Card`, `Dialog`, `Alert`, `Message`, `Bubble`, `AttachmentGroup`, `MessageScroller`) using semantic tokens and `data-icon` rather than hand-rolling custom markup.
+Frontend component composition and styling standards. See `.agents/skills/shadcn/rules/`.
+- Keep `@repo/ui` primitives 100% pure to upstream shadcn (`base-lyra`).
+- Place all app-specific customization and layouts in the composition layer (`apps/web`).
 
+### Code navigation & CodeGraph
+
+Semantic code intelligence and knowledge graph navigation. See `.agents/skills/codegraph/SKILL.md`.
+- Reach for `codegraph` before falling back to `grep` when exploring architecture, tracing call hierarchies, or assessing refactoring impact.
+
+### Browser testing & Chrome DevTools
+
+Live browser automation, visual QA, and runtime debugging. See `.agents/skills/chrome-devtools/SKILL.md`.
+- Reach for `chrome-devtools` when verifying UI rendering (`apps/web`), diagnosing console errors, or inspecting SSE/streaming requests.
