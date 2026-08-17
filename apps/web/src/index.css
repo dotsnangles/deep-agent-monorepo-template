@@ -2,48 +2,68 @@
 
 @keyframes gemini-aurora-breathe {
   0% {
-    transform: scale(0.9) translate(0px, 0px) rotate(0deg);
+    transform: scale(0.92) translate(0px, 0px) rotate(0deg);
     opacity: 0.75;
   }
   33% {
-    transform: scale(1.2) translate(-30px, 20px) rotate(25deg);
+    transform: scale(1.18) translate(-25px, 15px) rotate(20deg);
     opacity: 1;
   }
   66% {
-    transform: scale(1.05) translate(25px, -25px) rotate(-20deg);
+    transform: scale(1.05) translate(20px, -20px) rotate(-15deg);
     opacity: 0.85;
   }
   100% {
-    transform: scale(0.9) translate(0px, 0px) rotate(0deg);
+    transform: scale(0.92) translate(0px, 0px) rotate(0deg);
     opacity: 0.75;
   }
 }
 
 @keyframes gemini-aurora-counter {
   0% {
-    transform: scale(1.15) translate(20px, -15px) rotate(0deg);
+    transform: scale(1.15) translate(15px, -10px) rotate(0deg);
     opacity: 0.65;
   }
   50% {
-    transform: scale(0.88) translate(-25px, 20px) rotate(-35deg);
+    transform: scale(0.9) translate(-20px, 15px) rotate(-25deg);
     opacity: 0.95;
   }
   100% {
-    transform: scale(1.15) translate(20px, -15px) rotate(0deg);
+    transform: scale(1.15) translate(15px, -10px) rotate(0deg);
     opacity: 0.65;
   }
 }
 
+/* Light Mode: Soft airy sky-sapphire watercolor mist */
 .gemini-ambient-glow {
-  background: radial-gradient(ellipse 65% 55% at 50% 50%, rgba(59, 130, 246, 0.45) 0%, rgba(99, 102, 241, 0.3) 45%, transparent 75%);
-  filter: blur(80px);
+  background: radial-gradient(ellipse 65% 55% at 50% 50%, rgba(147, 197, 253, 0.32) 0%, rgba(199, 210, 254, 0.2) 45%, transparent 75%);
+  filter: blur(100px);
   animation: gemini-aurora-breathe 14s ease-in-out infinite;
   will-change: transform, opacity;
 }
 
 .gemini-ambient-glow-secondary {
-  background: radial-gradient(ellipse 60% 50% at 50% 50%, rgba(139, 92, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 40%, transparent 70%);
-  filter: blur(95px);
+  background: radial-gradient(ellipse 60% 50% at 50% 50%, rgba(165, 180, 252, 0.24) 0%, rgba(191, 219, 254, 0.16) 40%, transparent 70%);
+  filter: blur(115px);
   animation: gemini-aurora-counter 11s ease-in-out infinite;
   will-change: transform, opacity;
+}
+
+/* Dark Mode: Deep celestial sapphire & midnight twilight glow */
+:is(.dark) .gemini-ambient-glow,
+:root.dark .gemini-ambient-glow,
+html.dark .gemini-ambient-glow,
+body.dark .gemini-ambient-glow,
+.dark .gemini-ambient-glow {
+  background: radial-gradient(ellipse 65% 55% at 50% 50%, rgba(56, 114, 224, 0.24) 0%, rgba(30, 58, 138, 0.18) 45%, transparent 75%);
+  filter: blur(120px);
+}
+
+:is(.dark) .gemini-ambient-glow-secondary,
+:root.dark .gemini-ambient-glow-secondary,
+html.dark .gemini-ambient-glow-secondary,
+body.dark .gemini-ambient-glow-secondary,
+.dark .gemini-ambient-glow-secondary {
+  background: radial-gradient(ellipse 60% 50% at 50% 50%, rgba(79, 70, 229, 0.18) 0%, rgba(37, 99, 235, 0.12) 40%, transparent 70%);
+  filter: blur(130px);
 }
