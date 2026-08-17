@@ -57,9 +57,12 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Focus textarea on session change
+  // Focus textarea on session change or mount
   useEffect(() => {
-    textareaRef.current?.focus();
+    const focusTimer = setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 20);
+    return () => clearTimeout(focusTimer);
   }, [sessionId]);
 
   // Auto-adjust textarea height
@@ -93,8 +96,16 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.nativeEvent.isComposing) return;
-    if (e.key === "Enter" && !e.shiftKey) {
+    // Prevent premature sending during IME (e.g. Korean) character composition
+    if (e.nativeEvent.isComposing || e.keyCode === 229) {
+      return;
+    }
+    if (e.key === "Enter") {
+      if (e.shiftKey) {
+        // Shift + Enter: Allow natural multiline newline insertion in textarea
+        return;
+      }
+      // Enter alone: Send message
       e.preventDefault();
       handleSend();
     }
@@ -120,16 +131,6 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
     : "Where should we start?";
 
   const isEmpty = activePath.length === 0;
-
-  // 1. Loading State when session has not loaded
-  if (isLoading && isEmpty) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full w-full min-h-[300px] text-muted-foreground gap-2 max-w-4xl mx-auto">
-        <span className="size-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-        <p className="text-xs">대화 기록을 불러오는 중입니다...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col h-full w-full min-h-0 relative overflow-hidden">
@@ -258,6 +259,7 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
 
           <Textarea
             ref={textareaRef}
+            autoFocus
             value={inputPrompt}
             onChange={(e) => setInputPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
