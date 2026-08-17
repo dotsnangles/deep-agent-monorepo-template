@@ -2,7 +2,7 @@
 
 import { useContext, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUp, Plus, Square } from "lucide-react";
+import { ArrowUp, Paperclip, Square } from "lucide-react";
 import { Button } from "@repo/ui/components/button";
 import { Textarea } from "@repo/ui/components/textarea";
 import {
@@ -272,9 +272,9 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
           onDragOver={(e) => e.preventDefault()}
           onDrop={handleDrop}
           className={cn(
-            "relative w-full flex flex-col bg-card/95 dark:bg-[#1e1f20] border border-border/40 shadow-sm transition-all duration-300",
-            stagedFiles.length > 0 ? "rounded-2xl p-2" : "rounded-full px-2 py-1.5",
-            isEmpty ? "max-w-2xl" : "max-w-4xl mx-auto"
+            "relative w-full flex flex-col rounded-2xl bg-card border border-border/70 shadow-md transition-all duration-300",
+            stagedFiles.length > 0 ? "p-2.5" : "px-3 py-2",
+            isEmpty ? "max-w-3xl shadow-lg" : "max-w-4xl mx-auto"
           )}
         >
           {/* File Attachment Staging Bar */}
@@ -286,22 +286,22 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
             />
           )}
 
-          {/* Single-Row Horizontal Pill Bar */}
-          <div className="flex items-center w-full min-h-[44px] gap-2">
-            {/* Left Plus (+) / File Attachment Trigger */}
+          {/* Single Row Horizontal Bar */}
+          <div className="flex items-center w-full min-h-[40px] gap-2">
+            {/* File Attachment Trigger */}
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="size-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/50 cursor-pointer shrink-0"
+              className="size-8 rounded-xl text-muted-foreground hover:text-foreground cursor-pointer shrink-0"
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
               title="파일 첨부 (이미지, PDF, TXT, CSV, JSON, MD)"
             >
-              <Plus className="size-5" />
+              <Paperclip className="size-4" />
             </Button>
 
-            {/* Middle Flexible Input */}
+            {/* Input Textarea */}
             <Textarea
               ref={textareaRef}
               autoFocus
@@ -313,7 +313,7 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
                   ? "파일을 업로드하는 중입니다..."
                   : isGenerating
                   ? "답변 생성 중... (새 질문 작성 후 Enter 시 전송)"
-                  : "무엇이든 물어보세요..."
+                  : "무엇이든 물어보세요... (Enter: 전송, Shift+Enter: 줄바꿈, 파일 드래그앤드롭)"
               }
               className="flex-1 min-h-[38px] max-h-[160px] resize-none border-none shadow-none focus-visible:ring-0 focus:ring-0 focus:outline-none text-sm px-2 py-2 bg-transparent leading-relaxed"
               rows={1}
@@ -334,13 +334,13 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
               }}
             />
 
-            {/* Right Action Group: Send / Stop button */}
-            <div className="flex items-center gap-1.5 shrink-0 pr-1">
+            {/* Right Action Button (Send / Stop) */}
+            <div className="flex items-center shrink-0">
               {isGenerating ? (
                 <Button
                   type="button"
                   size="icon"
-                  className="size-8 rounded-full shadow-xs bg-foreground text-background hover:bg-foreground/90 transition-all cursor-pointer animate-in zoom-in-90 duration-150"
+                  className="size-8 rounded-xl shadow-xs bg-foreground text-background hover:bg-foreground/90 transition-all cursor-pointer animate-in zoom-in-90 duration-150"
                   onClick={stop}
                   title="답변 생성 중단 (Stop)"
                 >
@@ -351,12 +351,7 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
                   type="button"
                   size="icon"
                   disabled={isSendDisabled}
-                  className={cn(
-                    "size-8 rounded-full transition-all cursor-pointer",
-                    !isSendDisabled
-                      ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs"
-                      : "bg-muted/50 text-muted-foreground/35 cursor-not-allowed"
-                  )}
+                  className="size-8 rounded-xl shadow-xs cursor-pointer"
                   onClick={handleSend}
                   title="메시지 전송 (Enter)"
                 >
