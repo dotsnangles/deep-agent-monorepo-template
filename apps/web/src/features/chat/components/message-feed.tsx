@@ -30,7 +30,7 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
   const router = useRouter();
   const {
     activePath,
-    isLoading,
+    isLoading: isEngineLoading,
     isGenerating,
     generatingAssistantId,
     send,
@@ -141,11 +141,15 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
   const greetingText = getRandomGreeting(userName, greetingIndex);
 
   const chatSessionsContext = useContext(ChatSessionContext);
+  const isSessionsLoading = chatSessionsContext?.isLoading ?? false;
   const isExistingSession = chatSessionsContext
     ? chatSessionsContext.sessions.some((s) => s.id === sessionId)
     : false;
 
-  const isEmpty = !isExistingSession && activePath.length === 0;
+  // During initial mount, while sessions or the message tree are being fetched from DB,
+  // do not prematurely treat it as an empty draft to prevent the center hero flash on refresh.
+  const isCheckingExisting = isSessionsLoading || isEngineLoading;
+  const isEmpty = !isCheckingExisting && !isExistingSession && activePath.length === 0;
 
   return (
     <div className="flex flex-col h-full w-full min-h-0 relative overflow-hidden">
