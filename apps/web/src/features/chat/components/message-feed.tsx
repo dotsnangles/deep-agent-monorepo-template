@@ -107,9 +107,11 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
         // Shift + Enter: Allow natural multiline newline insertion in textarea
         return;
       }
-      // Enter alone: Send message
+      // Enter alone: Send message only when input is present
       e.preventDefault();
-      handleSend();
+      if (!isSendDisabled) {
+        handleSend();
+      }
     }
   };
 
@@ -311,9 +313,7 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
               placeholder={
                 isUploading
                   ? "파일을 업로드하는 중입니다..."
-                  : isGenerating
-                  ? "답변 생성 중... (새 질문 작성 후 Enter 시 전송)"
-                  : "무엇이든 물어보세요... (Enter: 전송, Shift+Enter: 줄바꿈, 파일 드래그앤드롭)"
+                  : "무엇이든 물어보세요..."
               }
               className="flex-1 min-h-[38px] max-h-[160px] resize-none border-none shadow-none focus-visible:ring-0 focus:ring-0 focus:outline-none text-sm px-2 py-2 bg-transparent dark:bg-transparent leading-relaxed"
               rows={1}
@@ -339,6 +339,7 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
               {isGenerating ? (
                 <Button
                   type="button"
+                  tabIndex={-1}
                   size="icon"
                   className="size-8 rounded-xl shadow-xs bg-foreground text-background hover:bg-foreground/90 transition-all cursor-pointer animate-in zoom-in-90 duration-150"
                   onClick={stop}
