@@ -4,6 +4,9 @@ export const KOREAN_GREETINGS_WITH_NAME: ((name: string) => string)[] = [
   (name) => `${name}님, 새로운 아이디어가 있으신가요?`,
   (name) => `${name}님, 오늘 어떤 작업을 함께할까요?`,
   (name) => `${name}님, 어디서부터 시작해볼까요?`,
+  (name) => `${name}님, 궁금한 점이 있으신가요?`,
+  (name) => `${name}님, 오늘 어떤 문제를 해결해볼까요?`,
+  (name) => `${name}님, 무엇이든 편하게 물어보세요.`,
 ];
 
 export const KOREAN_GREETINGS_GUEST: string[] = [
@@ -12,6 +15,9 @@ export const KOREAN_GREETINGS_GUEST: string[] = [
   "새로운 아이디어가 있으신가요?",
   "오늘 어떤 작업을 함께할까요?",
   "어디서부터 시작해볼까요?",
+  "궁금한 점이 있으신가요?",
+  "오늘 어떤 문제를 해결해볼까요?",
+  "무엇이든 편하게 물어보세요.",
 ];
 
 export function hashStringToIndex(str: string, modulo: number): number {
@@ -28,7 +34,7 @@ export function getRandomGreeting(userName?: string | null, seedIndex?: number):
   const index =
     typeof seedIndex === "number" && seedIndex >= 0
       ? Math.abs(seedIndex) % KOREAN_GREETINGS_GUEST.length
-      : 0;
+      : Math.floor(Math.random() * KOREAN_GREETINGS_GUEST.length);
 
   if (userName?.trim()) {
     const generator = KOREAN_GREETINGS_WITH_NAME[index] || KOREAN_GREETINGS_WITH_NAME[0];

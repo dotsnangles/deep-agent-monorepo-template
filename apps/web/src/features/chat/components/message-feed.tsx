@@ -17,7 +17,7 @@ import { authClient } from "../../../lib/auth-client";
 import { ChatSessionContext } from "../context/chat-session-context";
 import { useChatEngine } from "../hooks/use-chat-engine";
 import { useDirectUpload } from "../hooks/use-direct-upload";
-import { getSessionGreeting } from "../lib/greetings";
+import { getRandomGreeting, getSessionGreeting } from "../lib/greetings";
 import { MessageItem } from "./message-item";
 import { AttachmentStagingBar } from "./attachment-staging-bar";
 
@@ -128,7 +128,14 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
   const userName = authSession?.user?.name
     ? authSession.user.name.split(" ")[0] || authSession.user.name
     : null;
-  const greetingText = getSessionGreeting(sessionId, userName);
+
+  const [greetingText, setGreetingText] = useState<string>(() =>
+    getSessionGreeting(sessionId, userName)
+  );
+
+  useEffect(() => {
+    setGreetingText(getRandomGreeting(userName));
+  }, [sessionId, userName]);
 
   const chatSessionsContext = useContext(ChatSessionContext);
   const isExistingSession = chatSessionsContext
