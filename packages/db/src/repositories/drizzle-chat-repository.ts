@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, inArray, type SQL } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import type { AttachmentEntity } from "@repo/validators";
 import * as schema from "../schema";
 import { chatArtifact, chatAttachment, chatMessage, chatSession } from "../schema/chat";
 import type {
@@ -67,16 +68,47 @@ function toSessionEntity(record: typeof chatSession.$inferSelect): ChatSessionEn
   };
 }
 
-function toMessageNode(record: typeof chatMessage.$inferSelect): MessageNode {
+function toMessageNode(
+  record: typeof chatMessage.$inferSelect,
+  attachments?: AttachmentEntity[]
+): MessageNode {
   return {
     id: record.id,
     sessionId: record.sessionId,
     parentId: record.parentId,
     role: record.role as "user" | "assistant" | "system",
     content: record.content,
-    attachments: record.attachments ?? [],
+    attachments: attachments ?? [],
     createdAt: record.createdAt,
   };
+}
+
+async function getAttachmentsMapForSession(
+  db: DrizzleDb,
+  sessionId: string
+): Promise<Map<string, AttachmentEntity[]>> {
+  const records = await db
+    .select()
+    .from(chatAttachment)
+    .where(eq(chatAttachment.sessionId, sessionId))
+    .orderBy(asc(chatAttachment.createdAt));
+
+  const map = new Map<string, AttachmentEntity[]>();
+  for (const r of records) {
+    if (r.messageId) {
+      const list = map.get(r.messageId) || [];
+      list.push({
+        id: r.id,
+        name: r.name,
+        mimeType: r.mimeType,
+        size: r.sizeBytes ?? 0,
+        s3Key: r.storageKey,
+        url: `/api/storage/presigned-url?key=${encodeURIComponent(r.storageKey)}`,
+      });
+      map.set(r.messageId, list);
+    }
+  }
+  return map;
 }
 
 export class DrizzleChatRepository implements ChatRepository {
@@ -119,7 +151,7 @@ export class DrizzleChatRepository implements ChatRepository {
   }
 
   public async createSession(params: CreateSessionParams): Promise<ChatSessionEntity> {
-    const [created] = await this.db
+    const [record] = await this.db
       .insert(chatSession)
       .values({
         id: params.id,
@@ -129,14 +161,18 @@ export class DrizzleChatRepository implements ChatRepository {
       })
       .returning();
 
-    if (!created) {
+    if (!record) {
       throw new Error("Failed to create chat session record");
     }
 
-    return toSessionEntity(created);
+    return toSessionEntity(record);
   }
 
-  public async updateSessionTitle(sessionId: string, userId: string, title: string): Promise<boolean> {
+  public async updateSessionTitle(
+    sessionId: string,
+    userId: string,
+    title: string
+  ): Promise<boolean> {
     return this.updateSessionRecord(
       and(eq(chatSession.id, sessionId), eq(chatSession.userId, userId)) as SQL,
       { title }
@@ -173,13 +209,16 @@ export class DrizzleChatRepository implements ChatRepository {
       return null;
     }
 
-    const records = await this.db
-      .select()
-      .from(chatMessage)
-      .where(eq(chatMessage.sessionId, sessionId))
-      .orderBy(asc(chatMessage.createdAt));
+    const [records, attachmentsMap] = await Promise.all([
+      this.db
+        .select()
+        .from(chatMessage)
+        .where(eq(chatMessage.sessionId, sessionId))
+        .orderBy(asc(chatMessage.createdAt)),
+      getAttachmentsMapForSession(this.db, sessionId),
+    ]);
 
-    const messages = records.map(toMessageNode);
+    const messages = records.map((r) => toMessageNode(r, attachmentsMap.get(r.id)));
     const activePath = traverseActivePath(messages, session.activeLeafId);
 
     return {
@@ -196,13 +235,16 @@ export class DrizzleChatRepository implements ChatRepository {
       return null;
     }
 
-    const records = await this.db
-      .select()
-      .from(chatMessage)
-      .where(eq(chatMessage.sessionId, sessionId))
-      .orderBy(asc(chatMessage.createdAt));
+    const [records, attachmentsMap] = await Promise.all([
+      this.db
+        .select()
+        .from(chatMessage)
+        .where(eq(chatMessage.sessionId, sessionId))
+        .orderBy(asc(chatMessage.createdAt)),
+      getAttachmentsMapForSession(this.db, sessionId),
+    ]);
 
-    return records.map(toMessageNode);
+    return records.map((r) => toMessageNode(r, attachmentsMap.get(r.id)));
   }
 
   public async forkSession(
@@ -212,7 +254,6 @@ export class DrizzleChatRepository implements ChatRepository {
     newTitle?: string
   ): Promise<ForkSessionResult | null> {
     return await this.db.transaction(async (tx) => {
-      // 1. Verify source session ownership
       const [sourceSession] = await tx
         .select()
         .from(chatSession)
@@ -223,7 +264,6 @@ export class DrizzleChatRepository implements ChatRepository {
         return null;
       }
 
-      // 2. Fetch all messages for source session
       const records = await tx
         .select()
         .from(chatMessage)
@@ -236,7 +276,6 @@ export class DrizzleChatRepository implements ChatRepository {
         return null;
       }
 
-      // Extract ancestral lineage from fromMessageId back to root
       const lineage: typeof records = [];
       const visited = new Set<string>();
       let curr: typeof targetMsg | undefined = targetMsg;
@@ -246,12 +285,11 @@ export class DrizzleChatRepository implements ChatRepository {
         lineage.push(curr);
         curr = curr.parentId ? msgMap.get(curr.parentId) : undefined;
       }
-      lineage.reverse(); // [root, ..., targetMsg]
+      lineage.reverse();
 
       const newSessionId = crypto.randomUUID();
       const title = newTitle || `${sourceSession.title} (분기)`;
 
-      // Map old message IDs to new UUIDs
       const idMap = new Map<string, string>();
       lineage.forEach((m) => {
         idMap.set(m.id, crypto.randomUUID());
@@ -259,7 +297,6 @@ export class DrizzleChatRepository implements ChatRepository {
 
       const lastClonedId = idMap.get(fromMessageId) || null;
 
-      // 3. Create new session record
       const [newSession] = await tx
         .insert(chatSession)
         .values({
@@ -274,7 +311,6 @@ export class DrizzleChatRepository implements ChatRepository {
         throw new Error("Failed to create forked session record");
       }
 
-      // 4. Clone messages with remapped parentId
       const clonedToInsert = lineage.map((r, idx) => {
         const clonedId = idMap.get(r.id)!;
         return {
@@ -283,7 +319,6 @@ export class DrizzleChatRepository implements ChatRepository {
           parentId: r.parentId ? idMap.get(r.parentId) ?? null : null,
           role: r.role,
           content: r.content,
-          attachments: r.attachments ?? [],
           createdAt: new Date(r.createdAt.getTime() + idx),
         };
       });
@@ -296,7 +331,6 @@ export class DrizzleChatRepository implements ChatRepository {
           .returning();
       }
 
-      // 5. Replicate associated artifacts
       const sourceArtifacts = await tx
         .select()
         .from(chatArtifact)
@@ -319,7 +353,6 @@ export class DrizzleChatRepository implements ChatRepository {
         await tx.insert(chatArtifact).values(artifactsToInsert);
       }
 
-      // 6. Replicate associated user attachments
       const sourceAttachments = await tx
         .select()
         .from(chatAttachment)
@@ -344,12 +377,28 @@ export class DrizzleChatRepository implements ChatRepository {
         await tx.insert(chatAttachment).values(attachmentsToInsert);
       }
 
+      const attachmentsByNewMessageId = new Map<string, AttachmentEntity[]>();
+      for (const att of attachmentsToInsert) {
+        const list = attachmentsByNewMessageId.get(att.messageId) || [];
+        list.push({
+          id: att.id,
+          name: att.name,
+          mimeType: att.mimeType,
+          size: att.sizeBytes ?? 0,
+          s3Key: att.storageKey,
+          url: `/api/storage/presigned-url?key=${encodeURIComponent(att.storageKey)}`,
+        });
+        attachmentsByNewMessageId.set(att.messageId, list);
+      }
+
       return {
         session: {
           ...toSessionEntity(newSession),
           activeLeafId: lastClonedId,
         },
-        messages: insertedMessages.map(toMessageNode),
+        messages: insertedMessages.map((m) =>
+          toMessageNode(m, attachmentsByNewMessageId.get(m.id))
+        ),
       };
     });
   }
@@ -359,7 +408,6 @@ export class DrizzleChatRepository implements ChatRepository {
     userId: string
   ): Promise<SaveMessageResult | null> {
     return await this.db.transaction(async (tx) => {
-      // 1. Check existing session for tenant boundary verification
       const [existingSession] = await tx
         .select()
         .from(chatSession)
@@ -370,33 +418,31 @@ export class DrizzleChatRepository implements ChatRepository {
         return null;
       }
 
-      const isNewSession = !existingSession;
-      const messageId = params.id || crypto.randomUUID();
-      const initialTitle = createSessionSnippet(params.content);
+      let isNewSession = false;
+      let sessionRecord = existingSession;
 
-      // 2. Upsert session with activeLeafId
-      const [sessionRecord] = await tx
-        .insert(chatSession)
-        .values({
-          id: params.sessionId,
-          userId,
-          title: initialTitle,
-          activeLeafId: messageId,
-        })
-        .onConflictDoUpdate({
-          target: chatSession.id,
-          set: {
-            activeLeafId: messageId,
-            updatedAt: new Date(),
-          },
-        })
-        .returning();
-
+      // 2. Auto-create session on first user turn if it does not exist
       if (!sessionRecord) {
-        return null;
+        isNewSession = true;
+        const snippet = createSessionSnippet(params.content || "새로운 대화");
+        const [createdSession] = await tx
+          .insert(chatSession)
+          .values({
+            id: params.sessionId,
+            userId,
+            title: snippet,
+            activeLeafId: null,
+          })
+          .returning();
+
+        if (!createdSession) {
+          throw new Error("Failed to auto-create session record");
+        }
+        sessionRecord = createdSession;
       }
 
-      // 3. Insert message node
+      const messageId = params.id || crypto.randomUUID();
+
       const [insertedMessage] = await tx
         .insert(chatMessage)
         .values({
@@ -405,7 +451,6 @@ export class DrizzleChatRepository implements ChatRepository {
           parentId: params.parentId || null,
           role: params.role,
           content: params.content,
-          attachments: params.attachments ?? [],
         })
         .returning();
 
@@ -413,8 +458,37 @@ export class DrizzleChatRepository implements ChatRepository {
         return null;
       }
 
+      if (params.attachments && params.attachments.length > 0) {
+        for (const att of params.attachments) {
+          const s3Key =
+            att.s3Key ||
+            att.url?.split("?")[0] ||
+            `attachments/${userId}/${params.sessionId}/${att.id}_${att.name}`;
+          await tx
+            .insert(chatAttachment)
+            .values({
+              id: att.id,
+              sessionId: params.sessionId,
+              messageId,
+              userId,
+              name: att.name,
+              storageKey: s3Key,
+              mimeType: att.mimeType,
+              sizeBytes: att.size ?? 0,
+              uploadStatus: ((att as any).uploadStatus as any) || "ready",
+              metadata: ((att as any).metadata as any) || {},
+            })
+            .onConflictDoUpdate({
+              target: chatAttachment.id,
+              set: {
+                messageId,
+              },
+            });
+        }
+      }
+
       return {
-        message: toMessageNode(insertedMessage),
+        message: toMessageNode(insertedMessage, params.attachments),
         session: toSessionEntity(sessionRecord),
         isNewSession,
       };
@@ -445,7 +519,7 @@ export class DrizzleChatRepository implements ChatRepository {
         .where(eq(chatMessage.sessionId, sessionId))
         .orderBy(asc(chatMessage.createdAt));
 
-      const allNodes = allRecords.map(toMessageNode);
+      const allNodes = allRecords.map((r) => toMessageNode(r));
       const targetNode = allNodes.find((n) => n.id === messageId);
       if (!targetNode) {
         return null;

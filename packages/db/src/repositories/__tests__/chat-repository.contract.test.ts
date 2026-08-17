@@ -181,7 +181,8 @@ describe("ChatRepository Contract Tests (FakeChatRepository)", () => {
 
       const tree = await repo.getTree("sess-att", USER_A);
       expect(tree?.messages[0].attachments).toHaveLength(1);
-      expect(tree?.messages[0].attachments?.[0].url).toBe("https://s3.example.com/image.png");
+      expect(tree?.messages[0].attachments?.[0].name).toBe("image.png");
+      expect(tree?.messages[0].attachments?.[0].s3Key).toBe("attachments/usr/image.png");
     });
 
     it("appends user and assistant messages maintaining tree hierarchy", async () => {

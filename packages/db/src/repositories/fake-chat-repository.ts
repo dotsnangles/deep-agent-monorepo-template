@@ -1,3 +1,4 @@
+import type { AttachmentEntity } from "@repo/validators";
 import type {
   ChatRepository,
   ChatSessionEntity,
@@ -100,13 +101,36 @@ export class FakeChatRepository implements ChatRepository {
     return true;
   }
 
+  private getAttachmentsMapForSession(sessionId: string): Map<string, AttachmentEntity[]> {
+    const map = new Map<string, AttachmentEntity[]>();
+    for (const att of this.attachments.values()) {
+      if (att.sessionId === sessionId && att.messageId) {
+        const list = map.get(att.messageId) || [];
+        list.push({
+          id: att.id,
+          name: att.name,
+          mimeType: att.mimeType,
+          size: att.sizeBytes ?? 0,
+          s3Key: att.storageKey,
+          url: `/api/storage/presigned-url?key=${encodeURIComponent(att.storageKey)}`,
+        });
+        map.set(att.messageId, list);
+      }
+    }
+    return map;
+  }
+
   public async getTree(sessionId: string, userId: string): Promise<TreeResult | null> {
     const session = this.sessions.get(sessionId);
     if (!session || session.userId !== userId) {
       return null;
     }
     const sessionMessages = this.messages.get(sessionId) || [];
-    const clonedMessages = sessionMessages.map((m) => ({ ...m }));
+    const attachmentsMap = this.getAttachmentsMapForSession(sessionId);
+    const clonedMessages = sessionMessages.map((m) => ({
+      ...m,
+      attachments: attachmentsMap.get(m.id) ?? m.attachments ?? [],
+    }));
     const activePath = traverseActivePath(clonedMessages, session.activeLeafId);
 
     return {
@@ -123,8 +147,12 @@ export class FakeChatRepository implements ChatRepository {
       return null;
     }
     const sessionMessages = this.messages.get(sessionId) || [];
+    const attachmentsMap = this.getAttachmentsMapForSession(sessionId);
     return sessionMessages
-      .map((m) => ({ ...m }))
+      .map((m) => ({
+        ...m,
+        attachments: attachmentsMap.get(m.id) ?? m.attachments ?? [],
+      }))
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   }
 
@@ -259,6 +287,28 @@ export class FakeChatRepository implements ChatRepository {
       attachments: params.attachments ? [...params.attachments] : [],
       createdAt: new Date(),
     };
+
+    if (params.attachments && params.attachments.length > 0) {
+      for (const att of params.attachments) {
+        const s3Key =
+          att.s3Key ||
+          att.url?.split("?")[0] ||
+          `attachments/${userId}/${params.sessionId}/${att.id}_${att.name}`;
+        this.attachments.set(att.id, {
+          id: att.id,
+          sessionId: params.sessionId,
+          messageId,
+          userId,
+          name: att.name,
+          storageKey: s3Key,
+          mimeType: att.mimeType,
+          sizeBytes: att.size ?? 0,
+          uploadStatus: ((att as any).uploadStatus as any) || "ready",
+          metadata: ((att as any).metadata as any) || {},
+          createdAt: new Date(),
+        });
+      }
+    }
 
     const sessionMessages = this.messages.get(params.sessionId) || [];
     sessionMessages.push(messageNode);
