@@ -58,6 +58,7 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
   } = useChatEngine(sessionId);
 
   const lastUserIndex = activePath.map((m) => m.role).lastIndexOf("user");
+  const lastAssistantIndex = activePath.map((m) => m.role).lastIndexOf("assistant");
 
   const {
     stagedFiles,
@@ -190,10 +191,13 @@ export function MessageFeed({ sessionId, onOpenArtifacts }: MessageFeedProps) {
                               }
                             : undefined
                         }
-                        onRegenerate={() => {
-                          regenerate(msg.id);
-                        }}
-                        onDelete={() => deleteNode(msg.id)}
+                        onRegenerate={
+                          index === lastAssistantIndex && !isGenerating
+                            ? () => {
+                                regenerate(msg.id);
+                              }
+                            : undefined
+                        }
                         onRetry={() => {
                           retry(msg.id);
                         }}

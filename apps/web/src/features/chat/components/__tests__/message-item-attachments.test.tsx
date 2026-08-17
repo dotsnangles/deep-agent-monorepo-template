@@ -30,7 +30,6 @@ describe("MessageItem Attachment Rendering", () => {
         message={mockMessage}
         isGenerating={false}
         onRegenerate={vi.fn()}
-        onDelete={vi.fn()}
       />
     );
 
@@ -64,7 +63,6 @@ describe("MessageItem Attachment Rendering", () => {
         message={mockMessage}
         isGenerating={false}
         onRegenerate={vi.fn()}
-        onDelete={vi.fn()}
       />
     );
 
@@ -91,7 +89,6 @@ describe("MessageItem Attachment Rendering", () => {
         message={mockMessage}
         isGenerating={false}
         onRegenerate={vi.fn()}
-        onDelete={vi.fn()}
       />
     );
 

@@ -10,7 +10,6 @@ import {
   FileCode,
   GitFork,
   RotateCw,
-  Trash2,
   User,
   X,
 } from "lucide-react";
@@ -51,8 +50,7 @@ interface MessageItemProps {
   message: MessageNode;
   isGenerating: boolean;
   onEdit?: (newContent: string) => void;
-  onRegenerate: () => void;
-  onDelete: () => void;
+  onRegenerate?: () => void;
   onRetry?: () => void;
   onFork?: () => void;
   onApprove?: (toolCallId: string) => void;
@@ -179,7 +177,6 @@ export function MessageItem({
   isGenerating,
   onEdit,
   onRegenerate,
-  onDelete,
   onRetry,
   onFork,
   onApprove,
@@ -190,7 +187,6 @@ export function MessageItem({
   const { copied, copy } = useCopyToClipboard();
   const [isEditing, setIsEditing] = useState(false);
   const [editDraft, setEditDraft] = useState(message.content);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const hasAttachments = message.attachments && message.attachments.length > 0;
 
@@ -425,7 +421,7 @@ export function MessageItem({
               )}
 
               {/* Regenerate (Assistant only) */}
-              {!isUser && !isGenerating && (
+              {!isUser && !isGenerating && onRegenerate && (
                 <Button
                   variant="ghost"
                   size="icon-xs"
@@ -448,46 +444,6 @@ export function MessageItem({
                 >
                   <GitFork data-icon="inline-start" />
                 </Button>
-              )}
-
-              {/* Delete Message */}
-              {!isGenerating && (
-                showDeleteConfirm ? (
-                  <div className="inline-flex items-center gap-1 bg-destructive/10 px-1.5 py-0.5 rounded-lg border border-destructive/30 animate-in fade-in-50 duration-150">
-                    <span className="text-[10px] text-destructive font-medium">삭제할까요?</span>
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      className="size-5 text-destructive hover:bg-destructive/20 cursor-pointer"
-                      onClick={() => {
-                        setShowDeleteConfirm(false);
-                        onDelete();
-                      }}
-                      title="확인"
-                    >
-                      <Check data-icon="inline-start" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      className="size-5 text-muted-foreground hover:bg-muted cursor-pointer"
-                      onClick={() => setShowDeleteConfirm(false)}
-                      title="취소"
-                    >
-                      <X data-icon="inline-start" />
-                    </Button>
-                  </div>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    className="text-muted-foreground hover:text-destructive cursor-pointer"
-                    onClick={() => setShowDeleteConfirm(true)}
-                    title="메시지 삭제"
-                  >
-                    <Trash2 data-icon="inline-start" />
-                  </Button>
-                )
               )}
             </div>
           </MessageFooter>
