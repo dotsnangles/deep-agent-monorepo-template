@@ -48,7 +48,15 @@ class TestPersistenceAdapters:
         assert pref == {"theme": "dark"}
 
         # 3. Clear messages
-        await adapter.clear_messages("t-1", ["msg-1"])
+        msg_obj = type("Msg", (), {"id": "msg-1", "content": "hello"})()
+        await adapter.save_checkpoint(
+            thread_id="t-2",
+            state={"messages": [msg_obj]},
+            metadata={},
+        )
+        await adapter.clear_messages("t-2", ["msg-1"])
+        st = await adapter.get_state("t-2")
+        assert len(st.values["messages"]) == 0
 
 
 class TestSandboxAdapters:
@@ -77,12 +85,22 @@ class TestSandboxAdapters:
     @pytest.mark.asyncio
     async def test_sandbox_security_denial(self, tmp_path: Path):
         adapter = InProcessSandboxAdapter(root_dir=tmp_path)
-        
+        docker_adapter = DockerSandboxAdapter(root_dir=tmp_path)
+
         with pytest.raises(PermissionError):
             await adapter.write_file("sess-1", ".env", "SECRET=123")
 
         with pytest.raises(PermissionError):
             await adapter.read_file("sess-1", "../sensitive.txt")
+
+        # Command denial
+        res1 = await adapter.execute_command("sess-1", "cat .env")
+        assert res1.exit_code == 1
+        assert "PermissionError" in res1.stderr
+
+        res2 = await docker_adapter.execute_command("sess-1", "cat ../config.json")
+        assert res2.exit_code == 1
+        assert "PermissionError" in res2.stderr
 
 
 class TestStorageAdapters:

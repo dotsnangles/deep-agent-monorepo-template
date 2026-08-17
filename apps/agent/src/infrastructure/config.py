@@ -43,7 +43,9 @@ OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "gemma4:e4b-it-q4_K_M")
 OLLAMA_NUM_CTX: int = int(os.getenv("OLLAMA_NUM_CTX", "32768"))
 OPENAI_API_KEY: str | None = os.getenv("OPENAI_API_KEY")
+OPENAI_API_BASE: str | None = os.getenv("OPENAI_API_BASE")
 OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_MODEL_NAME: str = os.getenv("OPENAI_MODEL_NAME", OPENAI_MODEL)
 ANTHROPIC_API_KEY: str | None = os.getenv("ANTHROPIC_API_KEY")
 ANTHROPIC_MODEL: str = os.getenv("ANTHROPIC_MODEL", "claude-3-5-haiku-20241022")
 GOOGLE_API_KEY: str | None = os.getenv("GOOGLE_API_KEY")
@@ -54,6 +56,7 @@ REDIS_URL: str | None = os.getenv("REDIS_URL")
 SERVER_HOST: str = os.getenv("SERVER_HOST", "0.0.0.0")
 SERVER_PORT: int = int(os.getenv("SERVER_PORT", "8000"))
 TITLE_WORKER_CONCURRENCY: int = int(os.getenv("TITLE_WORKER_CONCURRENCY", "3"))
+TITLE_WORKER_INTERVAL: int = int(os.getenv("TITLE_WORKER_INTERVAL", "5"))
 ENABLE_SUBAGENTS: bool = os.getenv("ENABLE_SUBAGENTS", "false").lower() == "true"
 ENABLE_TITLE_WORKER: bool = os.getenv("ENABLE_TITLE_WORKER", "false").lower() == "true"
 

@@ -43,6 +43,16 @@ def is_denied_path(file_path: str) -> bool:
     return False
 
 
+def is_denied_command(command: str) -> bool:
+    """Checks whether command contains forbidden resource access or path traversal patterns."""
+    forbidden = [".env", ".git", "../", "..\\"]
+    cmd_lower = command.lower()
+    for f in forbidden:
+        if f in cmd_lower:
+            return True
+    return False
+
+
 class InProcessSandboxAdapter(SandboxExecutionPort):
     """In-process sandbox executing commands directly on host in isolated temp directories."""
 
@@ -59,6 +69,12 @@ class InProcessSandboxAdapter(SandboxExecutionPort):
     async def execute_command(
         self, session_id: str, command: str, timeout_seconds: int = 30
     ) -> SandboxResult:
+        if is_denied_command(command):
+            return SandboxResult(
+                stdout="",
+                stderr="PermissionError: Command access to sensitive resource or path traversal denied.",
+                exit_code=1,
+            )
         session_dir = self._get_session_dir(session_id)
         try:
             proc = await asyncio.create_subprocess_shell(
@@ -157,6 +173,13 @@ class DockerSandboxAdapter(InProcessSandboxAdapter):
     async def execute_command(
         self, session_id: str, command: str, timeout_seconds: int = 30
     ) -> SandboxResult:
+        if is_denied_command(command):
+            return SandboxResult(
+                stdout="",
+                stderr="PermissionError: Command access to sensitive resource or path traversal denied.",
+                exit_code=1,
+            )
+
         # Check if docker is available and container running
         if shutil.which("docker") and self.container_name:
             session_dir = self._get_session_dir(session_id)

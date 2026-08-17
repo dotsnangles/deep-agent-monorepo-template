@@ -24,3 +24,6 @@ def get_langfuse_callback() -> Any:
     except Exception as e:
         logger.warning("Failed to initialize Langfuse callback: %s", e)
         return None
+
+
+get_langfuse_handler = get_langfuse_callback

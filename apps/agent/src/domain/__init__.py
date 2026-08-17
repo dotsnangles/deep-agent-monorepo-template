@@ -11,6 +11,13 @@ from src.domain.ports import (
     StoragePort,
     ToolDefinition,
 )
+from src.domain.types import (
+    AgentStateSnapshot,
+    AgentTurn,
+    ApprovalDecision,
+    Attachment,
+    ChatMessage,
+)
 
 __all__ = [
     "PersistencePort",
@@ -24,4 +31,9 @@ __all__ = [
     "ArtifactDescriptor",
     "ToolDefinition",
     "ModelChunk",
+    "AgentTurn",
+    "ChatMessage",
+    "Attachment",
+    "ApprovalDecision",
+    "AgentStateSnapshot",
 ]

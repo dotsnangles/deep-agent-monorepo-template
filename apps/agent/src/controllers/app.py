@@ -11,17 +11,17 @@ from src.controllers.copilotkit import register_copilotkit_agent
 from src.controllers.events import events_router
 from src.controllers.health import health_router
 from src.controllers.title import title_router
-from src.core.checkpointer import CheckpointerFactory
-from src.core.config import DATABASE_URL, ENABLE_TITLE_WORKER, REDIS_URL
-from src.core.redis import RedisEventBroker
 from src.graphs.chat.graph import build_agent
-from src.infrastructure.persistence.adapter import (
+from src.infrastructure import (
+    DATABASE_URL,
+    ENABLE_TITLE_WORKER,
+    REDIS_URL,
+    CheckpointerFactory,
     InMemoryPersistenceAdapter,
-    PostgresPersistenceAdapter,
-)
-from src.infrastructure.sandbox.adapter import InProcessSandboxAdapter
-from src.infrastructure.storage.adapter import (
     InMemoryStorageAdapter,
+    InProcessSandboxAdapter,
+    PostgresPersistenceAdapter,
+    RedisEventBroker,
     S3StorageAdapter,
 )
 from src.runtime import AgentRuntime

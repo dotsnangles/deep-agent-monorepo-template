@@ -101,3 +101,16 @@ class TestAgentRuntime:
         assert snapshot.thread_id == "thread-empty"
         assert snapshot.is_interrupted is False
         assert snapshot.turn_count == 0
+
+        # With mock interrupted tasks
+        interrupt_val = {"action_requests": [{"id": "req-1", "name": "execute", "args": {"cmd": "ls"}}]}
+        mock_task = type("Task", (), {"interrupts": [type("Intr", (), {"value": interrupt_val})()]})()
+        await runtime.persistence.save_checkpoint(
+            thread_id="thread-hitl",
+            state={"messages": [{"role": "user", "content": "hi"}], "tasks": (mock_task,)},
+            metadata={},
+        )
+        hitl_snapshot = await runtime.inspect("thread-hitl")
+        assert hitl_snapshot.thread_id == "thread-hitl"
+        assert len(hitl_snapshot.pending_tool_approvals) == 1
+        assert hitl_snapshot.pending_tool_approvals[0]["name"] == "execute"

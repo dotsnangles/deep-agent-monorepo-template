@@ -3,7 +3,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
-from src.infrastructure.sandbox.adapter import is_denied_path, MIME_TYPE_OVERRIDES, guess_mime_type
+from src.infrastructure import MIME_TYPE_OVERRIDES, guess_mime_type, is_denied_path
 from src.graphs.chat.backends import DEFAULT_WORKSPACE_DIR
 
 artifacts_router = APIRouter(prefix="/sessions", tags=["artifacts"])

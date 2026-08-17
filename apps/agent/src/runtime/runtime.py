@@ -338,10 +338,12 @@ class AgentRuntime(AgentExecutionPort):
         store: Any = None,
     ) -> AgentRuntime:
         """Factory for 100% in-memory hermetic testing."""
-        from src.infrastructure.models.adapter import FakeChatModelAdapter
-        from src.infrastructure.persistence.adapter import InMemoryPersistenceAdapter
-        from src.infrastructure.sandbox.adapter import InProcessSandboxAdapter
-        from src.infrastructure.storage.adapter import InMemoryStorageAdapter
+        from src.infrastructure import (
+            FakeChatModelAdapter,
+            InMemoryPersistenceAdapter,
+            InMemoryStorageAdapter,
+            InProcessSandboxAdapter,
+        )
 
         return cls(
             persistence=InMemoryPersistenceAdapter(checkpointer=checkpointer, store=store),
@@ -364,14 +366,14 @@ class AgentRuntime(AgentExecutionPort):
     ) -> AgentRuntime:
         """Factory for production deployment with PostgreSQL, Docker, S3, and Redis."""
         import redis.asyncio as aioredis
-        from src.infrastructure.config import get_llm
-        from src.infrastructure.persistence.adapter import (
+        from src.infrastructure import (
+            DockerSandboxAdapter,
             InMemoryPersistenceAdapter,
             PostgresPersistenceAdapter,
+            RedisEventBroker,
+            S3StorageAdapter,
+            get_llm,
         )
-        from src.infrastructure.redis import RedisEventBroker
-        from src.infrastructure.sandbox.adapter import DockerSandboxAdapter
-        from src.infrastructure.storage.adapter import S3StorageAdapter
 
         # 1. Persistence Adapter
         try:
@@ -465,10 +467,12 @@ class AgentRuntime(AgentExecutionPort):
     async def _stream_inner(self, turn: AgentTurn) -> AsyncIterator[AgentStreamEvent]:
         from src.graphs.chat.factory import DeepAgentEnvironmentFactory
         from src.graphs.chat.prompts import MAIN_SYSTEM_PROMPT
-        from src.infrastructure.config import get_llm
-        from src.infrastructure.models.adapter import FakeChatModelAdapter
-        from src.infrastructure.observability import get_langfuse_callback
-        from src.infrastructure.redis import RedisStreamingCallbackHandler
+        from src.infrastructure import (
+            FakeChatModelAdapter,
+            RedisStreamingCallbackHandler,
+            get_langfuse_callback,
+            get_llm,
+        )
 
         thread_id = turn.thread_id
         lc_messages = _normalize_turn_messages(turn.input, system_prompt=turn.system_prompt)

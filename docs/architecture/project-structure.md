@@ -63,7 +63,9 @@ apps/agent/
 │   │   ├── title.py             # Direct title summarization (/api/title)
 │   │   └── dependencies.py      # Dependency injection providers (get_agent_runtime)
 │   ├── domain/                  # Pure Business Contracts & Outbound Ports
-│   │   └── ports.py             # PersistencePort, SandboxExecutionPort, StoragePort, ModelPort
+│   │   ├── ports.py             # PersistencePort, SandboxExecutionPort, StoragePort, ModelPort
+│   │   ├── types.py             # AgentTurn, ApprovalDecision, Attachment, ChatMessage, AgentStateSnapshot
+│   │   └── __init__.py
 │   ├── runtime/                 # Deep Execution Engine (Single-flight lock, AST demuxing, HITL)
 │   │   ├── runtime.py           # AgentRuntime implementation (.stream, .inspect)
 │   │   ├── events.py            # AgentStreamEvent definitions & SSE serialization

@@ -4,9 +4,16 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
+from src.domain.types import (
+    AgentStateSnapshot,
+    AgentTurn,
+    ApprovalDecision,
+    Attachment,
+    ChatMessage,
+)
+
 if TYPE_CHECKING:
     from src.runtime.events import AgentStreamEvent
-    from src.runtime.types import AgentTurn, ApprovalDecision, ChatMessage
 
 
 @dataclass(frozen=True)
@@ -17,6 +24,7 @@ class StateSnapshot:
     config: dict[str, Any]
     metadata: dict[str, Any]
     created_at: str
+    tasks: tuple[Any, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
