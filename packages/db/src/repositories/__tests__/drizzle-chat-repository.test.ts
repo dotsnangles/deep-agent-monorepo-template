@@ -146,10 +146,17 @@ describe("DrizzleChatRepository Unit & Transaction Tests", () => {
         orderBy: vi.fn().mockResolvedValue([]),
       };
 
+      const artifactsChain = {
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        orderBy: vi.fn().mockResolvedValue([]),
+      };
+
       mockDb.select
         .mockReturnValueOnce(sessionChain)
         .mockReturnValueOnce(messagesChain)
-        .mockReturnValueOnce(attachmentsChain);
+        .mockReturnValueOnce(attachmentsChain)
+        .mockReturnValueOnce(artifactsChain);
 
       const tree = await repo.getTree("s1", USER_ID);
       expect(tree).not.toBeNull();
@@ -376,10 +383,17 @@ describe("DrizzleChatRepository Unit & Transaction Tests", () => {
         orderBy: vi.fn().mockResolvedValue([]),
       };
 
+      const artifactsChain = {
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        orderBy: vi.fn().mockResolvedValue([]),
+      };
+
       mockDb.select
         .mockReturnValueOnce(sessionSelectChain)
         .mockReturnValueOnce(messagesSelectChain)
-        .mockReturnValueOnce(attachmentsChain);
+        .mockReturnValueOnce(attachmentsChain)
+        .mockReturnValueOnce(artifactsChain);
 
       const msgs = await repo.getMessages("s1", USER_ID);
       expect(msgs).toHaveLength(2);

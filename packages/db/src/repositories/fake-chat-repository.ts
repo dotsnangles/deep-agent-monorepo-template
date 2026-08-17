@@ -120,6 +120,18 @@ export class FakeChatRepository implements ChatRepository {
     return map;
   }
 
+  private getArtifactsMapForSession(sessionId: string): Map<string, ChatArtifactEntity[]> {
+    const map = new Map<string, ChatArtifactEntity[]>();
+    for (const art of this.artifacts.values()) {
+      if (art.sessionId === sessionId && art.messageId) {
+        const list = map.get(art.messageId) || [];
+        list.push({ ...art });
+        map.set(art.messageId, list);
+      }
+    }
+    return map;
+  }
+
   public async getTree(sessionId: string, userId: string): Promise<TreeResult | null> {
     const session = this.sessions.get(sessionId);
     if (!session || session.userId !== userId) {
@@ -127,9 +139,11 @@ export class FakeChatRepository implements ChatRepository {
     }
     const sessionMessages = this.messages.get(sessionId) || [];
     const attachmentsMap = this.getAttachmentsMapForSession(sessionId);
+    const artifactsMap = this.getArtifactsMapForSession(sessionId);
     const clonedMessages = sessionMessages.map((m) => ({
       ...m,
       attachments: attachmentsMap.get(m.id) ?? m.attachments ?? [],
+      artifacts: artifactsMap.get(m.id) ?? m.artifacts ?? [],
     }));
     const activePath = traverseActivePath(clonedMessages, session.activeLeafId);
 
@@ -148,10 +162,12 @@ export class FakeChatRepository implements ChatRepository {
     }
     const sessionMessages = this.messages.get(sessionId) || [];
     const attachmentsMap = this.getAttachmentsMapForSession(sessionId);
+    const artifactsMap = this.getArtifactsMapForSession(sessionId);
     return sessionMessages
       .map((m) => ({
         ...m,
         attachments: attachmentsMap.get(m.id) ?? m.attachments ?? [],
+        artifacts: artifactsMap.get(m.id) ?? m.artifacts ?? [],
       }))
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   }
@@ -305,6 +321,22 @@ export class FakeChatRepository implements ChatRepository {
           sizeBytes: att.size ?? 0,
           uploadStatus: ((att as any).uploadStatus as any) || "ready",
           metadata: ((att as any).metadata as any) || {},
+          createdAt: new Date(),
+        });
+      }
+    }
+
+    if (params.artifacts && params.artifacts.length > 0) {
+      for (const art of params.artifacts) {
+        this.artifacts.set(art.id, {
+          id: art.id,
+          sessionId: params.sessionId,
+          messageId,
+          name: art.name,
+          storageKey: art.storageKey,
+          mimeType: art.mimeType,
+          sizeBytes: art.sizeBytes,
+          metadata: art.metadata || {},
           createdAt: new Date(),
         });
       }

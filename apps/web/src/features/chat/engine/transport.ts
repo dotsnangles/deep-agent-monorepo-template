@@ -111,6 +111,7 @@ export class HttpChatTransport implements ChatTransport {
 
     const payload: ChatStreamRequestDTO = {
       threadId: params.sessionId,
+      assistantMessageId: params.assistantMessageId,
       messages: params.contextMessages,
       resume: params.resume,
     };

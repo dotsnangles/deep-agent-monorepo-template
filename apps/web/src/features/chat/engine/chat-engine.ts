@@ -870,7 +870,7 @@ export class ChatEngine {
           parentId: params.userMessageId,
           role: "assistant",
           content: savedPState.content,
-          attachments: capturedAttachments,
+          artifacts: capturedArtifacts.length > 0 ? capturedArtifacts : undefined,
         });
       }
 

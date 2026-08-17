@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { sessionId, parentId = null, role, content, attachments, id } = parseResult.data;
+    const { sessionId, parentId = null, role, content, attachments, artifacts, id } = parseResult.data;
 
     const sanitizedAttachments = attachments?.map((att) => ({
       id: att.id,
@@ -122,6 +122,17 @@ export async function POST(req: NextRequest) {
         role,
         content,
         attachments: sanitizedAttachments,
+        artifacts: artifacts?.map((art) => ({
+          id: art.id,
+          sessionId: art.sessionId || sessionId,
+          messageId: id || null,
+          name: art.name,
+          storageKey: art.storageKey,
+          mimeType: art.mimeType,
+          sizeBytes: art.sizeBytes ?? null,
+          metadata: art.metadata || {},
+          createdAt: typeof art.createdAt === "string" ? new Date(art.createdAt) : art.createdAt,
+        })),
       },
       userId
     );

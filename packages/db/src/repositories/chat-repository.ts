@@ -16,6 +16,7 @@ export interface MessageNode {
   role: "user" | "assistant" | "system";
   content: string;
   attachments?: AttachmentEntity[];
+  artifacts?: ChatArtifactEntity[];
   createdAt: Date;
 }
 
@@ -38,6 +39,7 @@ export interface CreateMessageParams {
   role: "user" | "assistant" | "system";
   content: string;
   attachments?: AttachmentEntity[];
+  artifacts?: ChatArtifactEntity[];
 }
 
 export interface SaveMessageResult {

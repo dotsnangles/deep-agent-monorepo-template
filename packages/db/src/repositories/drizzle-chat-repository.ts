@@ -70,7 +70,8 @@ function toSessionEntity(record: typeof chatSession.$inferSelect): ChatSessionEn
 
 function toMessageNode(
   record: typeof chatMessage.$inferSelect,
-  attachments?: AttachmentEntity[]
+  attachments?: AttachmentEntity[],
+  artifacts?: ChatArtifactEntity[]
 ): MessageNode {
   return {
     id: record.id,
@@ -78,7 +79,8 @@ function toMessageNode(
     parentId: record.parentId,
     role: record.role as "user" | "assistant" | "system",
     content: record.content,
-    attachments: attachments ?? [],
+    attachments: attachments && attachments.length > 0 ? attachments : undefined,
+    artifacts: artifacts && artifacts.length > 0 ? artifacts : undefined,
     createdAt: record.createdAt,
   };
 }
@@ -105,6 +107,27 @@ async function getAttachmentsMapForSession(
         s3Key: r.storageKey,
         url: `/api/storage/presigned-url?key=${encodeURIComponent(r.storageKey)}`,
       });
+      map.set(r.messageId, list);
+    }
+  }
+  return map;
+}
+
+async function getArtifactsMapForSession(
+  db: DrizzleDb,
+  sessionId: string
+): Promise<Map<string, ChatArtifactEntity[]>> {
+  const records = await db
+    .select()
+    .from(chatArtifact)
+    .where(eq(chatArtifact.sessionId, sessionId))
+    .orderBy(asc(chatArtifact.createdAt));
+
+  const map = new Map<string, ChatArtifactEntity[]>();
+  for (const r of records) {
+    if (r.messageId) {
+      const list = map.get(r.messageId) || [];
+      list.push(toArtifactEntity(r));
       map.set(r.messageId, list);
     }
   }
@@ -209,16 +232,19 @@ export class DrizzleChatRepository implements ChatRepository {
       return null;
     }
 
-    const [records, attachmentsMap] = await Promise.all([
+    const [records, attachmentsMap, artifactsMap] = await Promise.all([
       this.db
         .select()
         .from(chatMessage)
         .where(eq(chatMessage.sessionId, sessionId))
         .orderBy(asc(chatMessage.createdAt)),
       getAttachmentsMapForSession(this.db, sessionId),
+      getArtifactsMapForSession(this.db, sessionId),
     ]);
 
-    const messages = records.map((r) => toMessageNode(r, attachmentsMap.get(r.id)));
+    const messages = records.map((r) =>
+      toMessageNode(r, attachmentsMap.get(r.id), artifactsMap.get(r.id))
+    );
     const activePath = traverseActivePath(messages, session.activeLeafId);
 
     return {
@@ -235,16 +261,19 @@ export class DrizzleChatRepository implements ChatRepository {
       return null;
     }
 
-    const [records, attachmentsMap] = await Promise.all([
+    const [records, attachmentsMap, artifactsMap] = await Promise.all([
       this.db
         .select()
         .from(chatMessage)
         .where(eq(chatMessage.sessionId, sessionId))
         .orderBy(asc(chatMessage.createdAt)),
       getAttachmentsMapForSession(this.db, sessionId),
+      getArtifactsMapForSession(this.db, sessionId),
     ]);
 
-    return records.map((r) => toMessageNode(r, attachmentsMap.get(r.id)));
+    return records.map((r) =>
+      toMessageNode(r, attachmentsMap.get(r.id), artifactsMap.get(r.id))
+    );
   }
 
   public async forkSession(
@@ -487,8 +516,31 @@ export class DrizzleChatRepository implements ChatRepository {
         }
       }
 
+      if (params.artifacts && params.artifacts.length > 0) {
+        for (const art of params.artifacts) {
+          await tx
+            .insert(chatArtifact)
+            .values({
+              id: art.id,
+              sessionId: params.sessionId,
+              messageId,
+              name: art.name,
+              storageKey: art.storageKey,
+              mimeType: art.mimeType,
+              sizeBytes: art.sizeBytes ?? null,
+              metadata: art.metadata ?? {},
+            })
+            .onConflictDoUpdate({
+              target: chatArtifact.id,
+              set: {
+                messageId,
+              },
+            });
+        }
+      }
+
       return {
-        message: toMessageNode(insertedMessage, params.attachments),
+        message: toMessageNode(insertedMessage, params.attachments, params.artifacts),
         session: toSessionEntity(sessionRecord),
         isNewSession,
       };

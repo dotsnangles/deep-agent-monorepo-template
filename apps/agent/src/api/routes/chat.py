@@ -63,6 +63,11 @@ class ChatStreamRequestDTO(BaseModel):
         default_factory=list,
         description="List of messages in active path",
     )
+    assistant_message_id: str | None = Field(
+        default=None,
+        alias="assistantMessageId",
+        description="Unique assistant message node ID to bind generated artifacts to",
+    )
     agent_type: str = Field(
         default="default",
         alias="agentType",
@@ -109,6 +114,7 @@ async def stream_chat(
             agent_type=req.agent_type,
             system_prompt=req.system_prompt,
             resume_action=resume_dict,
+            assistant_message_id=req.assistant_message_id,
         ):
             yield event.to_sse()
 

@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { threadId, messages, agentType, systemPrompt, resume } = parseResult.data;
+    const { threadId, messages, agentType, systemPrompt, resume, assistantMessageId } = parseResult.data;
 
     const agentRes = await fetch(`${AGENT_SERVER_URL}/chat/stream`, {
       method: "POST",
@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         threadId,
         userId: session.user.id,
+        assistantMessageId,
         messages: messages?.map((m) => ({
           role: m.role,
           content: m.content,

@@ -371,6 +371,17 @@ describe("ChatRepository Contract Tests (FakeChatRepository)", () => {
       expect(newArtifacts[0].messageId).toBe(newM2.id);
       expect(newArtifacts[0].name).toBe("summary.txt");
 
+      // Verify getTree includes artifacts directly on message node
+      const origTree = await repo.getTree("orig-sess", USER_A);
+      const origM2Node = origTree?.messages.find((m) => m.id === "m2");
+      expect(origM2Node?.artifacts).toHaveLength(1);
+      expect(origM2Node?.artifacts?.[0].name).toBe("summary.txt");
+
+      const forkedTree = await repo.getTree(forkResult!.session.id, USER_A);
+      const forkedM2Node = forkedTree?.messages.find((m) => m.id === newM2.id);
+      expect(forkedM2Node?.artifacts).toHaveLength(1);
+      expect(forkedM2Node?.artifacts?.[0].name).toBe("summary.txt");
+
       // Verify original session is unchanged
       const origMessages = await repo.getMessages("orig-sess", USER_A);
       expect(origMessages).toHaveLength(4);

@@ -121,6 +121,34 @@ export const forkChatSessionSchema = z.object({
 
 export type ForkChatSessionDTO = z.infer<typeof forkChatSessionSchema>;
 
+// Chat Artifact Schemas
+export const chatArtifactEntitySchema = z.object({
+  id: z.string(),
+  sessionId: z.string(),
+  messageId: z.string().nullable().optional(),
+  name: z.string(),
+  storageKey: z.string(),
+  mimeType: z.string(),
+  sizeBytes: z.number().nullable().optional(),
+  metadata: z.record(z.string(), z.unknown()).default({}),
+  createdAt: z.date().or(z.string()),
+});
+
+export type ChatArtifactEntity = z.infer<typeof chatArtifactEntitySchema>;
+
+export const createChatArtifactSchema = z.object({
+  id: z.string().optional(),
+  sessionId: z.string().min(1, "sessionId is required"),
+  messageId: z.string().nullable().optional(),
+  name: z.string().min(1, "name is required"),
+  storageKey: z.string().min(1, "storageKey is required"),
+  mimeType: z.string().min(1, "mimeType is required"),
+  sizeBytes: z.number().nonnegative().nullable().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export type CreateChatArtifactDTO = z.infer<typeof createChatArtifactSchema>;
+
 // Chat Message DTO Schemas
 export const createChatMessageSchema = z.object({
   sessionId: z.string().min(1, "sessionId is required"),
@@ -128,6 +156,7 @@ export const createChatMessageSchema = z.object({
   role: z.enum(["user", "assistant", "system"]),
   content: z.string(),
   attachments: z.array(attachmentEntitySchema).optional(),
+  artifacts: z.array(chatArtifactEntitySchema).optional(),
   id: z.string().optional(),
 });
 
@@ -166,6 +195,7 @@ export type StreamMessageContextDTO = z.infer<typeof streamMessageContextSchema>
 export const chatStreamRequestSchema = z.object({
   threadId: z.string().optional(),
   userId: z.string().optional(),
+  assistantMessageId: z.string().optional(),
   messages: z.array(streamMessageContextSchema).optional().default([]),
   agentType: z.string().optional(),
   systemPrompt: z.string().optional(),
@@ -173,32 +203,4 @@ export const chatStreamRequestSchema = z.object({
 });
 
 export type ChatStreamRequestDTO = z.infer<typeof chatStreamRequestSchema>;
-
-// Chat Artifact Schemas
-export const chatArtifactEntitySchema = z.object({
-  id: z.string(),
-  sessionId: z.string(),
-  messageId: z.string().nullable().optional(),
-  name: z.string(),
-  storageKey: z.string(),
-  mimeType: z.string(),
-  sizeBytes: z.number().nullable().optional(),
-  metadata: z.record(z.string(), z.unknown()).default({}),
-  createdAt: z.date().or(z.string()),
-});
-
-export type ChatArtifactEntity = z.infer<typeof chatArtifactEntitySchema>;
-
-export const createChatArtifactSchema = z.object({
-  id: z.string().optional(),
-  sessionId: z.string().min(1, "sessionId is required"),
-  messageId: z.string().nullable().optional(),
-  name: z.string().min(1, "name is required"),
-  storageKey: z.string().min(1, "storageKey is required"),
-  mimeType: z.string().min(1, "mimeType is required"),
-  sizeBytes: z.number().nonnegative().nullable().optional(),
-  metadata: z.record(z.string(), z.unknown()).optional(),
-});
-
-export type CreateChatArtifactDTO = z.infer<typeof createChatArtifactSchema>;
 

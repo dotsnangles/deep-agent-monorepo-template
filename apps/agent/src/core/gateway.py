@@ -363,6 +363,7 @@ class AgentExecutionGateway:
         backend: Any = None,
         user_id: str | None = None,
         environment: str | None = None,
+        assistant_message_id: str | None = None,
     ) -> AsyncIterator[AgentStreamEvent]:
         from contextlib import nullcontext
 
@@ -384,6 +385,7 @@ class AgentExecutionGateway:
                 backend=backend,
                 user_id=user_id,
                 environment=environment,
+                assistant_message_id=assistant_message_id,
             ):
                 yield event
 
@@ -399,6 +401,7 @@ class AgentExecutionGateway:
         backend: Any = None,
         user_id: str | None = None,
         environment: str | None = None,
+        assistant_message_id: str | None = None,
     ) -> AsyncIterator[AgentStreamEvent]:
         """Internal stream execution logic."""
         lc_messages = _normalize_messages(messages, system_prompt=system_prompt)
@@ -628,6 +631,7 @@ class AgentExecutionGateway:
                         )
                         artifact_events = await sync_processor.sync_session_artifacts(
                             session_id=effective_thread_id,
+                            message_id=assistant_message_id,
                         )
                         for art_ev in artifact_events:
                             yield AgentStreamEvent.artifact_created(
@@ -681,6 +685,7 @@ class AgentExecutionGateway:
                 )
                 artifact_events = await sync_processor.sync_session_artifacts(
                     session_id=effective_thread_id,
+                    message_id=assistant_message_id,
                 )
                 for art_ev in artifact_events:
                     yield AgentStreamEvent.artifact_created(
