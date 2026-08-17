@@ -70,7 +70,6 @@ export interface ArtifactListPanelProps {
   artifacts: (ChatArtifactEntity & { url?: string; downloadUrl?: string })[];
   attachments?: AttachmentEntity[];
   onSelectImage?: (img: { src: string; alt: string }) => void;
-  onClose?: () => void;
 }
 
 export function ArtifactListPanel({
@@ -78,34 +77,23 @@ export function ArtifactListPanel({
   artifacts,
   attachments = [],
   onSelectImage,
-  onClose,
 }: ArtifactListPanelProps) {
+  const totalCount = artifacts.length + attachments.length;
+
   return (
     <div className="flex flex-col h-full bg-background" data-testid="artifact-list-panel">
-      {/* Gemini-style Panel Header: Files + Close Button */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-border/40 shrink-0">
+      {/* Gemini-style Panel Header: Files */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border/40 shrink-0 pr-12">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-semibold tracking-tight text-foreground">
             Files
           </h3>
-          {artifacts.length > 0 && (
+          {totalCount > 0 && (
             <Badge variant="secondary" className="h-5 px-1.5 text-[11px] font-mono">
-              {artifacts.length}
+              {totalCount}
             </Badge>
           )}
         </div>
-        {onClose && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-7 rounded-lg text-muted-foreground hover:text-foreground cursor-pointer"
-            onClick={onClose}
-            title="닫기"
-          >
-            <span className="sr-only">닫기</span>
-            <span className="text-sm font-bold">✕</span>
-          </Button>
-        )}
       </div>
 
       {/* Body: Created (Artifacts) & Added (User Attachments) Sections */}
@@ -329,7 +317,6 @@ export function ArtifactSidebar({
             artifacts={artifacts}
             attachments={attachments}
             onSelectImage={setSelectedImage}
-            onClose={() => onOpenChange(false)}
           />
         </SheetContent>
       </Sheet>

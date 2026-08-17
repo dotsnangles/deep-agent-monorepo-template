@@ -66,6 +66,7 @@ describe("ArtifactListPanel Component Tests", () => {
     );
 
     expect(html).toContain("Files");
+    expect(html).toContain("3"); // Total count badge (2 artifacts + 1 attachment)
     expect(html).toContain("Created");
     expect(html).toContain("sales_chart.png");
     expect(html).toContain("data_report.csv");

@@ -25,6 +25,7 @@ export default function Home() {
   const [isArtifactsOpen, setIsArtifactsOpen] = useState(false);
 
   const sessionAttachments = activePath.flatMap((m) => m.attachments || []);
+  const totalFilesCount = artifacts.length + sessionAttachments.length;
 
   const handleShare = () => {
     if (typeof window !== "undefined") {
@@ -37,22 +38,6 @@ export default function Home() {
     <div className="flex flex-col h-full w-full relative">
       {/* Top-Right Gemini-style Minimalist Action Bar */}
       <div className="absolute top-3 right-4 z-20 flex items-center gap-1.5">
-        {artifacts.length > 0 && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 px-2.5 rounded-xl text-xs gap-1.5 bg-background/80 backdrop-blur-xs border-border/70 hover:border-primary/50 shadow-xs cursor-pointer animate-in fade-in duration-200"
-            onClick={() => setIsArtifactsOpen(true)}
-            title="대화 파일 및 산출물 보기"
-          >
-            <Layers className="size-3.5 text-primary" data-icon="inline-start" />
-            <span className="hidden sm:inline">산출물</span>
-            <Badge variant="secondary" className="h-4 px-1 text-[10px] font-mono leading-none">
-              {artifacts.length}
-            </Badge>
-          </Button>
-        )}
-
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
@@ -74,9 +59,9 @@ export default function Home() {
             >
               <FolderArchive className="size-4 text-primary" />
               <span>이 대화의 파일 (Files)</span>
-              {artifacts.length > 0 && (
+              {totalFilesCount > 0 && (
                 <Badge variant="secondary" className="ml-auto h-4 px-1 text-[9px] font-mono leading-none">
-                  {artifacts.length}
+                  {totalFilesCount}
                 </Badge>
               )}
             </DropdownMenuItem>
