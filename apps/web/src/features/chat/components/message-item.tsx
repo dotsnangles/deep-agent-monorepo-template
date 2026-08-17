@@ -3,7 +3,6 @@
 import { useState } from "react";
 import {
   AlertCircle,
-  Bot,
   Check,
   Copy,
   Download,
@@ -19,7 +18,6 @@ import { Button } from "@repo/ui/components/button";
 import { Textarea } from "@repo/ui/components/textarea";
 import {
   Message,
-  MessageAvatar,
   MessageContent,
   MessageHeader,
   MessageFooter,
@@ -211,25 +209,20 @@ export function MessageItem({
 
   return (
     <Message align={isUser ? "end" : "start"} className="group/message py-2 px-1">
-      {/* AI Bot Avatar (Shown on left for assistant messages) */}
-      {!isUser && (
-        <MessageAvatar className="size-8 rounded-xl bg-primary/10 text-primary border border-primary/20 shadow-2xs mt-0.5">
-          <Bot className="size-4" />
-        </MessageAvatar>
-      )}
-
       {/* Main Message Content Column */}
-      <MessageContent className="min-w-0">
-        {/* Header: Sender Label & Time */}
-        <MessageHeader className="gap-2 mb-1 text-[11px] font-medium text-muted-foreground">
-          <span>{isUser ? "나" : "Hollow Echo Agent"}</span>
-          <span className="text-[10px] opacity-60">
-            {new Date(message.createdAt).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </span>
-        </MessageHeader>
+      <MessageContent className="min-w-0 w-full">
+        {/* Header: Sender Label & Time (User only) */}
+        {isUser && (
+          <MessageHeader className="gap-2 mb-1 text-[11px] font-medium text-muted-foreground justify-end">
+            <span>나</span>
+            <span className="text-[10px] opacity-60">
+              {new Date(message.createdAt).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          </MessageHeader>
+        )}
 
         {/* Content Body: User bubble vs AI canvas markdown */}
         {isEditing ? (
