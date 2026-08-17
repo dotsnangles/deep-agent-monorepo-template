@@ -225,7 +225,7 @@ class ArtifactSyncProcessor:
                 # 1. Build metadata and keys
                 mime_type = guess_artifact_mime_type(file_path)
                 size_bytes = file_path.stat().st_size
-                artifact_id = f"art_{uuid.uuid4().hex[:12]}"
+                artifact_id = str(uuid.uuid4())
                 metadata = {"content_hash": content_hash}
 
                 if message_id:

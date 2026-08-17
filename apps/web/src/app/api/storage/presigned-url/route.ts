@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
 
     const { filename, mimeType, sizeBytes, sessionId } = parseResult.data;
     const sanitizedFilename = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const attachmentId = `att_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    const attachmentId = crypto.randomUUID();
     const sessionFolder = sessionId ? sessionId.replace(/[^a-zA-Z0-9_-]/g, "_") : "global";
     const s3Key = `attachments/${session.user.id}/${sessionFolder}/${attachmentId}_${sanitizedFilename}`;
 

@@ -610,7 +610,7 @@ export class DrizzleChatRepository implements ChatRepository {
   }
 
   public async saveArtifact(params: CreateArtifactParams): Promise<ChatArtifactEntity> {
-    const id = params.id || `art_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const id = params.id || crypto.randomUUID();
     const [record] = await this.db
       .insert(chatArtifact)
       .values({
@@ -658,7 +658,7 @@ export class DrizzleChatRepository implements ChatRepository {
   }
 
   public async saveAttachment(params: CreateAttachmentParams): Promise<ChatAttachmentEntity> {
-    const id = params.id || `att_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const id = params.id || crypto.randomUUID();
     const [record] = await this.db
       .insert(chatAttachment)
       .values({

@@ -97,7 +97,7 @@ describe("Storage Presigned URL Route Handler (/api/storage/presigned-url)", () 
     expect(res.status).toBe(200);
 
     const data = await res.json();
-    expect(data.id).toMatch(/^att_\d+_/);
+    expect(data.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
     expect(data.uploadUrl).toContain("http://test-storage.local/upload/attachments/usr_storage_test/sess-123/");
     expect(data.downloadUrl).toContain("http://test-storage.local/files/attachments/usr_storage_test/sess-123/");
     expect(data.name).toBe("architecture diagram.png");

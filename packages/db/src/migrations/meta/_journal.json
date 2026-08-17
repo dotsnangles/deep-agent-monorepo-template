@@ -36,6 +36,13 @@
       "when": 1786933960808,
       "tag": "0004_messy_freak",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786937858963,
+      "tag": "0005_hard_harpoon",
+      "breakpoints": true
     }
   ]
 }

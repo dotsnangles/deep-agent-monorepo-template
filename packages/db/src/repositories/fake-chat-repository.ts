@@ -203,13 +203,13 @@ export class FakeChatRepository implements ChatRepository {
     }
     lineage.reverse(); // [root, ..., targetMsg]
 
-    const newSessionId = `sess_fork_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const newSessionId = crypto.randomUUID();
     const title = newTitle || `${sourceSession.title} (분기)`;
 
     // Map old message IDs to new cloned IDs
     const idMap = new Map<string, string>();
-    lineage.forEach((m, idx) => {
-      idMap.set(m.id, `msg_fork_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 6)}`);
+    lineage.forEach((m) => {
+      idMap.set(m.id, crypto.randomUUID());
     });
 
     const clonedMessages: MessageNode[] = lineage.map((m, idx) => {
@@ -241,7 +241,7 @@ export class FakeChatRepository implements ChatRepository {
     // Replicate associated artifacts
     for (const art of this.artifacts.values()) {
       if (art.sessionId === sourceSessionId && art.messageId && idMap.has(art.messageId)) {
-        const clonedArtId = `art_fork_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        const clonedArtId = crypto.randomUUID();
         this.artifacts.set(clonedArtId, {
           ...art,
           id: clonedArtId,
@@ -255,7 +255,7 @@ export class FakeChatRepository implements ChatRepository {
     // Replicate associated user attachments
     for (const att of this.attachments.values()) {
       if (att.sessionId === sourceSessionId && att.messageId && idMap.has(att.messageId)) {
-        const clonedAttId = `att_fork_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        const clonedAttId = crypto.randomUUID();
         this.attachments.set(clonedAttId, {
           ...att,
           id: clonedAttId,
@@ -293,7 +293,7 @@ export class FakeChatRepository implements ChatRepository {
       return null;
     }
 
-    const messageId = params.id || `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const messageId = params.id || crypto.randomUUID();
     const messageNode: MessageNode = {
       id: messageId,
       sessionId: params.sessionId,
@@ -388,7 +388,7 @@ export class FakeChatRepository implements ChatRepository {
   }
 
   public async saveArtifact(params: CreateArtifactParams): Promise<ChatArtifactEntity> {
-    const id = params.id || `art_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const id = params.id || crypto.randomUUID();
     const artifact: ChatArtifactEntity = {
       id,
       sessionId: params.sessionId,
@@ -430,7 +430,7 @@ export class FakeChatRepository implements ChatRepository {
   }
 
   public async saveAttachment(params: CreateAttachmentParams): Promise<ChatAttachmentEntity> {
-    const id = params.id || `att_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const id = params.id || crypto.randomUUID();
     const attachment: ChatAttachmentEntity = {
       id,
       sessionId: params.sessionId,

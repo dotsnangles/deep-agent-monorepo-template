@@ -1,17 +1,17 @@
 import { relations } from "drizzle-orm";
-import { index, integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { index, integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 import { user } from "./auth";
 
 export const chatSession = pgTable(
   "chat_session",
   {
-    id: text("id").primaryKey(), // LangGraph thread_id (UUID or unique string)
+    id: uuid("id").primaryKey().defaultRandom(), // LangGraph thread_id (UUID)
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     title: text("title").notNull().default("새로운 대화"),
-    activeLeafId: text("active_leaf_id"),
+    activeLeafId: uuid("active_leaf_id"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -24,11 +24,11 @@ export const chatSession = pgTable(
 export const chatMessage = pgTable(
   "chat_message",
   {
-    id: text("id").primaryKey(), // UUID string
-    sessionId: text("session_id")
+    id: uuid("id").primaryKey().defaultRandom(), // UUID
+    sessionId: uuid("session_id")
       .notNull()
       .references(() => chatSession.id, { onDelete: "cascade" }),
-    parentId: text("parent_id"), // Self-referencing FK, nullable for root message
+    parentId: uuid("parent_id"), // Self-referencing FK, nullable for root message
     role: text("role").notNull(), // 'user' | 'assistant' | 'system'
     content: text("content").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -46,11 +46,11 @@ export const chatMessage = pgTable(
 export const chatAttachment = pgTable(
   "chat_attachment",
   {
-    id: text("id").primaryKey(), // UUID string
-    sessionId: text("session_id")
+    id: uuid("id").primaryKey().defaultRandom(), // UUID
+    sessionId: uuid("session_id")
       .notNull()
       .references(() => chatSession.id, { onDelete: "cascade" }),
-    messageId: text("message_id")
+    messageId: uuid("message_id")
       .references(() => chatMessage.id, { onDelete: "set null" }),
     userId: text("user_id")
       .notNull()
@@ -76,11 +76,11 @@ export const chatAttachment = pgTable(
 export const chatArtifact = pgTable(
   "chat_artifact",
   {
-    id: text("id").primaryKey(), // UUID string
-    sessionId: text("session_id")
+    id: uuid("id").primaryKey().defaultRandom(), // UUID
+    sessionId: uuid("session_id")
       .notNull()
       .references(() => chatSession.id, { onDelete: "cascade" }),
-    messageId: text("message_id")
+    messageId: uuid("message_id")
       .references(() => chatMessage.id, { onDelete: "set null" }),
     name: text("name").notNull(),
     storageKey: text("storage_key").notNull(),
