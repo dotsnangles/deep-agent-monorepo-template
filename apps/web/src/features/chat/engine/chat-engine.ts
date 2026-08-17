@@ -30,6 +30,7 @@ export interface ChatEngineState {
   allNodes: MessageNode[];
   activeLeafId: string | null;
   activePath: MessageNode[];
+  artifacts: (ChatArtifactEntity & { url?: string; downloadUrl?: string })[];
   isLoading: boolean;
   isGenerating: boolean;
   generatingAssistantId: string | null;
@@ -43,6 +44,7 @@ export interface ChatEngineOptions {
   initialNodes?: MessageNode[];
   initialActiveLeafId?: string | null;
   initialTitle?: string;
+  initialArtifacts?: (ChatArtifactEntity & { url?: string; downloadUrl?: string })[];
   onSessionCreated?: (sessionId: string, title: string) => void;
 }
 
@@ -76,6 +78,7 @@ export class ChatEngine {
         initialNodes.length > 0
           ? traverseActivePath(initialNodes, initialActiveLeafId)
           : [],
+      artifacts: options.initialArtifacts || [],
       isLoading: !options.initialNodes,
       isGenerating: false,
       generatingAssistantId: null,
@@ -142,11 +145,25 @@ export class ChatEngine {
 
     try {
       const result = await this.transport.fetchTree(this.sessionId);
+      const sessionArtifacts = result.artifacts || [];
+      const artifactMap = new Map<string, ChatArtifactEntity & { url?: string; downloadUrl?: string }>();
+      for (const art of sessionArtifacts) {
+        artifactMap.set(art.id, art);
+      }
+      for (const node of result.messages) {
+        if (node.artifacts) {
+          for (const art of node.artifacts) {
+            artifactMap.set(art.id, art);
+          }
+        }
+      }
+
       this.state = {
         ...this.state,
         allNodes: result.messages,
         activeLeafId: result.activeLeafId,
         title: result.title || this.state.title,
+        artifacts: Array.from(artifactMap.values()),
         isLoading: false,
       };
       this.notify();
@@ -730,8 +747,17 @@ export class ChatEngine {
               capturedArtifacts.push(artifact);
             }
 
+            const currentArtifacts = [...(this.state.artifacts || [])];
+            const existingSessionArtIdx = currentArtifacts.findIndex((a) => a.id === artifact.id);
+            if (existingSessionArtIdx >= 0) {
+              currentArtifacts[existingSessionArtIdx] = artifact;
+            } else {
+              currentArtifacts.push(artifact);
+            }
+
             this.state = {
               ...this.state,
+              artifacts: currentArtifacts,
               allNodes: this.state.allNodes.map((n) =>
                 n.id === params.assistantMessageId
                   ? {

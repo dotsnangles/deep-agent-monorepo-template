@@ -27,6 +27,7 @@ export interface TreeFetchResult {
   messages: MessageNode[];
   activeLeafId: string | null;
   title?: string;
+  artifacts?: (ChatArtifactEntity & { url?: string; downloadUrl?: string })[];
 }
 
 export interface DeleteSubtreeResult {
@@ -96,6 +97,7 @@ export class HttpChatTransport implements ChatTransport {
       messages: data.messages || [],
       activeLeafId: data.activeLeafId || null,
       title: data.session?.title || data.title,
+      artifacts: data.artifacts || [],
     };
   }
 

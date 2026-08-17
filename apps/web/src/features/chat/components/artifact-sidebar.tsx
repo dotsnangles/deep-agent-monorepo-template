@@ -215,6 +215,38 @@ export function ArtifactSidebar({
     src: string;
     alt: string;
   } | null>(null);
+  const [fetchedArtifacts, setFetchedArtifacts] = useState<
+    (ChatArtifactEntity & { url?: string; downloadUrl?: string })[]
+  >([]);
+
+  React.useEffect(() => {
+    if (!isOpen || !sessionId) return;
+    let isSubscribed = true;
+    fetch(`/api/chat/sessions/${encodeURIComponent(sessionId)}/artifacts`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (isSubscribed && data?.artifacts) {
+          setFetchedArtifacts(data.artifacts);
+        }
+      })
+      .catch((err) => {
+        console.warn("[ArtifactSidebar] Failed to fetch session artifacts:", err);
+      });
+    return () => {
+      isSubscribed = false;
+    };
+  }, [isOpen, sessionId]);
+
+  const displayArtifacts = React.useMemo(() => {
+    const map = new Map<string, ChatArtifactEntity & { url?: string; downloadUrl?: string }>();
+    for (const art of artifacts) {
+      map.set(art.id, art);
+    }
+    for (const art of fetchedArtifacts) {
+      map.set(art.id, art);
+    }
+    return Array.from(map.values());
+  }, [artifacts, fetchedArtifacts]);
 
   return (
     <>
@@ -225,7 +257,7 @@ export function ArtifactSidebar({
         >
           <ArtifactListPanel
             sessionId={sessionId}
-            artifacts={artifacts}
+            artifacts={displayArtifacts}
             onSelectImage={setSelectedImage}
           />
         </SheetContent>

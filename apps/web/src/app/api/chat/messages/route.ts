@@ -36,9 +36,16 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    let sessionArtifacts: any[] = [];
     try {
       const artifacts = await chatRepository.getArtifactsBySession(sessionId);
       if (artifacts && artifacts.length > 0) {
+        sessionArtifacts = artifacts.map((art) => ({
+          ...art,
+          url: `/api/chat/sessions/${sessionId}/artifacts/${encodeURIComponent(art.name)}`,
+          downloadUrl: `/api/chat/sessions/${sessionId}/artifacts/${encodeURIComponent(art.name)}`,
+        }));
+
         const artifactByMessage = new Map<string, typeof artifacts>();
         for (const art of artifacts) {
           if (art.messageId) {
@@ -54,6 +61,7 @@ export async function GET(req: NextRequest) {
             (msg as any).artifacts = msgArtifacts.map((art) => ({
               ...art,
               url: `/api/chat/sessions/${sessionId}/artifacts/${encodeURIComponent(art.name)}`,
+              downloadUrl: `/api/chat/sessions/${sessionId}/artifacts/${encodeURIComponent(art.name)}`,
             }));
           }
         }
@@ -67,6 +75,7 @@ export async function GET(req: NextRequest) {
       activeLeafId: tree.activeLeafId,
       messages: tree.messages,
       activePath: tree.activePath,
+      artifacts: sessionArtifacts,
     });
   } catch (error) {
     console.error("[API GET /api/chat/messages] Error:", error);

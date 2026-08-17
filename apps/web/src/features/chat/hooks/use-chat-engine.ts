@@ -115,7 +115,12 @@ export function useChatEngine(
   );
 
   const artifacts = useMemo(() => {
-    const map = new Map<string, ChatArtifactEntity & { url?: string }>();
+    const map = new Map<string, ChatArtifactEntity & { url?: string; downloadUrl?: string }>();
+    if (state.artifacts) {
+      for (const art of state.artifacts) {
+        map.set(art.id, art);
+      }
+    }
     for (const node of state.activePath) {
       if (node.artifacts) {
         for (const art of node.artifacts) {
@@ -124,7 +129,7 @@ export function useChatEngine(
       }
     }
     return Array.from(map.values());
-  }, [state.activePath]);
+  }, [state.artifacts, state.activePath]);
 
   return {
     engine,
