@@ -1,13 +1,14 @@
 "use client";
 
 import { useSyncExternalStore, useEffect, useCallback, useMemo, useRef } from "react";
-import type { AttachmentEntity } from "@repo/validators";
+import type { AttachmentEntity, ChatArtifactEntity } from "@repo/validators";
 import { globalChatEngineRegistry } from "../engine";
 import type { ChatEngine, ChatEngineState, ChatEngineOptions } from "../engine";
 import type { BranchInfo } from "../lib/tree";
 
 export interface UseChatEngineReturn extends ChatEngineState {
   engine: ChatEngine;
+  artifacts: (ChatArtifactEntity & { url?: string })[];
   send: (
     content: string,
     attachments?: AttachmentEntity[],
@@ -113,9 +114,22 @@ export function useChatEngine(
     [engine]
   );
 
+  const artifacts = useMemo(() => {
+    const map = new Map<string, ChatArtifactEntity & { url?: string }>();
+    for (const node of state.activePath) {
+      if (node.artifacts) {
+        for (const art of node.artifacts) {
+          map.set(art.id, art);
+        }
+      }
+    }
+    return Array.from(map.values());
+  }, [state.activePath]);
+
   return {
     engine,
     ...state,
+    artifacts,
     send,
     respondToApproval,
     forkAndEdit,

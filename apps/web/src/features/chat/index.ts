@@ -12,6 +12,7 @@ export { TodoPlanCard } from "./components/todo-plan-card";
 export { SpecialistDelegationCard } from "./components/specialist-delegation-card";
 export { InteractiveChartImage } from "./components/interactive-chart-image";
 export { AttachmentStagingBar } from "./components/attachment-staging-bar";
+export { ArtifactSidebar } from "./components/artifact-sidebar";
 export {
   useChatEngine,
   useChatRegistry,

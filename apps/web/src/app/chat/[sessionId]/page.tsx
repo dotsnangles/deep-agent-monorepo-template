@@ -1,9 +1,15 @@
 "use client";
 
-import { use, useEffect } from "react";
-import { Bot, GitFork } from "lucide-react";
+import { use, useEffect, useState } from "react";
+import { Bot, GitFork, Layers } from "lucide-react";
 import { Badge } from "@repo/ui/components/badge";
-import { MessageFeed, useChatSessions } from "@/features/chat";
+import { Button } from "@repo/ui/components/button";
+import {
+  MessageFeed,
+  useChatSessions,
+  useChatEngine,
+  ArtifactSidebar,
+} from "@/features/chat";
 
 export default function ChatSessionPage({
   params,
@@ -12,6 +18,8 @@ export default function ChatSessionPage({
 }) {
   const { sessionId } = use(params);
   const { switchSession, activeSessionId } = useChatSessions();
+  const { artifacts } = useChatEngine(sessionId);
+  const [isArtifactsOpen, setIsArtifactsOpen] = useState(false);
 
   useEffect(() => {
     if (sessionId && sessionId !== activeSessionId) {
@@ -38,16 +46,42 @@ export default function ChatSessionPage({
           </div>
         </div>
 
-        <Badge variant="secondary" className="gap-1.5 py-1 px-2.5 text-[10px] font-mono bg-muted/60">
-          <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span>에이전트 준비됨</span>
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+            onClick={() => setIsArtifactsOpen(true)}
+            title="대화 산출물 보기"
+          >
+            <Layers className="size-3.5" data-icon="inline-start" />
+            <span className="hidden sm:inline">산출물</span>
+            {artifacts.length > 0 && (
+              <Badge variant="secondary" className="h-4 px-1 text-[10px] font-mono leading-none">
+                {artifacts.length}
+              </Badge>
+            )}
+          </Button>
+
+          <Badge variant="secondary" className="gap-1.5 py-1 px-2.5 text-[10px] font-mono bg-muted/60">
+            <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span>에이전트 준비됨</span>
+          </Badge>
+        </div>
       </div>
 
       {/* Main Fullscreen Message Feed */}
       <div className="flex-1 min-h-0 relative flex flex-col overflow-hidden">
         <MessageFeed key={sessionId} sessionId={sessionId} />
       </div>
+
+      {/* Right Artifacts Drawer */}
+      <ArtifactSidebar
+        sessionId={sessionId}
+        artifacts={artifacts}
+        isOpen={isArtifactsOpen}
+        onOpenChange={setIsArtifactsOpen}
+      />
     </div>
   );
 }
